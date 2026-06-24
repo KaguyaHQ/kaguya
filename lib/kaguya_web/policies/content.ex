@@ -43,20 +43,25 @@ defmodule KaguyaWeb.Policies.Content do
     "development" => %{
       title: "Development",
       page_title: "Development • Kaguya",
-      description: "The tech stack and team behind Kaguya.",
+      description: "The tech stack behind Kaguya.",
       body: """
-      Kaguya is built by a team of two.
+      ## The Source
+
+      Kaguya is open source. The full source code of the site is available as a [git repository](https://github.com/KaguyaHQ/kaguya). You can use it to track changes to the code, run your own instance of Kaguya, and contribute to issues or pull requests. Check the README in the repository for instructions. The code is licensed under [AGPL-3.0](https://github.com/KaguyaHQ/kaguya/blob/main/LICENSE).
 
       ## Tech Stack
 
-      **Backend**
-      - [Elixir](https://elixir-lang.org/) & [Phoenix](https://www.phoenixframework.org/)
-      - [Supabase](https://supabase.com/) (PostgreSQL hosting)
+      The whole site runs on [Elixir](https://elixir-lang.org/) and [Phoenix](https://www.phoenixframework.org/), with [Phoenix LiveView](https://www.phoenixframework.org/) rendering every page server-side over a live connection, so there's no separate frontend app.
 
-      **Frontend**
-      - [Phoenix LiveView](https://www.phoenixframework.org/) (HEEx templates)
-      - [Tailwind CSS](https://tailwindcss.com/)
-      - [SaladUI](https://salad-ui.fly.dev/)
+      - [Elixir](https://elixir-lang.org/) & [Phoenix](https://www.phoenixframework.org/) for the application and web layer
+      - [Phoenix LiveView](https://www.phoenixframework.org/) for server-rendered UI (HEEx templates)
+      - [PostgreSQL](https://www.postgresql.org/) on [Supabase](https://supabase.com/), via [Ecto](https://hexdocs.pm/ecto/)
+      - [Oban](https://hexdocs.pm/oban/) for background jobs and scheduled maintenance
+      - [Cachex](https://hexdocs.pm/cachex/) for in-memory caching on hot paths
+      - [Meilisearch](https://www.meilisearch.com/) for full-text search
+      - [Nx](https://hexdocs.pm/nx/) for recommendation inference
+      - [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) for image and asset storage
+      - [Tailwind CSS](https://tailwindcss.com/) & [SaladUI](https://salad-ui.fly.dev/) for styling and components
       """
     },
     "faq" => %{

@@ -256,4 +256,4 @@ Kaguya is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
 See [LICENSE](LICENSE). If you run a modified version as a network service, the
 AGPL requires you to offer your users the corresponding source.
 
-Copyright (C) 2026 Kaguya contributors.
+Copyright (C) 2026 Vasanth K.
