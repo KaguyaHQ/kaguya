@@ -1,0 +1,20 @@
+<div class="flex min-h-screen flex-col">
+  <%= unless assigns[:hide_navbar] do %>
+    <div class={assigns[:navbar_class]}>
+      <KaguyaWeb.AppNavbar.app_navbar
+        viewer={assigns[:nav_viewer]}
+        current_path={assigns[:current_path] || "/"}
+        transparent={assigns[:nav_transparent] || false}
+      />
+    </div>
+  <% end %>
+
+  <main class="flex-1">
+    <KaguyaWeb.SharedComponents.Toast.flash_group flash={@flash} />
+    {@inner_content}
+  </main>
+
+  <%= unless assigns[:hide_footer] do %>
+    <KaguyaWeb.AppFooter.app_footer />
+  <% end %>
+</div>

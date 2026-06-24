@@ -1,0 +1,103 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where 3rd-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+/.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# Ignore package tarball (built via "mix hex.build").
+kaguya-*.tar
+
+# Ignore assets that are produced by build tools.
+/priv/static/assets/
+
+# Ignore digested assets cache.
+/priv/static/cache_manifest.json
+
+# phx.digest output for tracked static sources (fonts, favicon, robots).
+# Matches `name-<32-hex-md5>.ext` digested copies plus gzipped siblings.
+/priv/static/**/*-????????????????????????????????.*
+/priv/static/**/*.gz
+
+# In case you use Node.js/npm, you want to ignore these.
+npm-debug.log
+/assets/node_modules/
+
+# .env file
+.env
+
+# .csv files
+*.csv
+
+# .json files
+*.json
+!assets/package.json
+!assets/package-lock.json
+!test/fixtures/**/*.json
+
+# .jsonl files
+*.jsonl
+
+# .image files
+*.png
+!priv/static/favicon.png
+
+# OS files
+.DS_Store
+
+# .elixir_ls files
+.elixir_ls/
+
+# HTML files in scripts folder (recursive)
+*.html
+
+# .txt files (recursive)
+*.txt
+!priv/static/robots.txt
+
+# Shell scripts: ignore stray ones, keep tracked tooling
+*.sh
+!scripts/*.sh
+!deploy/*.sh
+
+# SQL: ignore dumps, but commit the Ecto schema baseline
+*.sql
+!priv/repo/structure.sql
+
+# TLS certs/keys live only on the server — never commit
+deploy/certs/
+
+# mise
+mise.toml
+
+# Python artifacts
+__pycache__/
+*.pyc
+.venv/
+
+# Recommendations pipeline artifacts (regenerate via the training pipeline).
+# Ignore everything in priv/data except the tracked tag list.
+/priv/data/*
+!priv/data/vn_tags.json
+
+.claude/
+
+# Internal docs — not part of the public repo
+docs/

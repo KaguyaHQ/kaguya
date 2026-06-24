@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+: "${HETZNER_HOST:?set HETZNER_HOST to your deploy host, e.g. export HETZNER_HOST=1.2.3.4}"
+ssh -t "deploy@${HETZNER_HOST}" "docker exec -it kaguya-kaguya-1 /app/bin/kaguya remote"

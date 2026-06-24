@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+if ! mix format --check-formatted; then
+  printf "format check failed: run `mix format` and try again\n"
+  exit 1
+fi
+

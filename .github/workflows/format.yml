@@ -1,0 +1,37 @@
+name: Format check
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.0"
+          otp-version: "27.0.1"
+
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Install deps
+        run: mix deps.get
+
+      - name: Install Tailwind CLI
+        run: mix tailwind.install
+
+      - name: Check formatting
+        run: mix format --check-formatted

@@ -1,0 +1,104 @@
+networks:
+  default:
+    enable_ipv6: true
+  # Shared ingress network. A reverse proxy (e.g. Caddy) terminates TLS and
+  # reaches these apps by alias over this network. kaguya + meilisearch join it
+  # as upstreams; alloy joins it to scrape the proxy's metrics. The proxy lives
+  # in its own compose project. Create the network once on the host:
+  #   docker network create edge
+  # Self-hosting without a separate proxy? See deploy/example/ for a
+  # self-contained stack that bundles Caddy and serves TLS out of the box.
+  edge:
+    external: true
+
+services:
+  kaguya:
+    image: ghcr.io/kaguyahq/kaguya:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PHX_SERVER=true
+      - PORT=8080
+      - PHX_HOST=kaguya.io
+      - KAGUYA_MODEL_DIR=/srv/kaguya/data
+    volumes:
+      # Trained recommendation B matrix. Mounted read-only; optional (the app
+      # runs without it, recommendations are just disabled).
+      - ./data:/srv/kaguya/data:ro
+    expose:
+      - "8080"
+    # `default` carries internal traffic (kaguya -> meilisearch). `edge` exposes
+    # this app to the reverse proxy as `kaguya:8080`.
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - kaguya
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "10"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/health | grep -q healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  alloy:
+    image: grafana/alloy:v1.8.2
+    restart: unless-stopped
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=generally-available
+    environment:
+      - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}
+      - GRAFANA_CLOUD_PROMETHEUS_USER=${GRAFANA_CLOUD_PROMETHEUS_USER}
+      - GRAFANA_CLOUD_API_KEY=${GRAFANA_CLOUD_API_KEY}
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.50"
+    # `edge` lets alloy scrape the reverse proxy's metrics at caddy:2019.
+    networks:
+      default: {}
+      edge: {}
+    depends_on:
+      - kaguya
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+      - MEILI_ENV=production
+    volumes:
+      - meili_data:/meili_data
+    expose:
+      - "7700"
+    # `edge` exposes search to the reverse proxy as `meilisearch:7700`.
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - meilisearch
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7700/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  meili_data:
+  alloy_data:

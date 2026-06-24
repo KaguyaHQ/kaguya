@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <link rel="icon" href={~p"/favicon.png"} type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href={~p"/favicon.png"} />
+    <%!-- Observability — read by assets/js/sentry.js. No-op when env vars absent. --%>
+    <meta
+      :if={KaguyaWeb.Layouts.sentry_browser_meta(:dsn)}
+      name="sentry-dsn"
+      content={KaguyaWeb.Layouts.sentry_browser_meta(:dsn)}
+    />
+    <meta
+      :if={KaguyaWeb.Layouts.sentry_browser_meta(:environment)}
+      name="sentry-environment"
+      content={KaguyaWeb.Layouts.sentry_browser_meta(:environment)}
+    />
+    <meta
+      :if={KaguyaWeb.Layouts.sentry_browser_meta(:release)}
+      name="sentry-release"
+      content={KaguyaWeb.Layouts.sentry_browser_meta(:release)}
+    />
+    <meta :if={assigns[:meta_robots]} name="robots" content={assigns[:meta_robots]} />
+    <meta
+      name="description"
+      content={
+        assigns[:meta_description] ||
+          "Track, rate, and review visual novels. Follow friends, make lists, and discover what to read next."
+      }
+    />
+    <link :if={assigns[:canonical_url]} rel="canonical" href={assigns[:canonical_url]} />
+    <meta property="og:title" content={assigns[:og_title] || assigns[:page_title] || "Kaguya"} />
+    <meta
+      property="og:description"
+      content={
+        assigns[:og_description] || assigns[:meta_description] ||
+          "Track, rate, and review visual novels. Follow friends, make lists, and discover what to read next."
+      }
+    />
+    <meta
+      property="og:url"
+      content={assigns[:og_url] || assigns[:canonical_url] || "https://kaguya.io"}
+    />
+    <meta property="og:site_name" content="Kaguya" />
+    <meta property="og:type" content={assigns[:og_type] || "website"} />
+    <meta :if={assigns[:og_image]} property="og:image" content={assigns[:og_image]} />
+    <meta
+      :if={assigns[:og_image] && assigns[:og_image_width]}
+      property="og:image:width"
+      content={assigns[:og_image_width]}
+    />
+    <meta
+      :if={assigns[:og_image] && assigns[:og_image_height]}
+      property="og:image:height"
+      content={assigns[:og_image_height]}
+    />
+    <meta
+      :if={assigns[:og_image] && assigns[:og_image_alt]}
+      property="og:image:alt"
+      content={assigns[:og_image_alt]}
+    />
+    <meta name="twitter:card" content={assigns[:twitter_card] || "summary_large_image"} />
+    <meta
+      name="twitter:title"
+      content={assigns[:twitter_title] || assigns[:page_title] || "Kaguya"}
+    />
+    <meta
+      name="twitter:description"
+      content={
+        assigns[:twitter_description] || assigns[:meta_description] ||
+          "Track, rate, and review visual novels. Follow friends, make lists, and discover what to read next."
+      }
+    />
+    <meta :if={assigns[:twitter_image]} name="twitter:image" content={assigns[:twitter_image]} />
+    <link rel="preconnect" href="https://images.kaguya.io" crossorigin="anonymous" />
+    <link
+      :if={assigns[:preload_hero_image]}
+      rel="preload"
+      href={assigns[:preload_hero_image]}
+      as="image"
+      type="image/webp"
+    />
+    <%!-- Media-scoped LCP preloads for pages whose hero differs by viewport
+          (e.g. the VN page: desktop backdrop vs mobile cover). --%>
+    <link
+      :if={assigns[:preload_hero_image_desktop]}
+      rel="preload"
+      href={assigns[:preload_hero_image_desktop]}
+      as="image"
+      media="(min-width: 1024px)"
+    />
+    <link
+      :if={assigns[:preload_hero_image_mobile]}
+      rel="preload"
+      href={assigns[:preload_hero_image_mobile]}
+      as="image"
+      media="(max-width: 1023px)"
+    />
+    <script type="application/ld+json">
+      <%= Phoenix.HTML.raw(KaguyaWeb.Layouts.website_json_ld()) %>
+    </script>
+    <script :if={assigns[:json_ld]} type="application/ld+json">
+      <%= Phoenix.HTML.raw(assigns[:json_ld]) %>
+    </script>
+    <title>{assigns[:page_title] || "Kaguya"}</title>
+    <script>
+      (() => {
+        try {
+          const root = document.documentElement
+          if (localStorage.getItem("kaguya_nsfw_preference") === "true") {
+            root.dataset.nsfwShow = "1"
+          }
+          if (localStorage.getItem("kaguya_show_nsfw_screenshots") === "true") {
+            root.dataset.screenshotNsfw = "1"
+          }
+          if (localStorage.getItem("kaguya_show_brutal_screenshots") === "true") {
+            root.dataset.screenshotBrutal = "1"
+          }
+        } catch (_error) {}
+      })()
+    </script>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+  </head>
+  <body>
+    {@inner_content}
+  </body>
+</html>

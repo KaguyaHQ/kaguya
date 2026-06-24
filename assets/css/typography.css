@@ -1,0 +1,119 @@
+/*
+ * Production typography tokens. These mirror
+ * ../personal/legacy-next-app/src/styles/typography/figma-text-styles.json and are registered as
+ * Tailwind v4 utilities so responsive variants such as
+ * `lg:text-style-proseSemibold` compile when used in HEEx/JS.
+ */
+@utility text-style-body1Medium {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+@utility text-style-body1Regular {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+@utility text-style-body1Semibold {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+@utility text-style-body2Medium {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+@utility text-style-body2Regular {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+@utility text-style-body2Semibold {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+@utility text-style-captionMedium {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+@utility text-style-captionRegular {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+@utility text-style-display1Semibold {
+  font-size: 4rem;
+  font-weight: 600;
+  line-height: 64px;
+}
+
+@utility text-style-display2Semibold {
+  font-size: 3rem;
+  font-weight: 600;
+  line-height: 64px;
+}
+
+@utility text-style-heading1Regular {
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 32px;
+}
+
+@utility text-style-heading1Title {
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 32px;
+}
+
+@utility text-style-heading2Medium {
+  font-size: 1.625rem;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+@utility text-style-heading3Medium {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+@utility text-style-heading3Regular {
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+@utility text-style-heading3Semibold {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+@utility text-style-proseMedium {
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+@utility text-style-proseRegular {
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 28px;
+}
+
+@utility text-style-proseSemibold {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 28px;
+}

@@ -1,0 +1,844 @@
+@import "./generated/figma-variables.css";
+@import "./custom-tokens.css";
+@import "./fonts.css";
+@import "./typography.css";
+@import "./markdown.css";
+@import "./toast.css";
+@import "../node_modules/cropperjs/dist/cropper.css";
+
+@import "tailwindcss" source(none);
+@source "../css";
+@source "../js";
+@source "../../lib/kaguya_web";
+/* Safelist — classes referenced from server-rendered strings that Tailwind
+ * can't statically detect. Grouped by token family. */
+@source inline("bg-surface-base bg-surface-elevated bg-surface-elevated/40");
+@source inline("bg-surface-menu-item-default bg-surface-menu-item-hover bg-surface-menu-item-pressed");
+@source inline("text-foreground-primary text-foreground-secondary text-foreground-tertiary text-foreground-quaternary text-foreground-error");
+@source inline("border-border-divider border-border-strong-divider");
+@source inline("bg-text-field-bg border-text-field-border border-text-field-border-focus placeholder:text-text-field-placeholder-text");
+@source inline("bg-button-background-neutral-default bg-button-background-neutral-hover");
+@source inline("text-style-body2Regular text-style-body2Medium text-style-captionRegular");
+
+/* Onboarding step animation — each step mounts with a slide-and-fade
+   matching motion.js's spring transitions in ../kaguya. */
+@keyframes step-enter {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.step-section {
+  animation: step-enter 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Image cropper overrides — keep the round mask, neutral outline, and
+   white slider thumb matching ../kaguya's ImageCropper. */
+.image-cropper .cropper-view-box {
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+.image-cropper .cropper-line,
+.image-cropper .cropper-point {
+  display: none !important;
+}
+.image-cropper .cropper-dashed {
+  display: none !important;
+}
+.image-cropper[data-variant="profile"] .cropper-view-box,
+.image-cropper[data-variant="profile"] .cropper-face,
+.image-cropper[data-variant="profile"] .cropper-crop-box {
+  border-radius: 9999px;
+}
+.image-cropper-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+}
+.image-cropper-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+}
+.image-cropper-slider::-moz-range-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+}
+.image-cropper-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: white;
+  margin-top: -6px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+.image-cropper-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+@custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
+@custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
+@custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  button:not(:disabled),
+  summary,
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+[data-nsfw-blur="1"] {
+  filter: blur(max(2px, calc(var(--nsfw-blur-size, 100) * 0.02px)));
+  transition: filter 0.3s ease;
+}
+
+[data-nsfw-blur="1"][data-nsfw-reveal="1"]:hover {
+  filter: blur(max(2px, calc(var(--nsfw-blur-size, 100) * 0.016px)));
+}
+
+[data-nsfw-blur="1"][data-nsfw-reveal="1"][data-nsfw-revealed="1"],
+[data-nsfw-blur="1"][data-nsfw-revealed="1"] {
+  filter: none !important;
+}
+
+html[data-nsfw-show="1"] [data-nsfw-blur="1"][data-nsfw-reveal="1"],
+html[data-nsfw-show="1"] [data-nsfw-blur="1"] {
+  filter: none !important;
+}
+
+html[data-nsfw-show="1"] [data-nsfw-cover-reveal-overlay] {
+  display: none;
+}
+
+.range-slider-thumb {
+  cursor: pointer;
+}
+
+.range-slider-thumb::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 9999px;
+}
+
+.browse-range-input {
+  position: absolute;
+  inset: 0;
+  height: 44px;
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+.browse-range-input:focus {
+  outline: none;
+}
+
+.browse-range-input::-webkit-slider-runnable-track {
+  height: 44px;
+  background: transparent;
+}
+
+.browse-range-input::-moz-range-track {
+  height: 44px;
+  background: transparent;
+}
+
+.browse-range-input::-webkit-slider-thumb {
+  height: 18px;
+  width: 18px;
+  appearance: none;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.08);
+  cursor: pointer;
+  pointer-events: auto;
+  margin-top: 13px;
+}
+
+.browse-range-input::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border: 0;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.08);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.browse-range-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.08), 0 0 0 3px rgb(255 255 255 / 0.28);
+}
+
+.browse-range-input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.08), 0 0 0 3px rgb(255 255 255 / 0.28);
+}
+
+@theme {
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --font-sans: "Switzer", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-source-serif: "Source Serif 4", "Source Serif Pro", Georgia, serif;
+  --font-newsreader: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-fraunces: "Fraunces", "Source Serif 4", "Source Serif Pro", Georgia, serif;
+  --color-surface-base: rgb(var(--surface-base));
+  --color-surface-elevated: rgb(var(--surface-elevated));
+  --color-surface-banner: rgb(var(--surface-banner));
+  --color-surface-elevated-2: rgb(var(--surface-elevated-2));
+  --color-surface-on-media: rgb(var(--surface-on-media));
+  --color-surface-menu-item-default: rgb(var(--surface-menu-item-default));
+  --color-surface-menu-item-hover: rgb(var(--surface-menu-item-hover));
+  --color-surface-menu-item-pressed: rgb(var(--surface-menu-item-pressed));
+  --color-surface-overlay: rgb(var(--surface-overlay));
+  --color-foreground-primary: rgb(var(--foreground-primary));
+  --color-foreground-secondary: rgb(var(--foreground-secondary));
+  --color-foreground-tertiary: rgb(var(--foreground-tertiary));
+  --color-foreground-quaternary: rgb(var(--foreground-quaternary));
+  --color-foreground-error: rgb(var(--foreground-error));
+  --color-foreground-link: rgb(var(--foreground-link));
+  --color-border-strong-divider: rgb(var(--border-strong-divider));
+  --color-border-divider: rgb(var(--border-divider));
+  --color-text-field-bg: rgb(var(--text-field-bg));
+  --color-text-field-border: rgb(var(--text-field-border));
+  --color-text-field-border-focus: rgb(var(--text-field-border-focus));
+  --color-text-field-placeholder-text: rgb(var(--text-field-placeholder-text));
+  --color-button-background-brand-default: rgb(var(--button-background-brand-default));
+  --color-button-background-brand-hover: rgb(var(--button-background-brand-hover));
+  --color-button-background-brand-pressed: rgb(var(--button-background-brand-pressed));
+  --color-button-background-neutral-default: rgb(var(--button-background-neutral-default));
+  --color-button-background-neutral-hover: rgb(var(--button-background-neutral-hover));
+  --color-button-background-neutral-pressed: rgb(var(--button-background-neutral-pressed));
+  --color-button-background-neutral-inverse-default: rgb(var(--button-background-neutral-inverse-default));
+  --color-button-background-neutral-inverse-hover: rgb(var(--button-background-neutral-inverse-hover));
+  --color-button-background-neutral-inverse-pressed: rgb(var(--button-background-neutral-inverse-pressed));
+  --color-button-background-destructive-default: rgb(var(--button-background-destructive-default));
+  --color-button-background-destructive-hover: rgb(var(--button-background-destructive-hover));
+  --color-button-background-destructive-pressed: rgb(var(--button-background-destructive-pressed));
+  --color-button-text-on-brand: rgb(var(--button-text-on-brand));
+  --color-button-text-on-neutral: rgb(var(--button-text-on-neutral));
+  --color-button-text-on-neutral-inverse: rgb(var(--button-text-on-neutral-inverse));
+  --color-button-text-on-destructive: rgb(var(--button-text-on-destructive));
+  --color-button-border-secondary: rgb(var(--button-border-secondary));
+  --color-icons-filled: rgb(var(--icons-filled));
+  --color-icons-user-star: rgb(var(--icons-user-star));
+  --color-icons-global-star: rgb(var(--icons-global-star));
+  --color-icons-light: rgb(var(--icons-light));
+  --color-icons-extra-light: rgb(var(--icons-extra-light));
+  --color-icons-heart: rgb(var(--icons-heart));
+  --color-icons-user-star-hover: rgb(var(--icons-user-star-hover));
+  --color-overlay-image-action-bg: rgb(var(--overlay-image-action-bg));
+  --color-overlay-backdrop: rgb(var(--overlay-backdrop));
+  --color-overlay-selection: rgb(var(--overlay-selection));
+  --text-link-default: var(--foreground-link);
+  --text-link-hover: 121 184 255;
+  --color-star-golden: #fab116;
+  --color-text-link-hover: #79b8ff;
+  --color-icons-star-muted: rgb(var(--icons-star-muted));
+  --color-like-heart: rgb(var(--like-heart));
+  --color-semantic-error: rgb(var(--semantic-error));
+  --color-chip-border-warning-default: rgb(var(--chip-border-warning-default));
+  --color-chip-border-warning-hover: rgb(var(--chip-border-warning-hover));
+  --color-chip-border-default: rgb(var(--chip-border-default));
+  --color-chip-border-hover: rgb(var(--chip-border-hover));
+  --color-progress-reading-progress: rgb(var(--progress-reading-progress));
+  --color-component-progress-reading-progress: rgb(var(--component-progress-reading-progress));
+  --color-tab-background-default: rgb(var(--tab-background-default));
+  --color-tab-background-active: rgb(var(--tab-background-active));
+  --color-tab-text-default: rgb(var(--tab-text-default));
+  --color-tab-text-active: rgb(var(--tab-text-active));
+  --color-tab-border-default: rgb(var(--tab-border-default));
+  --color-tab-border-hover: rgb(var(--tab-border-hover));
+  --color-status-wishlist: rgb(var(--status-wishlist));
+  --color-status-reading: rgb(var(--status-reading));
+  --color-status-read: rgb(var(--status-read));
+  --color-status-paused: rgb(var(--status-paused));
+  --color-status-dnf: rgb(var(--status-dnf));
+  --color-status-not-interested: rgb(var(--status-not-interested));
+  --color-action-create: rgb(var(--action-create));
+  --color-action-revert: rgb(var(--action-revert));
+  --color-action-restrict: rgb(var(--action-restrict));
+
+  /*
+   * shadcn-token aliases still referenced by the kept styled components
+   * (`input`/`checkbox` -> `text-primary`/`border-primary`/`ring-ring`) and
+   * the native dialog primitive (`text-muted-foreground`). The rest of the
+   * SaladUI alias block was dropped with the native-first floating-UI
+   * migration. See docs/architecture/floating-ui.md.
+   */
+  --color-muted-foreground: var(--color-foreground-secondary);
+  --color-primary: var(--color-button-background-brand-default);
+  --color-primary-foreground: var(--color-button-text-on-brand);
+  --color-ring: var(--color-foreground-link);
+}
+
+/*
+ * System button (`KaguyaWeb.UI.Button`). Appearance is defined here, once,
+ * keyed to the Figma `--color-*` tokens: variants set only color variables,
+ * sizes set only geometry, and `.btn` owns layout/typography/states. Caller
+ * `class` is for layout/placement only — utilities still win over this layer
+ * (`@layer theme, base, components, utilities`), but appearance overrides at
+ * call sites are forbidden by convention; a different look is a new variant.
+ */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    cursor: pointer;
+    /* text-style-body2Medium, inlined (don't @apply a custom @utility) */
+    font-weight: 500;
+    line-height: 20px;
+    background-color: var(--btn-bg, transparent);
+    color: var(--btn-fg, inherit);
+    border: 1px solid var(--btn-border, transparent);
+    height: var(--btn-h);
+    padding-inline: var(--btn-px);
+    border-radius: var(--btn-radius);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      border-color 150ms ease;
+  }
+  .btn:hover {
+    background-color: var(--btn-bg-hover, var(--btn-bg, transparent));
+    color: var(--btn-fg-hover, var(--btn-fg, inherit));
+  }
+  .btn:active {
+    background-color: var(--btn-bg-pressed, var(--btn-bg-hover, var(--btn-bg, transparent)));
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--btn-focus-ring, var(--color-border-divider));
+    outline-offset: 2px;
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    pointer-events: none;
+    opacity: 0.4;
+  }
+  .btn-loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .btn-brand {
+    --btn-bg: var(--color-button-background-brand-default);
+    --btn-fg: var(--color-button-text-on-brand);
+    --btn-bg-hover: var(--color-button-background-brand-hover);
+    --btn-bg-pressed: var(--color-button-background-brand-pressed);
+  }
+  .btn-neutral {
+    --btn-bg: var(--color-button-background-neutral-default);
+    --btn-fg: var(--color-button-text-on-neutral);
+    --btn-border: var(--color-button-border-secondary);
+    --btn-bg-hover: var(--color-button-background-neutral-hover);
+    --btn-bg-pressed: var(--color-button-background-neutral-pressed);
+  }
+  .btn-neutral-inverse {
+    --btn-bg: var(--color-button-background-neutral-inverse-default);
+    --btn-fg: var(--color-button-text-on-neutral-inverse);
+    --btn-bg-hover: var(--color-button-background-neutral-inverse-hover);
+    --btn-bg-pressed: var(--color-button-background-neutral-inverse-pressed);
+  }
+  .btn-destructive {
+    --btn-bg: var(--color-button-background-destructive-default);
+    --btn-fg: var(--color-button-text-on-destructive);
+    --btn-bg-hover: var(--color-button-background-destructive-hover);
+    --btn-bg-pressed: var(--color-button-background-destructive-pressed);
+  }
+  .btn-ghost {
+    --btn-bg-hover: var(--color-surface-menu-item-hover);
+    --btn-fg-hover: var(--color-foreground-primary);
+  }
+  /* Quiet error-red confirm for guard-tone dialogs (see UI.ConfirmDialog). */
+  .btn-ghost-destructive {
+    --btn-fg: var(--color-foreground-error);
+    --btn-fg-hover: var(--color-foreground-error);
+    /* raw triplet for alpha, same pattern as .cover-tooltip below */
+    --btn-bg-hover: rgb(var(--button-background-destructive-default) / 0.1);
+  }
+  .btn-link {
+    --btn-fg: var(--color-foreground-secondary);
+  }
+  .btn-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .btn-large {
+    --btn-h: 56px;
+    --btn-px: 1.5rem;
+    --btn-radius: 12px;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+  .btn-medium {
+    --btn-h: 44px;
+    --btn-px: 1.25rem;
+    --btn-radius: 10px;
+    font-size: 0.875rem;
+  }
+  .btn-small {
+    --btn-h: 40px;
+    --btn-px: 0.875rem;
+    --btn-radius: 8px;
+    font-size: 13px;
+  }
+  .btn-icon {
+    --btn-h: 36px;
+    --btn-px: 0;
+    --btn-radius: 8px;
+    width: var(--btn-h);
+    font-size: 0.875rem;
+  }
+}
+
+@layer utilities {
+  /* SharedComponents.ReadMore — CSS line-clamp container. The
+     `--readmore-lines` custom property is set inline on the parent so
+     each call can choose its own clamp height. */
+  .readmore-collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--readmore-lines, 6);
+    line-clamp: var(--readmore-lines, 6);
+    overflow: hidden;
+  }
+}
+
+html {
+  color-scheme: dark;
+  scrollbar-gutter: stable;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
+}
+
+body {
+  min-height: 100vh;
+  background: rgb(var(--surface-base));
+  color: rgb(var(--foreground-primary));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-y: scroll !important;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+html body[data-scroll-locked] {
+  overflow-y: scroll !important;
+  --removed-body-scroll-bar-size: 0 !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+[data-phx-session],
+[data-phx-teleported-src] {
+  display: contents;
+}
+
+.prose a {
+  text-decoration: none;
+}
+
+.prose a:hover {
+  color: rgb(var(--text-link-hover));
+}
+
+.spoiler {
+  cursor: pointer;
+  border-radius: 4px;
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 1.25%,
+    rgb(var(--foreground-secondary) / 0.2) 1.25%,
+    rgb(var(--foreground-secondary) / 0.2) 89.75%,
+    rgb(var(--foreground-secondary) / 0.4) 89.75%,
+    rgb(var(--foreground-secondary) / 0.4) 97.75%,
+    transparent 97.75%
+  );
+  background-size: 100% 100%;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: transparent;
+  padding: 0 4px;
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.spoiler:hover {
+  background-image: linear-gradient(
+    to bottom,
+    transparent 1.25%,
+    rgb(var(--foreground-secondary) / 0.3) 1.25%,
+    rgb(var(--foreground-secondary) / 0.3) 89.75%,
+    rgb(var(--foreground-secondary) / 0.5) 89.75%,
+    rgb(var(--foreground-secondary) / 0.5) 97.75%,
+    transparent 97.75%
+  );
+}
+
+.spoiler:focus-visible {
+  outline: 2px solid white;
+}
+
+.spoiler.revealed {
+  background-image: none;
+  color: inherit;
+  cursor: auto;
+  user-select: auto;
+}
+
+.spoiler.revealed:hover {
+  background-image: none;
+}
+
+.rating-star [data-fill] {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.rating-star[data-base-state="full"] [data-fill="full"] { opacity: 1; }
+.rating-star[data-base-state="half"] [data-fill="half"] { opacity: 1; }
+.rating-star[data-hover="full"] [data-fill="full"],
+.rating-star[data-hover="full"] [data-fill="full"] * {
+  color: rgb(var(--icons-user-star-hover));
+  opacity: 1;
+}
+.rating-star[data-hover="full"] [data-fill="half"] { opacity: 0; }
+.rating-star[data-hover="half"] [data-fill="full"] { opacity: 0; }
+.rating-star[data-hover="half"] [data-fill="half"],
+.rating-star[data-hover="half"] [data-fill="half"] * {
+  color: rgb(var(--icons-user-star-hover));
+  opacity: 1;
+}
+.rating-star[data-hover="empty"] [data-fill] { opacity: 0; }
+
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-backdrop-fade-in {
+  animation: backdrop-fade-in 800ms ease-out forwards;
+}
+
+/* Recommendation vote controls:
+ * - Mobile: hidden by default, first tap reveals, second tap follows link.
+ * - Desktop: hidden until hover/focus on the recommendation item. */
+[data-vote-control] .vn-recommendation-vote-controls {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+}
+
+@media (max-width: 1023px) {
+  [data-vote-control][data-revealed="true"] .vn-recommendation-vote-controls {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-vote-control]:hover .vn-recommendation-vote-controls,
+  [data-vote-control]:focus-within .vn-recommendation-vote-controls {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+#recommendation-dialog [data-modal-panel] {
+  border: 0;
+}
+
+#recommendation-dialog input[type="search"] {
+  box-shadow: none;
+}
+
+#recommendation-dialog input[type="search"]:focus {
+  box-shadow: none;
+}
+
+#recommendation-dialog [phx-click="add_recommendation"] {
+  min-height: 64px;
+}
+
+#recommendation-dialog [phx-click="add_recommendation"] > span:first-of-type {
+  min-width: 0;
+}
+
+#recommendation-dialog [phx-click="add_recommendation"] > span:last-child {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+#recommendation-dialog [phx-click="add_recommendation"]:hover > span:last-child {
+  border-color: rgb(var(--button-border-secondary));
+  background-color: rgb(var(--button-background-neutral-hover));
+}
+
+/* Shared utility used heavily in the Next app for horizontal rails. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.kaguya-horizontal-rail {
+  margin-inline: -1rem;
+  scroll-padding-inline: 1rem;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.kaguya-horizontal-rail > * {
+  scroll-snap-align: start;
+}
+
+/* Token guard: Tailwind utility order can let foreground tokens override inverse button text. */
+[class~="bg-button-background-neutral-inverse-default"][class~="text-button-text-on-neutral-inverse"] {
+  color: rgb(var(--button-text-on-neutral-inverse) / 1);
+}
+
+/* Cover tooltip — the floating chip created by CoverTooltipProvider hook. */
+.cover-tooltip {
+  position: fixed;
+  box-sizing: border-box;
+  z-index: 50;
+  max-width: calc(100vw - 16px);
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-100%);
+  background-color: rgb(var(--button-background-neutral-inverse-default) / 1);
+  color: rgb(var(--button-text-on-neutral-inverse) / 1);
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: none;
+}
+
+.custom-search-scrollbar::-webkit-scrollbar {
+  width: 0;
+}
+
+.custom-search-scrollbar::-webkit-scrollbar-thumb {
+  height: 54px;
+  border-radius: 100px;
+  background-color: rgb(var(--surface-base));
+}
+
+.kaguya-button-loader {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.kaguya-button-loader-bar {
+  width: 4px;
+  height: 12px;
+  border-radius: 999px;
+  background-color: rgb(var(--foreground-primary));
+  animation: kaguya-button-loader-bounce 1s infinite;
+}
+
+@keyframes kaguya-button-loader-bounce {
+  0%,
+  100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+/* Paint the liked color the moment the JS hook flips aria-pressed,
+   so the user doesn't wait for the server round-trip. Higher specificity
+   than the server-rendered Tailwind utility classes, so it wins during
+   the optimistic window and is a harmless no-op once they catch up. */
+.kaguya-like-button[aria-pressed="true"] .kaguya-like-heart {
+  color: rgb(var(--like-heart));
+  fill: rgb(var(--like-heart));
+}
+.kaguya-like-button[aria-pressed="true"] [data-like-count] {
+  color: rgb(var(--like-heart));
+}
+
+.kaguya-like-pop {
+  animation: kaguya-like-pop 400ms ease-out both;
+}
+
+.kaguya-like-unpop {
+  animation: kaguya-like-unpop 400ms ease-out both;
+}
+
+.kaguya-like-count-up {
+  animation: kaguya-like-count-up 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.kaguya-like-count-down {
+  animation: kaguya-like-count-down 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes kaguya-like-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.4); }
+  65% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes kaguya-like-unpop {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.8); }
+  65% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes kaguya-like-count-up {
+  0% { opacity: 0; transform: translateY(45%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kaguya-like-count-down {
+  0% { opacity: 0; transform: translateY(-45%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Springy confirmation when a reading status becomes active (status segments
+   in the VN sidebar). Driven by the StatusSegments hook, which re-applies the
+   class after each LiveView patch lands. Same motion family as the like pop,
+   a touch more restrained to match a quieter control. */
+.kaguya-status-pop {
+  animation: kaguya-status-pop 380ms ease-out both;
+}
+
+@keyframes kaguya-status-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.28); }
+  65% { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kaguya-button-loader-bar,
+  .kaguya-toast,
+  .kaguya-toast[data-state="closing"],
+  .kaguya-like-pop,
+  .kaguya-like-unpop,
+  .kaguya-like-count-up,
+  .kaguya-like-count-down,
+  .kaguya-status-pop {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Stats page (profile) enter animations.
+ * Applied via Tailwind arbitrary-value `animate-[...]` utilities on bar fills,
+ * plus a class-based reveal for the donut segment group.
+ * ------------------------------------------------------------------------ */
+
+@keyframes barRise {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes donutSweep {
+  from { transform: scale(0.86); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.kaguya-donut-sweep {
+  transform-origin: 110px 110px;
+  animation: donutSweep 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes flourishFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.kaguya-stats-cover-wall {
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0%, black 22%, black 68%, transparent 100%),
+    linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, transparent 0%, black 22%, black 68%, transparent 100%),
+    linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+  mask-composite: intersect;
+  animation: flourishFade 1200ms ease-out both;
+}
+
+.kaguya-stats-cover-wall img {
+  filter: blur(9px) brightness(0.78) saturate(1);
+}
+
+.kaguya-stats-cover-drift {
+  animation: coverDrift 600s linear infinite;
+}
+
+@keyframes coverDrift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes threadEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.kaguya-thread-enter {
+  animation: threadEnter 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kaguya-donut-sweep,
+  .kaguya-stats-cover-wall,
+  .kaguya-stats-cover-drift,
+  .kaguya-thread-enter {
+    animation: none;
+  }
+}

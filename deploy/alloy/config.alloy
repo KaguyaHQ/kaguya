@@ -1,0 +1,123 @@
+// ============================================================================
+// SCRAPE TARGETS
+// ============================================================================
+
+// Caddy reverse proxy metrics (HTTP traffic for all domains)
+prometheus.scrape "caddy" {
+  targets = [{
+    __address__ = "caddy:2019",
+  }]
+  forward_to      = [prometheus.relabel.caddy_filter.receiver]
+  scrape_interval = "60s"
+  job_name        = "caddy"
+}
+
+// Phoenix API metrics (BEAM, Phoenix, Ecto, Oban via PromEx)
+prometheus.scrape "kaguya" {
+  targets = [{
+    __address__ = "kaguya:8080",
+  }]
+  metrics_path    = "/metrics"
+  forward_to      = [prometheus.relabel.backend_filter.receiver]
+  scrape_interval = "60s"
+  job_name        = "kaguya"
+}
+
+// ============================================================================
+// HOST METRICS (built-in node_exporter)
+// ============================================================================
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  // Only enable the collectors we actually use on the Infrastructure dashboard
+  disable_collectors = [
+    "arp", "bcache", "bonding", "btrfs", "edac",
+    "hwmon", "infiniband", "ipvs", "nfs", "nfsd",
+    "pressure", "rapl", "schedstat", "selinux",
+    "softnet", "tapestats", "textfile", "thermal_zone",
+    "udp_queues", "wifi", "xfs", "zfs",
+    "netstat", "sockstat", "conntrack", "entropy",
+    "timex", "vmstat", "powersupplyclass", "mdadm",
+  ]
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.relabel.host_filter.receiver]
+  scrape_interval = "60s"
+  job_name        = "integrations/unix"
+}
+
+// ============================================================================
+// CADDY FILTER
+// Only forward the 4 metric families used by Infrastructure and Backend
+// dashboards. Both dashboards filter Caddy metrics by host label.
+// ============================================================================
+
+prometheus.relabel "caddy_filter" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+  rule {
+    source_labels = ["__name__"]
+    regex         = "caddy_http_requests_in_flight|caddy_http_requests_total|caddy_http_request_duration_seconds_.+|caddy_http_response_size_bytes_.+"
+    action        = "keep"
+  }
+}
+
+// ============================================================================
+// BACKEND FILTER
+// Keep only the PromEx metrics used by the Backend dashboard:
+//   - Phoenix HTTP (request count, duration, response size)
+//   - Ecto (query execution time, pool checkout wait)
+//   - BEAM (memory breakdown, process/port count, GC)
+// Drops: Application plugin, Oban plugin, BEAM system info/limits/scheduler
+//        gauges, Ecto idle/decode/total time, Phoenix channel/socket metrics.
+// ============================================================================
+
+prometheus.relabel "backend_filter" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+  rule {
+    source_labels = ["__name__"]
+    regex         = "kaguya_prom_ex_phoenix_http_request.*|kaguya_prom_ex_phoenix_http_response_size_bytes.*|kaguya_prom_ex_ecto_repo_query_execution_time_milliseconds.*|kaguya_prom_ex_ecto_repo_query_queue_time_milliseconds.*|kaguya_prom_ex_beam_memory_.*|kaguya_prom_ex_beam_stats_.*|kaguya_prom_ex_oban_queue_length_count"
+    action        = "keep"
+  }
+}
+
+// ============================================================================
+// HOST FILTER
+// Keep only the metrics used by the Infrastructure dashboard's
+// CPU, Memory, Disk I/O, Network I/O, Filesystem, and Load panels.
+// ============================================================================
+
+prometheus.relabel "host_filter" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+  rule {
+    source_labels = ["__name__"]
+    regex         = "node_cpu_seconds_total|node_memory_MemTotal_bytes|node_memory_MemAvailable_bytes|node_memory_Cached_bytes|node_filesystem_avail_bytes|node_filesystem_size_bytes|node_disk_read_bytes_total|node_disk_written_bytes_total|node_network_receive_bytes_total|node_network_transmit_bytes_total|node_load1|node_load5|node_load15"
+    action        = "keep"
+  }
+}
+
+// ============================================================================
+// REMOTE WRITE TO GRAFANA CLOUD
+// ============================================================================
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+
+    queue_config {
+      max_shards = 10
+    }
+  }
+}

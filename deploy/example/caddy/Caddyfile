@@ -1,0 +1,55 @@
+{
+	admin 0.0.0.0:2019
+	metrics {
+		per_host
+	}
+}
+
+# Auto-HTTPS via Let's Encrypt for simple self-hosting: point your domain's
+# DNS at this box and Caddy provisions + renews certs automatically.
+#
+# Production runs behind Cloudflare with origin certs instead; if you do the
+# same, add a `tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem`
+# line to each site block.
+
+# Frontend: Phoenix LiveView
+kaguya.io {
+	log {
+		output file /var/log/caddy/kaguya.io.access.log {
+			roll_size 100MiB
+			roll_keep 10
+			roll_keep_for 168h
+		}
+		format json
+	}
+	@graphql path /graphql /graphql/*
+	respond @graphql 404
+	reverse_proxy kaguya:8080
+}
+
+# Legacy/browser aliases: keep old links working, but make kaguya.io
+# the only origin that serves the app and owns browser sessions.
+api.kaguya.io, www.kaguya.io {
+	log {
+		output file /var/log/caddy/redirects.access.log {
+			roll_size 100MiB
+			roll_keep 10
+			roll_keep_for 168h
+		}
+		format json
+	}
+	redir https://kaguya.io{uri} permanent
+}
+
+# Search: Meilisearch (auth via master key)
+search.kaguya.io {
+	log {
+		output file /var/log/caddy/search.kaguya.io.access.log {
+			roll_size 100MiB
+			roll_keep 10
+			roll_keep_for 168h
+		}
+		format json
+	}
+	reverse_proxy meilisearch:7700
+}

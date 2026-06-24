@@ -1,0 +1,131 @@
+/*
+ * Markdown rendering — used by long-form description fields and the
+ * comment renderer. Rules are intentionally unlayered: wrapping them in
+ * `@layer utilities { ... }` here would register the `utilities` layer
+ * before tailwindcss does, pinning it to position 1 and inverting the
+ * cascade so Tailwind's `base` preflight (e.g. `* { margin: 0 }`) wins
+ * over utilities like `mx-auto`.
+ */
+.kaguya-markdown {
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.kaguya-markdown p + p {
+  margin-top: 1em;
+}
+
+.kaguya-markdown a {
+  color: rgb(var(--foreground-link));
+  text-decoration: none;
+}
+
+.kaguya-markdown a:hover {
+  color: rgb(var(--text-link-hover));
+  text-decoration: none;
+}
+
+.kaguya-markdown strong {
+  color: inherit;
+  font-weight: 600;
+}
+
+.kaguya-markdown blockquote {
+  margin: 0.25rem 0;
+  border-left: 2px solid rgb(var(--border-divider));
+  padding-left: 0.75rem;
+  color: rgb(var(--foreground-secondary));
+}
+
+.kaguya-markdown ul,
+.kaguya-markdown ol {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+
+.kaguya-markdown ul {
+  list-style: disc;
+}
+
+.kaguya-markdown ol {
+  list-style: decimal;
+}
+
+.kaguya-markdown code {
+  border-radius: 0.25rem;
+  background: rgb(var(--surface-elevated));
+  padding: 0.125rem 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85em;
+}
+
+.kaguya-markdown pre {
+  margin: 0.25rem 0;
+  overflow-x: auto;
+  border-radius: 0.375rem;
+  background: rgb(var(--surface-elevated));
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.kaguya-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.comment-content p + p {
+  margin-top: 0.75em;
+}
+
+/*
+ * Review body — mirrors frontend `ReviewReadMore`'s `prose-p:my-3`,
+ * `prose-p:leading-[26px] sm:prose-p:leading-[28px]`, `prose-ul:my-0`,
+ * `prose-li:my-0.5`, marker / blockquote / strong overrides. The LV
+ * side doesn't load `@tailwindcss/typography`, so the prose-* utilities
+ * in HEEx are no-ops on their own; these scoped rules apply the same
+ * effect to anything inside `.review-content .kaguya-markdown`.
+ */
+.review-content .kaguya-markdown p {
+  margin: 0.75rem 0;
+  line-height: 26px;
+}
+
+@media (min-width: 640px) {
+  .review-content .kaguya-markdown p {
+    line-height: 28px;
+  }
+}
+
+.review-content .kaguya-markdown ul,
+.review-content .kaguya-markdown ol {
+  margin: 0;
+}
+
+.review-content .kaguya-markdown li {
+  margin-top: 0.125rem;
+  margin-bottom: 0.125rem;
+}
+
+.review-content .kaguya-markdown li::marker {
+  color: rgb(var(--foreground-quaternary));
+}
+
+.review-content .kaguya-markdown blockquote {
+  border-left-color: rgb(var(--foreground-quaternary));
+}
+
+.review-content .kaguya-markdown strong,
+.review-content .kaguya-markdown b {
+  color: rgb(var(--foreground-primary));
+  font-weight: 500;
+}
+
+.comment-content a {
+  color: rgb(var(--foreground-link));
+  text-decoration: none;
+}
+
+.comment-content a:hover {
+  text-decoration: underline;
+}

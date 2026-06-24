@@ -1,0 +1,33 @@
+/*
+ * Custom tokens — defined in code, not yet synced to Figma.
+ * When a token here gets added to the Figma design file and lands in
+ * generated/figma-variables.css, remove it from this file.
+ */
+
+:root {
+  --icons-star-muted: 160 160 174; /* #A0A0AE — silver/moonlight grey for unfilled stars */
+  --status-wishlist: 155 127 230; /* #9B7FE6 — amethyst */
+  --status-reading: 82 148 224; /* #5294E0 — sapphire */
+  --status-read: 52 199 137; /* #34C789 — malachite */
+  --status-paused: 212 168 67; /* #D4A843 — brass */
+  --status-dnf: 219 104 117; /* #DB6875 — rose */
+  --status-not-interested: 139 150 168; /* #8B96A8 — pewter */
+
+  --chip-border-warning-default: 68 38 38; /* warm grey — same visual weight as default 50/50/50, shifted warm */
+  --chip-border-warning-hover: 130 60 60; /* warm lift on hover — same ratio as default→hover */
+
+  /* Revision action accents — left-edge stripes on the changes feed. */
+  --action-create: 52 199 137;   /* malachite — new entity */
+  --action-revert: 212 168 67;   /* brass — undo */
+  --action-restrict: 206 101 101; /* rose — hide / lock */
+
+  --like-heart: 249 24 128; /* #F91880 */
+  --semantic-error: 206 101 101; /* #CE6565 */
+
+  --toast-success-bg: 27 122 53;   /* #1B7A35 */
+  --toast-error-bg:   255 66 87;   /* #FF4257 */
+  --toast-warning-bg: 245 158 11;  /* #F59E0B */
+  --toast-info-bg:    9 131 159;   /* #09839F */
+
+  --radius: 0.5rem;
+}

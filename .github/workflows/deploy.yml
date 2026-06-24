@@ -1,0 +1,69 @@
+name: Deploy kaguya
+
+on:
+  workflow_dispatch:
+
+# Only one prod deploy at a time; a newer push cancels an in-flight one so two
+# deploys can't interleave on the server.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: kaguyahq/kaguya
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      # Keep server-side ops files in sync with the repo. compose/deploy.sh/alloy
+      # changes take effect when deploy.sh reconciles the app container below.
+      # Ingress (Caddy) is owned by the separate edge-ops project, not synced here.
+      - name: Sync ops files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: deploy
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "deploy/docker-compose.yml,deploy/deploy.sh,deploy/alloy/config.alloy"
+          target: "/home/deploy/kaguya/"
+          strip_components: 1
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: deploy
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            chmod +x /home/deploy/kaguya/deploy.sh
+            docker pull ghcr.io/kaguyahq/kaguya:latest
+            /home/deploy/kaguya/deploy.sh kaguya

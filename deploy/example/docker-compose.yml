@@ -1,0 +1,107 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # Point Caddy at the file inside the bind-mounted DIRECTORY. Mounting the
+    # directory (not the single file) means scp replacing ./caddy/Caddyfile is
+    # resolved live by the container, so a `docker compose restart caddy`
+    # picks up the new content. See deploy.sh.
+    command: ["caddy", "run", "--config", "/etc/caddy/conf/Caddyfile", "--adapter", "caddyfile"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy:/etc/caddy/conf:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./logs/caddy:/var/log/caddy
+      # Only needed if you terminate TLS with your own origin certs (see
+      # Caddyfile); omit for auto-HTTPS.
+      - ./certs:/etc/caddy/certs:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "10"
+    depends_on:
+      - kaguya
+
+  kaguya:
+    image: ghcr.io/kaguyahq/kaguya:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PHX_SERVER=true
+      - PORT=8080
+      - PHX_HOST=kaguya.io
+      - KAGUYA_MODEL_DIR=/srv/kaguya/data
+    volumes:
+      # Trained recommendation B matrix (~500 MB). Mounted read-only;
+      # shipped via kaguya/scripts/deploy-model.sh (rsync + hot-reload).
+      - /home/deploy/kaguya/data:/srv/kaguya/data:ro
+    dns:
+      - 2001:4860:4860::8888
+      - 8.8.8.8
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "10"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/health | grep -q healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  alloy:
+    image: grafana/alloy:v1.8.2
+    restart: unless-stopped
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=generally-available
+    environment:
+      - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}
+      - GRAFANA_CLOUD_PROMETHEUS_USER=${GRAFANA_CLOUD_PROMETHEUS_USER}
+      - GRAFANA_CLOUD_API_KEY=${GRAFANA_CLOUD_API_KEY}
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.50"
+    depends_on:
+      - caddy
+      - kaguya
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+      - MEILI_ENV=production
+    volumes:
+      - meili_data:/meili_data
+    expose:
+      - "7700"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7700/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  caddy_data:
+  caddy_config:
+  meili_data:
+  alloy_data:
