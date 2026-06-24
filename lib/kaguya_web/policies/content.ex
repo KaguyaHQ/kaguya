@@ -13,13 +13,15 @@ defmodule KaguyaWeb.Policies.Content do
       page_title: "About • Kaguya",
       description: "What Kaguya is and why it's called that.",
       body: """
+      Kaguya is an all-in-one platform to track, discuss, and discover visual novels. Here's why I built it.
+
       I've been reading visual novels since 2021, and they have become my favorite medium even beyond books, which I lived on all my childhood. *Fata morgana* I've read 3 whole times. Some of my favorite AVNs I've read more than 5 times.
 
       I love the intimacy you build with characters over dozens of hours, the right music at the right moment, beautiful artwork and the depth of written storytelling.
 
       I believe VNs are extremely underrated and more people need to discover them. There's this inexplicable desire in me to help others discover VNs because I enjoy them a lot and I want more people to find them too. Also, an ulterior reason is that more people getting in means more works and we would get more quality stuff to read. ￣▽￣
 
-      Along the way, I've thought more about it and I decided the best thing to build is basically an all-in-one VN platform. One central agora + database + discovery place for visual novels.
+      Along the way, I've thought more about it and I decided the best thing to build is basically an all-in-one VN platform. One central hub + database + discovery place for visual novels.
 
       Somewhere to track socially what you're reading, discuss what you've read, write personal reviews, follow friends, build themed lists, customize your profile, see reading history stats, and discover what to read next. All in one place.
 
@@ -27,13 +29,13 @@ defmodule KaguyaWeb.Policies.Content do
 
       ## How it started
 
-      Back in April 2024, I had just got out of a rough internship and wanted to work on something meaningful instead of another desk job. I finally struck a grandiose vision of building the social discovery app for all entertainment mediums (books, movies, games, tv, and visual novels), with the idea that every story needed to finds the people it was meant for.
+      Back in April 2024, I had just got out of a rough internship and wanted to work on something meaningful instead of another desk job. I landed on a grandiose vision of building the social discovery app for all entertainment mediums (books, movies, games, tv, and visual novels), with the idea that every story needed to find the people it was meant for.
 
-      At that time, people were most loud about the utter deplorable state of Goodreads and so I thought why not start with the easiest entry point and then expand from there. (Little did I know how naive that was. There were more than 50 book trackers already out there.)
+      At that time, people were most loud about the deplorable state of Goodreads, so I thought why not start with the easiest entry point and then expand from there.
 
       So, I started building Kaguya, spent over 1.5 years on it, learning everything from SQL to UI design along the way. After all the major features were finally built in Nov 25, I tried building an audience for it, making content and videos, but I kept gravitating toward visual novel stuff instead. Making videos about Fata Morgana when I was supposed to be building a book audience. Visual novels are what I actually read nowadays, so the whole book thing was kind of me larping as something I wasn't anymore.
 
-      Eventually I just tried launching it for VNs to see if anyone would even care. That was January 1, 2026. It got enough attention to know this was the right direction. Closed the book site on February 5 and went VN-only. After that, we've been growing steadily. As of April 2026, we have 2k registered members.
+      Eventually I just tried launching it for VNs to see if anyone would even care. That was January 1, 2026. It got enough attention to know this was the right direction. Closed the book site on February 5 and went VN-only. Since then it's been growing steadily. As of June 2026, Kaguya has over 2,500 registered members.
 
       ## Why is it called Kaguya?
 
