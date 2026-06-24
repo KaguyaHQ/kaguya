@@ -122,8 +122,7 @@ defmodule KaguyaWeb.ProfileLive.Data do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Flags consumed by the moderation panel trigger. Mirrors the Next.js
-  `usePermissions()` hook.
+  Flags consumed by the moderation panel trigger.
   """
   def viewer_permissions(nil), do: %{any?: false}
 

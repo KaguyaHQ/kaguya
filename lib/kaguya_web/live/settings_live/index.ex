@@ -538,7 +538,7 @@ defmodule KaguyaWeb.SettingsLive.Index do
     end
   end
 
-  # Mirror Next.js: each cover/screenshot toggle writes a localStorage key
+  # Each cover/screenshot toggle writes a localStorage key
   # + html data-* attribute so the pre-paint script can suppress the blur
   # flash on the next hard reload, and other open tabs pick it up via the
   # storage event. Nukige/adjacent are server-side-only — no client mirror.

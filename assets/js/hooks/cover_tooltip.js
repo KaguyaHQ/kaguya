@@ -1,7 +1,6 @@
 /*
  * CoverTooltip — Letterboxd-style imperative tooltip for VN cover grids.
  *
- * Ported from `../personal/legacy-next-app/src/components/shared/CoverTooltipProvider.tsx`.
  * Tracks the pointer, finds the nearest configured tooltip data attribute
  * inside the hook root, and shows a single floating tooltip after
  * `delayDuration`.

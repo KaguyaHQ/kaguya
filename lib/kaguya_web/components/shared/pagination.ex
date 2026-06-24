@@ -1,10 +1,10 @@
 defmodule KaguyaWeb.SharedComponents.Pagination do
   @moduledoc """
-  Phoenix-side port of production's `PaginationSection`.
+  Shared pagination control.
 
   This component intentionally keeps URL handling server-rendered and LiveView
-  friendly while matching the Next.js pagination shape: centered icon
-  previous/next controls, numbered page buttons, and ellipses.
+  friendly: centered icon previous/next controls, numbered page buttons, and
+  ellipses.
   """
 
   use KaguyaWeb, :html

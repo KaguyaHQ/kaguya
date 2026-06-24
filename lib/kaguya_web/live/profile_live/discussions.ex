@@ -2,10 +2,8 @@ defmodule KaguyaWeb.ProfileLive.Discussions do
   @moduledoc """
   `/@:username/discussions` — user discussion posts.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/DiscussionsTab.tsx` and the
-  shared `PostList` / `PostListItem` row components. LiveView reads the
-  `Kaguya.Discussions` context directly and performs the same batched
-  hydration needed by the profile discussion tab.
+  LiveView reads the `Kaguya.Discussions` context directly and performs
+  the batched hydration needed by the profile discussion tab.
   """
 
   use KaguyaWeb.ProfileLive, tab: :discussions, title_suffix: "Discussions"

@@ -3,7 +3,7 @@ defmodule KaguyaWeb.Components.Profile.Header do
   Profile page header — banner, avatar, name, badges, action button,
   stats grid, and the tab nav strip below.
 
-  Mirrors `ProfileHeader.tsx`. Three shapes:
+  Three shapes:
     * Root profile (`/@:username`) — full banner + avatar block + stats.
     * Inner page (`/@:username/<tab>`) — no banner/avatar; nav only.
     * Hidden-nav pages (followers, following, tag votes) — only the

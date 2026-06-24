@@ -2,10 +2,9 @@ defmodule KaguyaWeb.Markdown.UserContent do
   @moduledoc """
   Safe markdown renderer for user-authored content.
 
-  Mirrors the Next.js pipeline: CommonMark + GFM via Earmark, then an AST
+  Pipeline: CommonMark + GFM via Earmark, then an AST
   transform pass for Discord-style `||spoilers||`, link sanitization +
-  VNDB-relative href rewriting, and a tag allowlist that matches the
-  `ALLOWED_TAGS` set used by DOMPurify on the Next.js side.
+  VNDB-relative href rewriting, and a tag allowlist.
 
   Output is bare semantic HTML — styling (paragraph spacing, blockquote
   borders, etc.) lives in the caller's `.kaguya-markdown` container, not
@@ -15,17 +14,16 @@ defmodule KaguyaWeb.Markdown.UserContent do
   @link_class "text-foreground-link no-underline hover:underline"
   @vndb_relative_pattern ~r{^/[a-z]\d+(?:[#?/.].*)?$}i
 
-  # Matches the Next.js DOMPurify allowlist in `src/utils/readMoreUtils.tsx`.
   @default_allowed_tags ~w(p br strong b em i del a span blockquote ul ol li pre code)
   @comment_allowed_tags @default_allowed_tags
-  # Matches `BioContent.tsx` exactly — no anchors, no lists/code/blockquotes,
+  # Bio preset — no anchors, no lists/code/blockquotes,
   # no `<b>`/`<i>`/`<span>` (the wider set the comment preset allows).
   @bio_allowed_tags ~w(p br strong em del)
 
   # Presets bundle an allowlist with a preprocess fn so callers pick one name
-  # instead of wiring both. Mirrors the Next.js render configs:
-  # - :default  / :comment → CommentContent.tsx + DescriptionReadMore (full block markdown)
-  # - :bio                  → BioContent.tsx (no links, no lists, escaped numbered prefixes)
+  # instead of wiring both:
+  # - :default / :comment → full block markdown
+  # - :bio → no links, no lists, escaped numbered prefixes
   @presets %{
     default: {@default_allowed_tags, :identity},
     comment: {@comment_allowed_tags, :comment_preprocess},
@@ -180,8 +178,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
   end
 
   # ---------------------------------------------------------------------------
-  # Allowlist filter — disallowed wrappers drop, children bubble up
-  # (matches DOMPurify's KEEP_CONTENT=true default on the Next.js side).
+  # Allowlist filter — disallowed wrappers drop, children bubble up.
   # ---------------------------------------------------------------------------
 
   defp filter(ast, allowed) when is_list(ast), do: Enum.flat_map(ast, &filter_node(&1, allowed))
@@ -233,7 +230,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
   defp apply_preprocess(content, _), do: content
 
   @doc """
-  Comment preprocessing — mirrors `CommentContent.tsx` lines 16–26.
+  Comment preprocessing.
 
   - Drop lone-backslash lines (a Discord quirk where users add `\\` to force
     a newline).
@@ -251,7 +248,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
   end
 
   @doc """
-  Bio preprocessing — mirrors `BioContent.tsx` lines 11–18.
+  Bio preprocessing.
 
   Stricter than comments: link syntax is stripped to plain text (the bio
   surface doesn't render `<a>`) and numbered-list prefixes are escaped so

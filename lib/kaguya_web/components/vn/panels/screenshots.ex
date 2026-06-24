@@ -1,13 +1,12 @@
 defmodule KaguyaWeb.VN.Panels.Screenshots do
   @moduledoc """
-  Screenshots tab — Phoenix-side port of `../personal/legacy-next-app/src/components/vn/detail/VNScreenshotsGrid.tsx`.
+  Screenshots tab.
 
   Hides NSFW / brutal screenshots based on the viewer's content
   preferences (`show_nsfw_screenshots` / `show_brutal_screenshots`).
   Logged-out viewers always get the strictest defaults (hide both).
   When anything is filtered out, a passive footer surfaces the count
-  and links to the Settings page — same shape as the Next.js
-  `ScreenshotsHiddenFooter` so users have one consistent path to
+  and links to the Settings page so users have one consistent path to
   adjust visibility.
   """
 

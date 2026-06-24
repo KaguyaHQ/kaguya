@@ -2,9 +2,9 @@ defmodule KaguyaWeb.Components.Profile.RevisionDiff do
   @moduledoc """
   Inline field-level diff components for profile contribution rows.
 
-  Mirrors `RevisionInlineDiff.tsx` from the Next.js app: scalar fields render
-  removed/added rows, long text gets word-level highlights, image scalar fields
-  use enriched snapshot URLs, and collection rows render compact labels.
+  Scalar fields render removed/added rows, long text gets word-level highlights,
+  image scalar fields use enriched snapshot URLs, and collection rows render
+  compact labels.
   """
 
   use KaguyaWeb, :html
@@ -645,7 +645,7 @@ defmodule KaguyaWeb.Components.Profile.RevisionDiff do
       (present?(value_of(item, :visual_novel_id)) or present?(value_of(item, :visual_novel_title)))
   end
 
-  # ── Snapshot object formatters (mirror prod helpers in RevisionDiffPage.tsx) ──
+  # ── Snapshot object formatters ──
 
   defp format_title_object(item) do
     lang = value_of(item, :lang) || "?"
@@ -764,8 +764,8 @@ defmodule KaguyaWeb.Components.Profile.RevisionDiff do
     Enum.any?([:cover_id, :image_id, :screenshot_id], &present?(value_of(item, &1)))
   end
 
-  # Match Next.js RevisionDiffPage: hide screenshot rows whose moderation
-  # flags the viewer hasn't opted into. Non-screenshot items always show.
+  # Hide screenshot rows whose moderation flags the viewer hasn't opted into.
+  # Non-screenshot items always show.
   defp visible_to?(nil, _user), do: true
 
   defp visible_to?(item, user) when is_map(item) do

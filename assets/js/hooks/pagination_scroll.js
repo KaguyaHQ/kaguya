@@ -1,7 +1,6 @@
 // Scrolls back to the top (or to a specific anchor) when the user clicks
-// a page link inside the shared `<.pagination>` component. Mirrors the
-// Next.js `PaginationSection` behavior so paginated views (lists, browse,
-// reviews, etc.) start fresh at the top after a page change.
+// a page link inside the shared `<.pagination>` component, so paginated views
+// (lists, browse, reviews, etc.) start fresh at the top after a page change.
 //
 // Honors an optional `data-scroll-target-id` attribute on the host
 // element — when set, scrolls to that element instead of the window top.

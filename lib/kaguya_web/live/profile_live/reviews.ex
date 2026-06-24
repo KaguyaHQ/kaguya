@@ -2,12 +2,9 @@ defmodule KaguyaWeb.ProfileLive.Reviews do
   @moduledoc """
   `/@:username/reviews` — paginated VN reviews for a user.
 
-  Mirrors the production Next.js source at
-  `../personal/legacy-next-app/src/components/profile/ReviewsTab.tsx` + the underlying
-  `VnReviewCard` (`../personal/legacy-next-app/src/components/vn/cards/VnReviewCard.tsx`).
   The LiveView reads `Kaguya.Reviews` directly.
 
-  URL state mirrors production:
+  URL state:
     * `?page=N`   (1-indexed; omitted when `N=1`)
     * `?sort=…`   (`MOST_LIKED` default, `NEWEST`, `OLDEST`)
 
@@ -181,7 +178,7 @@ defmodule KaguyaWeb.ProfileLive.Reviews do
             <% end %>
           </div>
 
-          <%!-- Right column reserved for future use (matches production). --%>
+          <%!-- Right column reserved for future use. --%>
           <div class="max-lg:hidden" />
         </div>
       </section>

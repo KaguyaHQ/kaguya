@@ -4,8 +4,7 @@ defmodule Kaguya.Activities.GroupedFeed do
 
   Walks an ordered list of `%UserActivity{}` (newest first) and merges
   consecutive rows that share `(user_id, action, context_key)` for the
-  four actions that summarise visually as a single entry. Mirrors the
-  legacy frontend rule from `activityUtils.ts:groupActivityItems`.
+  four actions that summarise visually as a single entry.
 
   Grouping keys:
 

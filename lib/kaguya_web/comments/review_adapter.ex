@@ -6,7 +6,7 @@ defmodule KaguyaWeb.Comments.ReviewAdapter do
   same component that powers list comments can power review comments without
   any duplication.
 
-  Visibility / authorization rules mirror the Next.js single-review page:
+  Visibility / authorization rules for the single-review page:
 
     * Anonymous viewers see public (non-hidden) comments only.
     * Comment authors can see their own hidden comments.
@@ -34,9 +34,9 @@ defmodule KaguyaWeb.Comments.ReviewAdapter do
   def load(review_id, viewer, opts) do
     page = int(Map.get(opts, :page, 1), 1)
     page_size = int(Map.get(opts, :page_size, @default_page_size), @default_page_size)
-    # Default to `:oldest` to match Next.js `VNReviewComments.tsx` which hard-codes
-    # `sortBy = SortBy.Oldest` for review threads (oldest-first reads more like a
-    # conversation; "most_liked" is a list-comments idiom).
+    # Default to `:oldest` (oldest comments first) for review threads;
+    # oldest-first reads more like a conversation, while "most_liked" is a
+    # list-comments idiom.
     sort_by = atomize_sort(Map.get(opts, :sort_by, :oldest))
     viewer_id = user_id(viewer)
 

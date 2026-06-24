@@ -2,9 +2,8 @@ defmodule KaguyaWeb.Components.Shared.SocialIcons do
   @moduledoc """
   Shared inline SVGs for social links and storefront links.
 
-  The old Next.js app kept these in `components/icons/SocialIcons.tsx`; this
-  module is the LiveView equivalent so producer pages, profile pages, and VN
-  release/storefront UI can share the same glyphs.
+  Producer pages, profile pages, and VN release/storefront UI all share the
+  same glyphs from here.
   """
 
   use KaguyaWeb, :html

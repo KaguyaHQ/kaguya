@@ -1,9 +1,7 @@
 defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
   @moduledoc """
   Moderator removal dialog: reason category + user-facing message + private
-  mod note + optional lock-thread checkbox. Ported from
-  `components/moderation/RemovalReasonDialog.tsx` so LiveView mods get the
-  same structured removal flow Next.js mods do — the message becomes a
+  mod note + optional lock-thread checkbox. The message becomes a
   moderator-comment on the post and the reason/mod_note feeds the audit
   trail in `Kaguya.Discussions.hide_post/2`.
 

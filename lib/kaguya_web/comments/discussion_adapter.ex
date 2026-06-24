@@ -255,9 +255,8 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
       display_name: user.display_name || user.username,
       role: user.role,
       # Surfaced so the comment header can render the "MOD" badge next to
-      # the username — matches `DiscussionModBadge.tsx` (`role === "admin"`
-      # || `modDiscussions === true`). Other adapters don't set this field
-      # so the badge stays scoped to discussion comments.
+      # the username (admin role or mod_discussions). Other adapters don't
+      # set this field so the badge stays scoped to discussion comments.
       is_discussion_moderator: user.role == :admin or user.mod_discussions == true,
       avatar_urls: avatar_urls,
       avatar_url: avatar_urls[:small]

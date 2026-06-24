@@ -1,8 +1,6 @@
 // Disables the signup-confirmation resend button for 30s after submit, with
-// a live countdown ("Resend in 30s"). Mirrors
-// `../personal/legacy-next-app/src/components/auth/ThanksForSignup.tsx`'s setIntervalState
-// + cooldown behavior. Cooldown timestamp is stored in localStorage so it
-// survives the redirect-back the form submission triggers.
+// a live countdown ("Resend in 30s"). Cooldown timestamp is stored in
+// localStorage so it survives the redirect-back the form submission triggers.
 const STORAGE_KEY = "kaguya:resend-cooldown-until"
 const COOLDOWN_MS = 30_000
 

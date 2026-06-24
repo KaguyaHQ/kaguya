@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.SharedComponents.ReadMore do
   @moduledoc """
-  Client-toggled "read more" wrapper — Phoenix-side port of
-  `../personal/legacy-next-app/src/components/shared/ReadMoreText.tsx` (+ DescriptionReadMore).
+  Client-toggled "read more" wrapper.
 
   Renders the full body inside a CSS line-clamp container. A JS hook
   (`ReadMore`, defined in `assets/js/hooks/read_more.js`) measures

@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.PoliciesLive.Show do
   @moduledoc """
-  Static policy / about / FAQ pages. Mirrors
-  `../personal/legacy-next-app/src/app/(main)/(policies)/<slug>/page.tsx`.
+  Static policy / about / FAQ pages.
 
   One LiveView serves all 10 slugs — the content map lives in
   `KaguyaWeb.Policies.Content` and is rendered through the shared

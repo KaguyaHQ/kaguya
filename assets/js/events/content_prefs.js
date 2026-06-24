@@ -1,6 +1,5 @@
-// Client storage for the user's content-preference toggles. Mirrors the
-// Next.js `nsfw-script.ts` + `screenshot-prefs-script.ts` so both apps
-// share the same localStorage keys + html data-* attribute contract.
+// Client storage for the user's content-preference toggles. Uses these
+// localStorage keys + html data-* attribute contract.
 //
 //   * kaguya_nsfw_preference           → data-nsfw-show
 //   * kaguya_show_nsfw_screenshots     → data-screenshot-nsfw

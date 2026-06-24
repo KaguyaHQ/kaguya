@@ -11,7 +11,7 @@ defmodule KaguyaWeb.VN.Backdrop do
 
   use KaguyaWeb, :html
 
-  # Side feather (L/R edges). 30 stops mirror production VNBackdrop.tsx so
+  # Side feather (L/R edges). 30 stops so
   # the image dissolves into the surface without a visible step.
   @side_gradient """
                  linear-gradient(to right,

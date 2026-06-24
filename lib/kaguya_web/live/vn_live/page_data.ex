@@ -184,8 +184,8 @@ defmodule KaguyaWeb.VNLive.PageData do
   # The viewer's own tag/recommendation votes, pulled out of the public core
   # so that core can be cached viewer-independently (Phase 2a). These overlay
   # the vote-less core in `show/data.ex` (`assign_viewer_bundle`) once the
-  # first-paint bundle lands, restoring the highlights the legacy Next.js page
-  # fetched client-side. Two independent reads → run them concurrently.
+  # first-paint bundle lands, restoring the per-viewer vote highlights.
+  # Two independent reads → run them concurrently.
   defp build_my_votes(vn, user_id) do
     [tag_votes, recommendation_votes] =
       Task.await_many([
@@ -449,8 +449,7 @@ defmodule KaguyaWeb.VNLive.PageData do
   # (`my_votes`, built by `build_my_votes/2`). What remains varies only by
   # content prefs (`allowed`) and mod visibility (`privileged?`), both bounded
   # (~4 pref combos × 2), so a handful of entries per VN serve every viewer.
-  # This is the origin-side replacement for the Cloudflare edge cache the
-  # legacy Next.js page had — a LiveView page can't carry `s-maxage`. See
+  # This is an origin-side cache; a LiveView page can't carry `s-maxage`. See
   # docs/migrations/nextjs-liveview/plans/vn-page-performance-plan.md.
   defp build_public_page(vn, viewer, page, sort) do
     allowed = Kaguya.VisualNovels.TitleCategory.allowed_categories(viewer || %{})
@@ -643,7 +642,7 @@ defmodule KaguyaWeb.VNLive.PageData do
   # Builds the VN page's "Related" section. Filters out unofficial relations,
   # self-references, and prequel/sequel entries (those belong in the series
   # "More" section). Also drops any extra relation pointing at a VN that's
-  # already covered by a prequel/sequel link, matching the dedupe Next.js does.
+  # already covered by a prequel/sequel link.
   defp public_similar_relations(vn_id) do
     official_non_self =
       vn_id

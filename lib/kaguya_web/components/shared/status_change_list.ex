@@ -3,7 +3,6 @@ defmodule KaguyaWeb.SharedComponents.StatusChangeList do
   Render the rows for a "Change status" menu — five status options plus a
   destructive "Remove VN" footer.
 
-  Mirrors the inner `StatusTab` from `../personal/legacy-next-app/src/components/shared/StatusDropdown.tsx`.
   The wrapper (popover, drawer, submenu) is the caller's responsibility — this
   component is just the row list, so the same markup serves the library cover
   menu, the VN show page, and any future status surface.

@@ -2,8 +2,7 @@ defmodule KaguyaWeb.VN.Community do
   @moduledoc """
   Social/community sections rendered below the header.
 
-  Every section here is a flat list (no elevated cards) styled to match
-  the production Next.js page:
+  Every section here is a flat list (no elevated cards):
 
   - `reviews_section/1` — paged community reviews with compact sort control.
   - `friend_reviews_section/1` — friends-only reviews reusing the same row.
@@ -336,7 +335,7 @@ defmodule KaguyaWeb.VN.Community do
           </p>
 
           <%!--
-            Action row mirrors `ReviewItem.tsx`: a like button with a
+            Action row: a like button with a
             hover-bg circle around the heart, and a comments shortcut that
             shows just the raw count (no noun) and deep-links to the
             review's #comments anchor.
@@ -559,8 +558,7 @@ defmodule KaguyaWeb.VN.Community do
     """
   end
 
-  # Verb mapping mirrors `STATUS_VERB_MAP` + `getTooltipText` in
-  # `src/components/vn/detail/sections/FriendActivitySection.tsx`.
+  # Verb mapping for friend status-activity tooltips.
   defp activity_tooltip_text(item) do
     name = item.user.display_name || item.user.username || "a friend"
 

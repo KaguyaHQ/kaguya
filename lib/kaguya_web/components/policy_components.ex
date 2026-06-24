@@ -1,10 +1,6 @@
 defmodule KaguyaWeb.PolicyComponents do
   @moduledoc """
   Shared layout primitives for the static policy / about / FAQ pages.
-  Mirrors the production layout in
-  `../personal/legacy-next-app/src/app/(main)/(policies)/layout.tsx`,
-  `../personal/legacy-next-app/src/components/policies/PolicyPage.tsx`, and
-  `../personal/legacy-next-app/src/components/policies/PolicySidebar.tsx`.
   """
 
   use KaguyaWeb, :html

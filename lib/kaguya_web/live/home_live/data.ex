@@ -27,8 +27,7 @@ defmodule KaguyaWeb.HomeLive.Data do
   @activity_limit 20
   # Reviews and lists are excluded from the activity stream everywhere
   # — they have their own first-class slot in the home feed and the
-  # `/reviews` / `/lists` pages. Mirrors `excludeActions` in the Next.js
-  # `HomeActivityFeed.tsx` (see commits 888d4373 and ab1ac169).
+  # `/reviews` / `/lists` pages.
   @activity_excluded_actions [:reviewed, :created_list]
   @list_cover_count 11
 

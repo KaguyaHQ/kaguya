@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.SharedComponents.Cover do
   @moduledoc """
-  Shared VN cover component — Phoenix-side port of
-  `../personal/legacy-next-app/src/components/shared/Cover.tsx`.
+  Shared VN cover component.
 
   One reusable HEEx component that handles:
 
@@ -14,13 +13,11 @@ defmodule KaguyaWeb.SharedComponents.Cover do
     * Optional graceful fallback when no image is available (title in a
       muted card matching prod's `CoverFallback`).
     * Letterboxd-style drop shadow (`shadow={true}`).
-    * Production-compatible NSFW cover blur via `data-nsfw-blur` when
+    * NSFW cover blur via `data-nsfw-blur` when
       the cover image itself is marked NSFW/suggestive.
 
-  The more involved parts of prod's `Cover.tsx` — dialog zoom,
-  cover-edit mode, and intersection-observer-driven lazy loading — are
-  intentionally deferred. They depend on context providers and Radix
-  dialogs that aren't ported yet.
+  The more involved features — dialog zoom, cover-edit mode, and
+  intersection-observer-driven lazy loading — are intentionally deferred.
 
   ## Examples
 

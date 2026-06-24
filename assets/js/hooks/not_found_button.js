@@ -1,10 +1,8 @@
 // NotFoundButton — positions the "Return home" anchor over the moon in the
 // 404 background image.
 //
-// Ports the natural-coordinate math from
-// `../personal/legacy-next-app/src/components/shared/NotFoundPage.tsx`. The image is
-// `object-fit: cover` with `object-position: 54.5% top`, so we reproduce
-// the same transform here to know where the moon ends up on screen.
+// The image is `object-fit: cover` with `object-position: 54.5% top`, so we
+// reproduce the same transform here to know where the moon ends up on screen.
 //
 // Two entry points share one implementation:
 //   * `NotFoundButton` — a LiveView hook used when the page is rendered

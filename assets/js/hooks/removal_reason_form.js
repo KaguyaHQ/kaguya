@@ -3,10 +3,10 @@ const RemovalReasonForm = {
     this.reasonSelect = this.el.querySelector("[data-removal-reason]")
     this.messageEl = this.el.querySelector("[data-removal-message]")
     this.submit = this.el.querySelector("[data-removal-submit]")
-    // Match Next.js: switching reason always overwrites the message
-    // textarea with that reason's default copy, even if the moderator
-    // had been editing it. The Next.js dialog discards in-progress
-    // edits on reason change so the wording stays consistent.
+    // Switching reason always overwrites the message textarea with that
+    // reason's default copy, even if the moderator had been editing it.
+    // In-progress edits are discarded on reason change so the wording
+    // stays consistent.
     this._onReasonChange = () => {
       if (!this.reasonSelect || !this.messageEl) return
       const option = this.reasonSelect.options[this.reasonSelect.selectedIndex]

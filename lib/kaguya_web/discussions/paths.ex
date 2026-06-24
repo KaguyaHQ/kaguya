@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.Discussions.Paths do
   @moduledoc """
-  Canonical discussion URLs, ported from
-  `../personal/legacy-next-app/src/lib/discussion-url.ts`.
+  Canonical discussion URLs.
 
   Entity-scoped posts use the entity route as human-readable context.
   Standalone posts keep the decorative slug behind `/discussions/p/...`.

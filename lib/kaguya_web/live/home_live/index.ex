@@ -12,8 +12,7 @@ defmodule KaguyaWeb.HomeLive.Index do
 
   # Bounded sidebar starts with one page (BOUNDED_LIMIT = 20 entries) and
   # tops up at most one extra page (BOUNDED_TOP_UP_LIMIT = 30) when the
-  # rendered rail is shorter than the viewport. Mirrors the constants in
-  # `../personal/legacy-next-app/src/components/home/HomeActivityFeed.tsx`.
+  # rendered rail is shorter than the viewport.
   @bounded_top_up_limit 30
   @bounded_max_pages 2
 
@@ -300,8 +299,7 @@ defmodule KaguyaWeb.HomeLive.Index do
   # appends another page, a run that straddled the boundary surfaces as
   # two adjacent entries with the same group key — merge them so the
   # rendered count is "X liked 50 covers" instead of "36 + 14". Render-only;
-  # never written back to the source data. Mirrors `stitchAdjacentEntries`
-  # in `../personal/legacy-next-app/src/components/home/HomeActivityFeed.tsx`.
+  # never written back to the source data.
   # ---------------------------------------------------------------------------
 
   @members_display_cap Kaguya.Activities.GroupedFeed.members_cap()

@@ -3,12 +3,12 @@ defmodule KaguyaWeb.Components.VN.Cards do
   Shared VN/character/list/review render primitives reused across profile
   tabs (overview, reviews, lists, library) and the VN page.
 
-  Mirrors the Next.js shared components:
+  Provides:
 
-    * `Cover`        → `cover/1`
-    * `CharacterImage` → `character_image/1`
-    * `StackedCovers`  → `stacked_covers/1`
-    * `VnReviewCard`   → `vn_review_card/1`
+    * `cover/1`
+    * `character_image/1`
+    * `stacked_covers/1`
+    * `vn_review_card/1`
 
   These are function components: pure inputs in, HEEx out. No LiveView state.
   """

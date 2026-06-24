@@ -1268,11 +1268,10 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
       "inline-flex h-[34px] items-center gap-1.5 rounded-full border border-white/[7%] bg-white/[4%] px-3.5 text-[13px] font-medium text-foreground-primary outline-none transition-colors duration-150 hover:border-white/[12%] hover:bg-white/[7%] focus:outline-none focus-visible:outline-none focus-within:border-white/[14%] focus-within:bg-white/[7%]"
 
     if active? do
-      # Drifts from prod (Next.js), which uses a brand-red border. Brand here
-      # is crimson (rgb 155 1 61), and red borders read as destructive/error
-      # next to the page's actual semantic-error chips. Filled neutral pill
-      # is the cleaner "this chip is selected" signal — bg does the work,
-      # not color.
+      # Brand here is crimson (rgb 155 1 61), and red borders read as
+      # destructive/error next to the page's actual semantic-error chips.
+      # A filled neutral pill is the cleaner "this chip is selected" signal:
+      # bg does the work, not color.
       # `!` overrides the base `bg-white/[4%]` (Tailwind v4 emits utilities
       # alphabetically; without !important the base wins on same-specificity
       # ties — prod sidesteps this via tailwind-merge, we string-concat).

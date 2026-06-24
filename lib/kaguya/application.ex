@@ -78,9 +78,8 @@ defmodule Kaguya.Application do
               lazy: true
             )
         ),
-        # Viewer-independent core of each VN detail page (`/vn/:slug`). The
-        # origin-side replacement for the Cloudflare edge cache the legacy
-        # Next.js page had. Keyed per VN × content-pref combo × mod visibility;
+        # Viewer-independent core of each VN detail page (`/vn/:slug`).
+        # Keyed per VN × content-pref combo × mod visibility;
         # invalidated on writes by `KaguyaWeb.VNLive.VNPageCache`. 2_000 entries
         # ≈ a few hundred hot VNs × their bounded pref/page variants.
         cachex_child(:vn_page_cache,

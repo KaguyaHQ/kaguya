@@ -621,7 +621,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
   end
 
   # When leaving the READ shelf, drop the read-specific sort options that
-  # don't make sense elsewhere. Matches the Next layout's behavior.
+  # don't make sense elsewhere.
   defp clear_shelf_specific_sort(filters, shelf) do
     case {filters.sort, shelf} do
       {sort, {:status, :read}} when sort in [:date_finished_desc, :date_finished_asc] -> filters

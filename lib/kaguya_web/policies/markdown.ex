@@ -2,12 +2,8 @@ defmodule KaguyaWeb.Policies.Markdown do
   @moduledoc """
   Tiny markdown → HTML renderer for static policy pages.
 
-  Mirrors the production `LegalMarkdown.tsx` component
-  (`../personal/legacy-next-app/src/components/legal/LegalMarkdown.tsx`):
-
-    * `## Heading` / `### Heading` with the production class set, plus
-      the production split for numbered headings ("1. Title" → a
-      `.no-underline` number span and a title span).
+    * `## Heading` / `### Heading`, plus a split for numbered headings
+      ("1. Title" → a `.no-underline` number span and a title span).
     * `- item` / `* item` unordered lists.
     * `1. item` ordered lists.
     * `---` horizontal rules.

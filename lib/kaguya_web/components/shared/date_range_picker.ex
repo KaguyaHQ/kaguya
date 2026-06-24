@@ -12,9 +12,7 @@ defmodule KaguyaWeb.SharedComponents.DateRangePicker do
   parent LiveView's `handle_info/2`. The parent persists and re-renders the
   component with the new dates.
 
-  Mirrors `src/components/shared/ReadDateRangePicker.tsx` on the Next.js side,
-  including the dropdown month/year navigation (react-day-picker's
-  `captionLayout="dropdown"`).
+  Includes dropdown month/year navigation.
   """
 
   use KaguyaWeb, :live_component
@@ -130,8 +128,7 @@ defmodule KaguyaWeb.SharedComponents.DateRangePicker do
 
     # Paint the new dates locally *before* the server roundtrip lands. The
     # `:unset` sentinel switches back once `update/2` sees the parent's
-    # canonical assigns line up with what we optimistically applied. Matches
-    # the autosave/pending_range buffer in `ReadDateRangePicker.tsx`.
+    # canonical assigns line up with what we optimistically applied.
     {:noreply,
      socket
      |> assign(:pending_started, started)

@@ -7,8 +7,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
   editable in this dialog — they're properties of the post, not of the
   current revision.
 
-  The Next.js parity component is the edit branch of `NewPostDialog.tsx`;
-  we don't reuse the full new-post UI here because the category picker is
+  We don't reuse the full new-post UI here because the category picker is
   pointless in edit mode and the simpler dialog keeps the show page cleaner.
   """
 

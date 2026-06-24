@@ -2,7 +2,6 @@ defmodule KaguyaWeb.ProfileLive.Stats do
   @moduledoc """
   `/@:username/stats` — detailed reading stats dashboard.
 
-  Phoenix-side port of `../personal/legacy-next-app/src/app/(main)/users/[username]/stats/page.tsx`.
   The charts are intentionally server-rendered: CSS/SVG bars and donuts for
   stable first paint, with the shared ratings surfaces reused where parity
   depends on the existing app-wide treatment.

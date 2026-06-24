@@ -4,8 +4,7 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
 
   Single source of truth for everywhere users author markdown: comment
   composers, comment-edit forms, the review editor, and (eventually) any
-  other markdown surface. Mirrors `MarkdownEditor.tsx` + `ReplyInput.tsx`
-  on the Next.js side: Cmd/Ctrl+B/I/K for inline formatting, Cmd+Enter to
+  other markdown surface. Cmd/Ctrl+B/I/K for inline formatting, Cmd+Enter to
   submit, auto-height textarea, click-anywhere-to-focus, expand-on-focus.
 
   Client behavior lives in the `MarkdownEditor` JS hook

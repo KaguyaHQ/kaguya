@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.SharedComponents.UserAvatar do
   @moduledoc """
-  Shared user avatar component — Phoenix-side port of
-  `../personal/legacy-next-app/src/components/shared/UserAvatar.tsx` (+ `AvatarFallbackIcon.tsx`).
+  Shared user avatar component.
 
   One reusable HEEx component replacing six per-domain `avatar/1`
   definitions (`app_navbar`, `home/activity_components`, `comments`,
@@ -34,7 +33,7 @@ defmodule KaguyaWeb.SharedComponents.UserAvatar do
   - `link={true}` wraps the avatar in an `<a href="/@username">` (matches
     the `comments` `linked` clause and `lists/cards` `user_avatar`).
   - `srcset` is emitted automatically when both `:small` and `:medium`
-    URLs are available, matching `UserAvatar.tsx`'s 120 w / 360 w pair.
+    URLs are available (120 w / 360 w pair).
 
   ## Examples
 
@@ -71,7 +70,7 @@ defmodule KaguyaWeb.SharedComponents.UserAvatar do
     default: :initials,
     values: [:initials, :default_url, :empty, :silhouette],
     doc:
-      "Rendered placeholder when the user has no avatar. `:silhouette` mirrors `../personal/legacy-next-app/src/components/shared/AvatarFallbackIcon.tsx` — scales with container, ideal for large avatars."
+      "Rendered placeholder when the user has no avatar. `:silhouette` scales with container, ideal for large avatars."
 
   attr :link, :boolean, default: false, doc: "Wrap in `<a href=\"/@username\">`."
 

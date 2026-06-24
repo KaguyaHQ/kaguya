@@ -2,9 +2,8 @@ defmodule KaguyaWeb.ProfileLive.Lists do
   @moduledoc """
   `/@:username/lists` — paginated VN lists.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/ListsTab.tsx` and its
-  `ListRow` dependency. The LiveView reads `Kaguya.Lists` directly with
-  the current viewer's visibility/content preferences.
+  The LiveView reads `Kaguya.Lists` directly with the current viewer's
+  visibility/content preferences.
   """
 
   use KaguyaWeb.ProfileLive, tab: :lists, title_suffix: "Lists"

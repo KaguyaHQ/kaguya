@@ -58,7 +58,7 @@ defmodule KaguyaWeb.VNLive.Edit do
   @impl true
   def handle_params(_params, _uri, %{assigns: %{live_action: :new}} = socket) do
     # A change summary is required to submit, so the create form ships with a
-    # sensible default the contributor can override (mirrors the Next flow).
+    # sensible default the contributor can override.
     create_form = Map.put(Form.empty_form(), "summary", "Initial creation")
 
     base = [
@@ -196,9 +196,9 @@ defmodule KaguyaWeb.VNLive.Edit do
 
   # ── Create type-fork (the pre-step before the form) ──────────────────
   #
-  # Mirrors the Next.js CreateVnTypeFork: pick a category, type the title
-  # (which live-checks the catalog for duplicates), then continue into the
-  # form pre-filled with mode-appropriate defaults. Only reachable on :new.
+  # Pick a category, type the title (which live-checks the catalog for
+  # duplicates), then continue into the form pre-filled with
+  # mode-appropriate defaults. Only reachable on :new.
   @impl true
   def handle_event("select_create_mode", %{"mode" => mode}, socket) do
     mode = parse_mode(mode)
@@ -890,7 +890,7 @@ defmodule KaguyaWeb.VNLive.Edit do
 
   # Translate the chosen category into starting form defaults. Japanese VNs
   # default to a Japanese original language; AVNs default to English, flag
-  # is_avn, and start in-development (mirrors the Next fork). "Other" gets
+  # is_avn, and start in-development. "Other" gets
   # the neutral English default.
   defp form_for_mode(mode, title) do
     initial_lang = if mode == :jvn, do: "ja", else: "en"

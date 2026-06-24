@@ -1,10 +1,8 @@
 defmodule KaguyaWeb.SharedComponents.ModerationNotice do
   @moduledoc """
   Subtle inline notices for moderated content — locked threads and
-  moderator removals. Ported from `components/moderation/LockedNotice.tsx`
-  and `components/moderation/RemovalNotice.tsx` so LiveView surfaces match
-  the Next.js visual language (neutral tokens, small lead icon) instead of
-  the bright amber/red banners the early LiveView port used.
+  moderator removals. Uses neutral tokens and a small lead icon instead of
+  bright amber/red banners.
   """
 
   use KaguyaWeb, :html

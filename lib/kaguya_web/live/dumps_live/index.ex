@@ -2,9 +2,8 @@ defmodule KaguyaWeb.DumpsLive.Index do
   @moduledoc """
   Public database dump download page.
 
-  Mirrors `../personal/legacy-next-app/src/app/(main)/dumps/page.tsx`, but reads the published
-  archive listing directly from `Kaguya.PublicDump.Publisher` instead of
-  round-tripping through the old JSON-only `/dumps` endpoint.
+  Reads the published archive listing directly from
+  `Kaguya.PublicDump.Publisher`.
   """
 
   use KaguyaWeb, :live_view

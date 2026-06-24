@@ -1,9 +1,8 @@
 defmodule KaguyaWeb.Components.Discussions.PostActionsMenu do
   @moduledoc """
-  Post-level "..." actions dropdown for the discussion show page. Mirrors
-  `components/discussions/PostActionsMenu.tsx` — owner Edit + Delete,
-  moderator Pin/Lock/Hide, non-owner Report, and an admin Delete for mods
-  on other people's posts.
+  Post-level "..." actions dropdown for the discussion show page: owner
+  Edit + Delete, moderator Pin/Lock/Hide, non-owner Report, and an admin
+  Delete for mods on other people's posts.
 
   All actions are emitted as phx-click events to the parent LiveView
   (`KaguyaWeb.DiscussionLive.Show`); this component just decides which

@@ -1,8 +1,6 @@
 // Markdown composer hook — paired with `KaguyaWeb.SharedComponents.MarkdownEditor`.
-// Mirrors the Next.js `MarkdownEditor.tsx` behavior: Cmd/Ctrl+B/I/K wrap
-// selection, Cmd/Ctrl+Enter submits, textarea auto-grows, focus expands the
-// composer via the configured event. The legacy `ReplyInput` registration
-// name still resolves here for any in-flight call sites.
+// Cmd/Ctrl+B/I/K wrap selection, Cmd/Ctrl+Enter submits, textarea auto-grows,
+// focus expands the composer via the configured event.
 
 const MarkdownEditor = {
   mounted() {

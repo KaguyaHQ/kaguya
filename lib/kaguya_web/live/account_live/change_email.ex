@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.AccountLive.ChangeEmail do
   @moduledoc """
-  Change-email form for authenticated users. Mirrors
-  `../personal/legacy-next-app/src/components/account/NewEmailForm.tsx`.
+  Change-email form for authenticated users.
 
   Submission posts to `/account/update-email`. The app sends a Phoenix-owned
   verification link to the new address; `/auth/confirm` applies the change.

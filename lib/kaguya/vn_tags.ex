@@ -67,11 +67,9 @@ defmodule Kaguya.VNTags do
   Lists every tag with at least one non-spoiler, non-overruled VN vote,
   ordered by `vns_count` desc.
 
-  Returns all categories *including* `:sexual`. The frontend separates
-  browse from editor surfaces via the `getVnTags/0` helper in
-  `src/data/vnTags.ts` — browse callers default to excluding sexual; the
-  add-tag dialog opts in. Returning every category here keeps a single
-  source of truth for the generated `vnTags.ts` snapshot.
+  Returns all categories *including* `:sexual`. Browse callers default to
+  excluding sexual; the add-tag dialog opts in. Returning every category
+  here keeps a single source of truth.
 
   `vns_count` is intentionally still bounded to non-spoiler, non-overruled
   votes so the popularity sort matches what users actually see on browse
@@ -110,7 +108,7 @@ defmodule Kaguya.VNTags do
   @doc """
   Searches VN tags for editor surfaces.
 
-  Mirrors the Next.js add-tag dialog ranking: exact name matches first,
+  Add-tag dialog ranking: exact name matches first,
   then prefix matches, then contains matches, with higher VN usage first
   inside each tier. Sexual tags are included because this is an editor
   surface, not a browse filter.

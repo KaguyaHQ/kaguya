@@ -2,10 +2,7 @@ defmodule KaguyaWeb.ProfileLive.Recs do
   @moduledoc """
   `/@:username/recs` — personalized VN recommendations.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/RecommendationsTab.tsx` and
-  the `RecommendationList` list variant. Data comes from
-  `Kaguya.Recommendations` directly.
-  the Next app, not an internal dependency for LiveView.
+  Data comes from `Kaguya.Recommendations` directly.
   """
 
   use KaguyaWeb.ProfileLive, tab: :recs, title_suffix: "Recommendations"

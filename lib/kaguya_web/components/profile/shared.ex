@@ -3,8 +3,7 @@ defmodule KaguyaWeb.Components.Profile.Shared do
   Small reusable atoms shared across profile pages.
 
   Includes the `user_badge` component, the member-since footer, and the
-  `format_short_number/1` helper that mirrors the Next.js
-  `formatToShortenNumber` so counts render identically across surfaces.
+  `format_short_number/1` helper for compact counts across surfaces.
   """
 
   use KaguyaWeb, :html
@@ -16,8 +15,7 @@ defmodule KaguyaWeb.Components.Profile.Shared do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Compact number formatting matching `formatToShortenNumber` in the Next.js
-  app: `0`, `1.2K`, `34.5M`. Trailing `.0` is stripped.
+  Compact number formatting: `0`, `1.2K`, `34.5M`. Trailing `.0` is stripped.
   """
   def format_short_number(nil), do: "0"
   def format_short_number(0), do: "0"
@@ -44,7 +42,6 @@ defmodule KaguyaWeb.Components.Profile.Shared do
 
   @doc """
   Staff / developer badge. Thin wrapper around `SharedComponents.Badge`.
-  Mirrors `UserBadge.tsx`.
   """
   attr :kind, :atom, default: :staff
   attr :class, :any, default: nil

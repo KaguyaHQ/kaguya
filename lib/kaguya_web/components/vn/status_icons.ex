@@ -3,22 +3,18 @@ defmodule KaguyaWeb.VN.StatusIcons do
   Single source of truth for the six reading-status glyphs used on the VN
   page (status segments, sidebar, mobile drawer, dropdowns).
 
-  Port of `src/utils/statusIcons.tsx` on the Next.js side. Next uses
-  `@phosphor-icons/react` for these specific icons — *not* `lucide-react`
-  — so the Phoenix migration must follow suit. The Phosphor paths and the
+  These use Phosphor icon paths — *not* Lucide. The Phosphor paths and the
   Lucide paths look visibly different at the same size (different stroke
   curves, different inner shapes for the rounded variants).
 
   ## Why a separate module from `lucide_icons`
 
-  - **Family mismatch.** Next pulls these from Phosphor, which ships
+  - **Family mismatch.** These come from Phosphor, which ships
     hand-tuned `regular` and `fill` variants per icon. CSS
     `fill-current` on a Lucide outline does *not* reproduce a Phosphor
     `fill` glyph (different inner geometry, different proportions).
-  - **Custom sparkle.** Next explicitly rejects Phosphor's own
-    `Sparkle` — see the comment in `statusIcons.tsx:9-11` — in favor of
+  - **Custom sparkle.** Phosphor's own `Sparkle` is rejected in favor of
     a BoxIcons-derived custom SVG with matching fill/regular variants.
-    We follow the same choice.
 
   ## API
 
@@ -26,14 +22,13 @@ defmodule KaguyaWeb.VN.StatusIcons do
 
   - `kind`: one of `:wishlist | :reading | :read | :paused
     | :did_not_finish | :not_interested`
-  - `weight`: `:regular` (outline) or `:fill` (solid). Mirrors the
-    Phosphor `weight` prop.
+  - `weight`: `:regular` (outline) or `:fill` (solid).
   - `class`: forwarded onto the `<svg>` element. Color is inherited
     via `currentColor`.
 
   Paths copied from `@phosphor-icons/react@2.1.10` (Phosphor Icons v2)
   for `BookOpen`, `CheckCircle`, `PauseCircle`, `StopCircle`, `XCircle`.
-  Sparkle from `statusIcons.tsx:13-44` (BoxIcons variant).
+  Sparkle is a BoxIcons-derived variant.
   """
 
   use KaguyaWeb, :html

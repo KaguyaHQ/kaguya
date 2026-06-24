@@ -2,8 +2,7 @@ defmodule KaguyaWeb.Components.Profile.ActivitySnapshot do
   @moduledoc """
   Right-sidebar activity snapshot rendered on the overview tab.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/ProfileActivitySnapshot.tsx`:
-  vertical timeline (dot + connecting line) with verb sentences in muted
+  Vertical timeline (dot + connecting line) with verb sentences in muted
   text and the entity name as a bold link. Read-only — no optimistic UI.
   """
 

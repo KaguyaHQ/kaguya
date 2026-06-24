@@ -2,9 +2,9 @@ defmodule KaguyaWeb.AuthPromptComponents do
   @moduledoc """
   Shared signed-out auth prompt components.
 
-  This mirrors the Next.js `AuthLink` / `AuthPromptModal` pair: callers keep
-  their normal destination for signed-in viewers, while anonymous viewers get
-  an inline prompt that preserves the current page as the login return target.
+  Callers keep their normal destination for signed-in viewers, while anonymous
+  viewers get an inline prompt that preserves the current page as the login
+  return target.
   """
 
   use KaguyaWeb, :html

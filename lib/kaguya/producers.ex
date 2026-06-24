@@ -201,8 +201,8 @@ defmodule Kaguya.Producers do
   Returns visible producers for sitemap indexing.
 
   Mirrors `list_visual_novels_for_sitemap/2` shape so `SitemapController` can
-  pull paginated slug + updated_at maps without preloading images (Next.js
-  `sitemap.ts` doesn't emit image sitemaps for producers).
+  pull paginated slug + updated_at maps without preloading images (no image
+  sitemaps are emitted for producers).
   """
   def list_producers_for_sitemap(page \\ 1, page_size \\ 1000) do
     query =

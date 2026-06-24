@@ -2,9 +2,7 @@ defmodule KaguyaWeb.Policies.Content do
   @moduledoc """
   Static content for the policy / about / FAQ pages.
 
-  Each entry mirrors its production source under
-  `../personal/legacy-next-app/src/app/(main)/(policies)/<slug>/page.tsx`. Keep this in
-  sync when production policy text changes.
+  Keep this in sync when policy text changes.
   """
 
   @base_url "https://kaguya.io"
@@ -52,14 +50,13 @@ defmodule KaguyaWeb.Policies.Content do
       ## Tech Stack
 
       **Backend**
-      - [Elixir](https://elixir-lang.org/) & [Phoenix](https://www.phoenixframework.org/) (LiveView)
+      - [Elixir](https://elixir-lang.org/) & [Phoenix](https://www.phoenixframework.org/)
       - [Supabase](https://supabase.com/) (PostgreSQL hosting)
 
       **Frontend**
-      - [Next.js](https://nextjs.org/) & [React](https://react.dev/)
-      - [TypeScript](https://www.typescriptlang.org/)
+      - [Phoenix LiveView](https://www.phoenixframework.org/) (HEEx templates)
       - [Tailwind CSS](https://tailwindcss.com/)
-      - [shadcn/ui](https://ui.shadcn.com/)
+      - [SaladUI](https://salad-ui.fly.dev/)
       """
     },
     "faq" => %{

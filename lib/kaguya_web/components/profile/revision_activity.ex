@@ -2,8 +2,7 @@ defmodule KaguyaWeb.Components.Profile.RevisionActivity do
   @moduledoc """
   Profile contribution activity rows and burst groups.
 
-  This ports the row density and behavior of the Next.js `ActivityLogEntry`
-  and `ActivityLogGroup` components while delegating field-level rendering to
+  Delegates field-level rendering to
   `KaguyaWeb.Components.Profile.RevisionDiff`.
   """
 

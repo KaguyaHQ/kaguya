@@ -2,17 +2,14 @@ defmodule KaguyaWeb.Home.ActivityComponents do
   @moduledoc """
   Compact activity rail for the signed-in home page.
 
-  Mirrors `../personal/legacy-next-app/src/components/home/HomeActivityFeed.tsx`:
-
     * Per-row avatar + actor link + verb sentence + relative timestamp.
     * Same-actor follow-ups collapse — avatar hidden, indented `ml-[38px]`,
-      smaller text — mirroring the Next.js compaction rule.
+      smaller text.
     * Server-grouped entries (`group_size > 1`) render as a single
       summary sentence (`liked 50 covers from <vn>`, `started reading
       <vn₀> and <vn₁>`, `followed <a> and <b>`).
     * Reviews and lists are excluded from the activity stream on every
       surface — they live in the home feed and on `/reviews` / `/lists`.
-      Mirrors Next.js's `excludeActions` in `HomeActivityFeed.tsx`.
 
   Verb resolution and href mapping are shared with the profile activity
   feed via `KaguyaWeb.Components.Activity.Helpers` and the inline verb
@@ -47,7 +44,7 @@ defmodule KaguyaWeb.Home.ActivityComponents do
   attr :can_top_up, :boolean,
     default: false,
     doc:
-      "Bounded sidebar only. When true, the JS hook is allowed to fire `bounded_top_up` once if the rail's rendered height is shorter than the viewport — mirrors the same-user-compaction backstop in HomeActivityFeed.tsx."
+      "Bounded sidebar only. When true, the JS hook is allowed to fire `bounded_top_up` once if the rail's rendered height is shorter than the viewport — a same-user-compaction backstop."
 
   def activity_feed(assigns) do
     ~H"""
@@ -616,7 +613,7 @@ defmodule KaguyaWeb.Home.ActivityComponents do
 
   # Class for bold target links inside the home rail. Truncates long titles
   # and switches to the muted-secondary tone on collapsed (same-actor
-  # follow-up) rows to mirror Next.js `HomeActivityFeed.tsx` line 528-532.
+  # follow-up) rows.
   # NOTE: do not add `truncate` here — it sets `white-space: nowrap` on
   # the title link, which would force the entire title onto a single
   # unbroken inline unit and defeat the sentence's `line-clamp-2`
@@ -630,7 +627,7 @@ defmodule KaguyaWeb.Home.ActivityComponents do
     do:
       "font-medium text-[rgb(var(--foreground-primary))] transition-colors hover:text-[rgb(var(--text-link-hover))]"
 
-  # Same-actor follow-up rule mirrors `HomeActivityFeed.tsx`: both rows
+  # Same-actor follow-up rule: both rows
   # must be compact (not a full review/list card) and share the same
   # actor id. Reviewed/created_list rows always start a new group.
   defp collapse_user?(nil, _), do: false

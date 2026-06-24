@@ -2,8 +2,7 @@ defmodule KaguyaWeb.Components.Profile.Activity do
   @moduledoc """
   Function components and helpers for the `/@:username/activity` feed.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/activity/ActivityItem.tsx`. Each
-  activity row picks a layout based on the action verb:
+  Each activity row picks a layout based on the action verb:
 
     * `:reviewed` — full VN review card.
     * `:created_list` — full activity list card.
@@ -11,7 +10,7 @@ defmodule KaguyaWeb.Components.Profile.Activity do
     * `:recommended_similar` — verb row + paired covers.
     * everything else — `CompactActivityItem` verb row.
 
-  Sidebar mirrors `ActivitySidebar.tsx`: 25-avatar following grid, or the
+  Sidebar: 25-avatar following grid, or the
   "members worth following" empty-state when the profile owner follows
   nobody (and we have discover users seeded).
   """

@@ -4,8 +4,7 @@ defmodule KaguyaWeb.SignupController do
   or the post-signup wizard (`KaguyaWeb.AuthLive.AccountSetup`) based on the
   `action` query param, while preserving the URL.
 
-  This mirrors the Next.js production app at `../personal/legacy-next-app/src/app/(auth)/signup/page.tsx`,
-  where `/signup?action=account_setup` is the canonical onboarding URL that
+  `/signup?action=account_setup` is the canonical onboarding URL that
   Phoenix magic-link confirmations redirect to.
 
   Each target LiveView declares its own `on_mount {KaguyaWeb.UserAuth, :default}`

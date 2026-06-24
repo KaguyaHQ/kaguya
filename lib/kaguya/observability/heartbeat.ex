@@ -2,10 +2,8 @@ defmodule Kaguya.Observability.Heartbeat do
   @moduledoc """
   Periodic BEAM health beacon shipped to Axiom.
 
-  Mirrors the Next.js diagnostics heartbeat
-  (`../personal/legacy-next-app/src/lib/diagnostics.ts`) so the same Axiom dashboards work
-  across both stacks. Three event_types are emitted, all as Logger calls
-  so the existing `Kaguya.Observability.AxiomLogHandler` routes them to Axiom without
+  Three event_types are emitted, all as Logger calls so the existing
+  `Kaguya.Observability.AxiomLogHandler` routes them to Axiom without
   any new plumbing:
 
     * `PROCESS_START` — emitted once on startup. Every occurrence in
@@ -64,8 +62,8 @@ defmodule Kaguya.Observability.Heartbeat do
 
     # :warning so the event clears the AxiomLogHandler's severity gate
     # (:warning+) and reaches Axiom on every tick — needed for the
-    # memory-trend / process-restart dashboards that the Next.js side
-    # already drives off the equivalent `HEARTBEAT` event. The level is
+    # memory-trend / process-restart dashboards driven off the `HEARTBEAT`
+    # event. The level is
     # operationally "interesting", not "something is wrong"; filter
     # dashboards / pagers by `event_type == "HEARTBEAT"` rather than by
     # level if heartbeats clutter warning queries.

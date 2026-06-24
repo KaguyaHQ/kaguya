@@ -1,8 +1,7 @@
 defmodule KaguyaWeb.Components.Profile.FollowButton do
   @moduledoc """
-  Follow / unfollow button.
+  Follow / unfollow button (default, non-custom-trigger variant).
 
-  Mirrors `FollowButton.tsx` for the default (non-custom-trigger) variant.
   Desktop hover swaps the "Following" label to "Unfollow"; mobile shows
   "Unfollow" directly when following.
 

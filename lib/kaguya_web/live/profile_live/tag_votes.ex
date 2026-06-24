@@ -2,9 +2,6 @@ defmodule KaguyaWeb.ProfileLive.TagVotes do
   @moduledoc """
   `/@:username/votes/tag` — cursor-paginated tag votes by the user.
 
-  Stream 0 stub. The tag-votes agent replaces the body to mirror
-  `../personal/legacy-next-app/src/components/profile/UserTagVotesList.tsx`.
-
   ProfileNav is hidden here too (mobile compact row only).
   """
 

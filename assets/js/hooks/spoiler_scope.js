@@ -1,8 +1,7 @@
 // Persists the "spoiler revealed" state for a review-level spoiler gate
-// (the `<details>` wrapping a review body when `is_spoiler` is true). Mirrors
-// the Next.js `useSpoilerRevealed` hook so the same localStorage key
-// (`spoiler:{review-id}`) controls both apps — a user who reveals a spoiler
-// in one surface won't see the gate again in the other.
+// (the `<details>` wrapping a review body when `is_spoiler` is true). The
+// localStorage key (`spoiler:{review-id}`) controls the gate so a user who
+// reveals a spoiler won't see the gate again on return.
 //
 // Usage:
 //   <details
@@ -11,8 +10,7 @@
 //     data-spoiler-scope={"review:#{@review.id}"}
 //   >...</details>
 //
-// The scope id is opaque — any `{namespace}:{id}` string works; we only
-// require it to match the Next.js convention to keep storage compatible.
+// The scope id is opaque (any `{namespace}:{id}` string works).
 
 const STORAGE_PREFIX = "spoiler:"
 

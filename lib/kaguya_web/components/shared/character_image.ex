@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.SharedComponents.CharacterImage do
   @moduledoc """
-  Shared character portrait — Phoenix-side port of
-  `../personal/legacy-next-app/src/components/shared/CharacterImage.tsx`.
+  Shared character portrait.
 
   Mirrors `KaguyaWeb.SharedComponents.Cover` for the character side:
   resolved srcset, NSFW blur, fallback, optional name tooltip attr.

@@ -33,10 +33,8 @@ defmodule KaguyaWeb.VN.Formatters do
   @doc """
   Returns a human-readable length label for a VN.
 
-  Mirrors `formatLengthMinutes`/`formatLengthCategory` in
-  `../personal/legacy-next-app/src/utils/vnHelpers.ts`: rounds `length_minutes` to whole
-  hours (minimum 1h) and only falls back to the humanized
-  `length_category` when minutes are missing.
+  Rounds `length_minutes` to whole hours (minimum 1h) and only falls back
+  to the humanized `length_category` when minutes are missing.
   """
   def length_label(%{length_minutes: minutes}) when is_integer(minutes) and minutes > 0 do
     hours = max(round(minutes / 60), 1)
@@ -84,8 +82,7 @@ defmodule KaguyaWeb.VN.Formatters do
 
   @doc """
   Stretches a raw 0–1 tag `relevance_score` to the 10–96 percentage range used
-  by `src/components/shared/TagChip.tsx#normalizeRelevance`, so the LiveView
-  chip percentages match prod within rounding error.
+  on tag chips.
   """
   def tag_percentage(%{relevance_score: score}) when is_number(score) do
     neutral = 0.65

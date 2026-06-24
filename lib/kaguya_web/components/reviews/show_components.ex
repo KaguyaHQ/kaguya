@@ -6,8 +6,6 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
   maps produced by `KaguyaWeb.ReviewLive.Data` so they never reach into
   Ecto schemas directly.
 
-  Layout parity with the Next.js source (`SingleReview.tsx`):
-
     * `review_header/1` — author row + VN title + rating stars (desktop)
     * `mobile_header/1` — compact mobile variant
     * `review_body/1`   — review prose (escaped, link-aware)
@@ -197,17 +195,16 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
   @doc """
   Like button + overflow menu (Share / Edit / Delete / Hide / Lock).
 
-  Mirrors Next.js `SingleReview.tsx` `<LikeButton/> + <ReviewActionsMenu/>`
-  row: Share is the first item *inside* the dropdown (not a separate
-  button), so anonymous viewers and viewers without edit/mod rights still
-  see the menu trigger.
+  Share is the first item *inside* the dropdown (not a separate button), so
+  anonymous viewers and viewers without edit/mod rights still see the menu
+  trigger.
   """
   def actions_bar(assigns) do
     ~H"""
     <%!--
       No `mt-5` here — the body wrapper above carries the spacing
-      (matches Next.js `SingleReview.tsx`, where actions sit flush below
-      body with only `prose-p:my-3`'s trailing margin between them).
+      (actions sit flush below body with only `prose-p:my-3`'s trailing
+      margin between them).
     --%>
     <div class="flex items-center gap-5">
       <LikeButton.like_button
@@ -456,8 +453,6 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
 
   @doc """
   Read-only 5-star rating display.
-
-  Shared Phoenix-side port of `DisplayRatings.tsx`.
   """
   def display_ratings(assigns), do: KaguyaWeb.VN.Icons.display_ratings(assigns)
 
@@ -552,8 +547,7 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
 
   defp fractional_rating?(_), do: false
 
-  # "DD MMM YYYY" formatter to match Next.js `dayjs(date).format("DD MMM YYYY")`
-  # used in `SingleReviewMobileHeader.tsx`.
+  # "DD MMM YYYY" formatter used in the mobile header.
   defp short_date(nil), do: ""
 
   defp short_date(%DateTime{} = dt) do

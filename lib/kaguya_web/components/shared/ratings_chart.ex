@@ -2,9 +2,8 @@ defmodule KaguyaWeb.Components.Shared.RatingsChart do
   @moduledoc """
   Shared ratings distribution chart.
 
-  Phoenix-side port of `components/shared/RatingsChart.tsx`. Used by the
-  profile overview and VN header so bar sizing, labels, footer, links, and
-  tooltip treatment do not drift across surfaces.
+  Used by the profile overview and VN header so bar sizing, labels, footer,
+  links, and tooltip treatment do not drift across surfaces.
   """
 
   use KaguyaWeb, :html

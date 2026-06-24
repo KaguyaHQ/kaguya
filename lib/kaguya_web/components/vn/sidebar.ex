@@ -649,8 +649,7 @@ defmodule KaguyaWeb.VN.Sidebar do
     ]
   end
 
-  # Matches the SEGMENT_COLORS map in prod's `statusUtils.tsx` — each
-  # reading status owns a distinct hue so the active segment reads at a
+  # Each reading status owns a distinct hue so the active segment reads at a
   # glance.
   defp status_color_class("WANT_TO_READ"), do: "text-[rgb(var(--status-wishlist))]"
   defp status_color_class("CURRENTLY_READING"), do: "text-[rgb(var(--status-reading))]"

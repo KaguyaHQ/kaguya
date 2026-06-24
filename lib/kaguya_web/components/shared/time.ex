@@ -1,9 +1,6 @@
 defmodule KaguyaWeb.SharedComponents.Time do
   @moduledoc """
-  Shared date labels matching production's `dayjs.calendarCustom()` helper.
-
-  Source of truth:
-  `../personal/legacy-next-app/src/utils/dayjs.ts`
+  Shared date labels for relative and absolute timestamps.
   """
 
   @month_names ~w(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
@@ -130,7 +127,7 @@ defmodule KaguyaWeb.SharedComponents.Time do
   @doc """
   Formats a date as `D MMM YYYY` (e.g. `15 Mar 2024`).
 
-  Matches Next.js `dayjs(value).format("D MMM YYYY")`. Accepts ISO date or
+  Accepts ISO date or
   datetime strings, `Date`, `NaiveDateTime`, and `DateTime`. Returns `nil`
   for unparseable input so callers can decide how to render the absence.
   """
@@ -165,8 +162,6 @@ defmodule KaguyaWeb.SharedComponents.Time do
 
   @doc """
   Formats a date as `MMMM D, YYYY` (e.g. `March 15, 2024`).
-
-  Matches Next.js `dayjs(value).format("MMMM D, YYYY")`.
   """
   def format_long_date(nil), do: nil
 
@@ -198,8 +193,7 @@ defmodule KaguyaWeb.SharedComponents.Time do
   @doc """
   Formats a datetime as `MMMM D, YYYY [at] h:mm A` (e.g. `March 15, 2024 at 3:30 PM`).
 
-  Matches Next.js `dayjs(value).format("MMMM D, YYYY [at] h:mm A")` used by
-  `DateTooltip`. Useful for hover tooltips on `<time>` elements.
+  Used by `DateTooltip`. Useful for hover tooltips on `<time>` elements.
   """
   def format_datetime_tooltip(nil), do: nil
 
@@ -222,8 +216,7 @@ defmodule KaguyaWeb.SharedComponents.Time do
   @doc """
   Formats a datetime as `MMM D, YYYY HH:mm` (e.g. `Mar 15, 2024 15:30`).
 
-  Matches Next.js `dayjs(value).format("MMM D, YYYY HH:mm")` used in the
-  changes log and activity log entry tooltips.
+  Used in the changes log and activity log entry tooltips.
   """
   def format_datetime_short(nil), do: nil
 
@@ -247,7 +240,7 @@ defmodule KaguyaWeb.SharedComponents.Time do
   @doc """
   Formats a datetime's time-of-day as `HH:mm` (24-hour, e.g. `15:30`).
 
-  Matches Next.js `dayjs(value).format("HH:mm")` used by activity log entries.
+  Used by activity log entries.
   """
   def format_time_24h(nil), do: nil
 
@@ -262,8 +255,6 @@ defmodule KaguyaWeb.SharedComponents.Time do
 
   @doc """
   Formats a datetime's time-of-day as `h:mm A` (12-hour with AM/PM, e.g. `3:30 PM`).
-
-  Matches Next.js `dayjs(value).format("h:mm A")`.
   """
   def format_time_12h(nil), do: nil
 
@@ -279,8 +270,6 @@ defmodule KaguyaWeb.SharedComponents.Time do
 
   @doc """
   Returns the year as a string (e.g. `2024`).
-
-  Matches Next.js `dayjs(value).format("YYYY")` / `.year()`.
   """
   def format_year(%Date{year: year}), do: Integer.to_string(year)
   def format_year(%DateTime{year: year}), do: Integer.to_string(year)
@@ -289,8 +278,6 @@ defmodule KaguyaWeb.SharedComponents.Time do
 
   @doc """
   Returns the abbreviated month name (e.g. `Mar`).
-
-  Matches Next.js `dayjs(value).format("MMM")`.
   """
   def format_month_short(%Date{} = date), do: month_name(date)
   def format_month_short(%DateTime{} = dt), do: dt |> DateTime.to_date() |> format_month_short()

@@ -3,9 +3,8 @@ defmodule KaguyaWeb.ProfileLive.Follows do
   `/@:username/followers` and `/@:username/following` — cursor-paginated
   user lists.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/FollowPage.tsx`,
-  `FollowTabs.tsx`, and `FollowUserCard.tsx`. The two routes share a single
-  module; `@live_action` differentiates `:followers` vs `:following`.
+  The two routes share a single module; `@live_action` differentiates
+  `:followers` vs `:following`.
   """
 
   use KaguyaWeb.ProfileLive, tab: :followers, title_suffix: "Followers"

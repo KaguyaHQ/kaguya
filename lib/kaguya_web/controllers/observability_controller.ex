@@ -2,7 +2,7 @@ defmodule KaguyaWeb.ObservabilityController do
   @moduledoc """
   Browser → Axiom proxy for client-side observability events.
 
-  Mirrors the Next.js `/api/axiom` route handler. Accepts a small
+  Accepts a small
   allow-list of `event_type` values and emits a Logger call so the
   existing `Kaguya.Observability.AxiomLogHandler` ships the event with the same
   structured columns as server-side telemetry.

@@ -1,6 +1,5 @@
 // Browser-side Sentry init for the LiveView surface.
 //
-// Adapted from the Next.js client config in `../personal/legacy-next-app/src/instrumentation-client.ts`:
 //   - Manual sampling in `beforeSend` so events tagged critical=true always
 //     ship (auth, billing) while everything else is sampled at 25%.
 //   - Broad `ignoreErrors` list covering common browser/network/extension noise.
@@ -61,7 +60,6 @@ if (dsn) {
     },
 
     // Drop known browser noise before event processing.
-    // Kept in sync with `../personal/legacy-next-app/src/instrumentation-client.ts`.
     ignoreErrors: [
       // Browser quirks
       /Failed to read the 'localStorage' property from 'Window'/,

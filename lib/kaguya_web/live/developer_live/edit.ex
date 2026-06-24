@@ -955,9 +955,9 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
   defp ensure_summary("", _action), do: "Updated developer"
   defp ensure_summary(summary, _action), do: summary
 
-  # Build the attrs map for `Producers.create_from_edit/1`. Mirrors the
-  # Next.js producer create form (name/description/type/language + links);
-  # the whole form maps cleanly, so there are no deferred fields here.
+  # Build the attrs map for `Producers.create_from_edit/1`. The producer
+  # create form (name/description/type/language + links) maps cleanly, so
+  # there are no deferred fields here.
   defp to_create_attrs(form) do
     %{
       name: blank_to_nil(Map.get(form, "name")),

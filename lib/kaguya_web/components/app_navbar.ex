@@ -1,8 +1,7 @@
 defmodule KaguyaWeb.AppNavbar do
   @moduledoc """
   Site-wide top navigation rendered above every LiveView via the `:app`
-  layout. Mirrors the Next.js production navbar
-  (`../personal/legacy-next-app/src/components/navbar/Navbar.tsx`):
+  layout:
 
     * Desktop (>= lg)  — logo, primary nav (Browse / Lists / Members /
       Discussions), search input, notifications bell, avatar, library

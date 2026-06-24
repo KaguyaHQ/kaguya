@@ -1,19 +1,17 @@
 defmodule KaguyaWeb.Components.Shared.NotFoundPage do
   @moduledoc """
-  Full-bleed 404 page mirroring `../personal/legacy-next-app/src/components/shared/NotFoundPage.tsx`.
+  Full-bleed 404 page.
 
   A background painting of the moon scene fills the viewport; the "Return
   home" anchor is positioned over the moon at runtime by the
-  `NotFoundButton` hook, which replays the natural-coordinate math the
-  Next.js component uses so the button stays on the moon at every
-  viewport size.
+  `NotFoundButton` hook, which replays the natural-coordinate math so the
+  button stays on the moon at every viewport size.
 
   Two variants:
     * `:fullscreen` — for the static 404 controller route; takes up
       `min-h-screen` inside the document flow.
     * `:overlay` — for in-LiveView use; `fixed inset-0 z-[100]` so it
-      paints over the surrounding navbar/footer (matches
-      `(main)/not-found.tsx`).
+      paints over the surrounding navbar/footer.
   """
 
   use KaguyaWeb, :html

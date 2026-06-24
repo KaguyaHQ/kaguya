@@ -92,9 +92,7 @@ defmodule KaguyaWeb.Components.Activity.Verbs do
   # ---------------------------------------------------------------------------
   # :recommended_similar — "recommended <similar-link> on <source-link>"
   #
-  # Both the similar VN and the source VN are clickable, mirroring
-  # `RecommendedSimilarItem` in `../personal/legacy-next-app/src/components/profile/activity/
-  # ActivityItem.tsx` and the inline branch in `HomeActivityFeed.tsx`. The
+  # Both the similar VN and the source VN are clickable. The
   # profile feed's `recommended_similar_item/1` adds paired cover thumbs
   # below this sentence; the home rail keeps just the sentence.
   # ---------------------------------------------------------------------------

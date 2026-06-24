@@ -2,7 +2,6 @@ defmodule KaguyaWeb.SharedComponents.StatusIcons do
   @moduledoc """
   Single source of truth for reading-status icons + colors.
 
-  Mirrors `../personal/legacy-next-app/src/utils/statusIcons.tsx`:
     * Phosphor icons (CheckCircle, BookOpen, PauseCircle, StopCircle, XCircle)
       inlined as SVG so we don't pull in the whole icon set.
     * Custom Sparkle SVG for Wishlist — Phosphor's default looks wrong.
@@ -67,8 +66,7 @@ defmodule KaguyaWeb.SharedComponents.StatusIcons do
 
   @doc """
   Render the icon for a status. `weight="fill"` switches to the solid variant.
-  When `status` is nil, renders the sparkle "add" icon in the tertiary color —
-  same convention as Next.js (`getStatusIcon` with no status).
+  When `status` is nil, renders the sparkle "add" icon in the tertiary color.
   """
   def status_icon(%{status: nil} = assigns) do
     assigns = assign(assigns, :icon, :sparkle)
@@ -219,7 +217,7 @@ defmodule KaguyaWeb.SharedComponents.StatusIcons do
   end
 
   # Box-Icons-style sparkle (Wishlist). Phosphor's default sparkle reads as a
-  # "magic wand" — this one matches the Next.js custom SVG.
+  # "magic wand" — this is a custom SVG instead.
   defp svg_icon(%{icon: :sparkle, weight: "regular"} = assigns) do
     ~H"""
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class={@class} aria-hidden="true">

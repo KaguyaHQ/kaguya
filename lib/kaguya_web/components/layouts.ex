@@ -21,7 +21,7 @@ defmodule KaguyaWeb.Layouts do
   end
 
   # Encoded once at compile time — the WebSite JSON-LD payload is static and
-  # rendered on every page for SEO parity with the Next.js root layout.
+  # rendered on every page for SEO.
   @website_json_ld KaguyaWeb.SEO.encode(KaguyaWeb.SEO.JsonLd.website())
 
   @doc "Returns the root WebSite JSON-LD as an encoded JSON string."

@@ -2,9 +2,7 @@ defmodule KaguyaWeb.ProfileLive.Edits do
   @moduledoc """
   `/@:username/edits` — contribution history with activity heatmap.
 
-  Mirrors the Next.js edits tab at
-  `../personal/legacy-next-app/src/app/(main)/(maxWidthWrapper)/users/[username]/(tabs)/edits/page.tsx`
-  using `Kaguya.Revisions` directly.
+  Contribution history backed by `Kaguya.Revisions`.
   """
 
   use KaguyaWeb.ProfileLive, tab: :edits, title_suffix: "Edits"
@@ -312,8 +310,8 @@ defmodule KaguyaWeb.ProfileLive.Edits do
   attr :type, :atom, required: true
   attr :class, :string, default: "size-4"
 
-  # Icon paths mirror lucide-react v0.577 to match the pills the Next.js
-  # `ChangesFilterBar` renders: BookOpenText, Disc3, Building2, Users, Rows3.
+  # Icon paths use lucide-react v0.577: BookOpenText, Disc3, Building2,
+  # Users, Rows3.
   defp entity_icon(%{type: :visual_novel} = assigns) do
     ~H"""
     <Lucide.book_open_text class={@class} aria-hidden />

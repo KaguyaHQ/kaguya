@@ -2,7 +2,6 @@ defmodule KaguyaWeb.Components.Profile.Skeletons do
   @moduledoc """
   Header + content placeholders shown while a profile route is loading.
 
-  Mirrors `ProfileHeaderSkeleton.tsx` and `ProfileContentSkeleton.tsx`.
   Used by tabs that pre-render before their full view-model has loaded.
   """
 

@@ -3,9 +3,8 @@ defmodule KaguyaWeb.Components.Profile.SocialLinks do
   Social-links row rendered inside the desktop bio sidebar (compact) and the
   bottom of the bio sheet on mobile (non-compact).
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/SocialLinks.tsx`. Instagram and
-  TikTok are commented out in production — we follow that and only render
-  website + twitter glyphs.
+  Instagram and TikTok are intentionally not rendered; only the
+  website + twitter glyphs show.
   """
 
   use KaguyaWeb, :html

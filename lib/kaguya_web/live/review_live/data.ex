@@ -86,7 +86,7 @@ defmodule KaguyaWeb.ReviewLive.Data do
 
       %Review{} = review ->
         # Hidden reviews are only visible to the author or to moderators —
-        # everyone else gets the same 404 as Next.js `notFound()`.
+        # everyone else gets a 404.
         cond do
           viewer_id == review.user_id -> {:ok, review}
           moderator?(viewer_perms) -> {:ok, review}

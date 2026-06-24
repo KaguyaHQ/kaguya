@@ -1,5 +1,4 @@
-// Mirrors the bounded-feed top-up behaviour from
-// `../personal/legacy-next-app/src/components/home/HomeActivityFeed.tsx`:
+// Bounded-feed top-up behaviour:
 //
 // The sidebar pulls a single bounded page (20 entries) on mount, but
 // same-user compaction can render that page visually tiny — leaving a

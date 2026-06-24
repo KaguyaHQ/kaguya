@@ -1,7 +1,6 @@
 import Cropper from "cropperjs"
 
-// Mirrors ../personal/legacy-next-app/src/components/shared/ImageCropper.tsx dimensions so
-// the cropped output matches the production avatar/banner pipeline.
+// These dimensions keep the cropped output matching the avatar/banner pipeline.
 const VARIANT_PRESETS = {
   profile: {
     aspectRatio: 1,

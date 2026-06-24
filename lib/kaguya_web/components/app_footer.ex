@@ -1,8 +1,7 @@
 defmodule KaguyaWeb.AppFooter do
   @moduledoc """
   Site-wide footer rendered beneath every LiveView via the `:app`
-  layout. Mirrors the Next.js production footer
-  (`../personal/legacy-next-app/src/components/shared/Footer.tsx`):
+  layout:
 
     * Four-column nav: Project / Contribute / Policies / Tools.
     * Bottom row: copyright + VNDB attribution on the left, contact +

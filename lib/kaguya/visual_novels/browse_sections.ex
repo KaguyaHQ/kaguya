@@ -7,9 +7,7 @@ defmodule Kaguya.VisualNovels.BrowseSections do
   Cache keys auto-segregate per section because filters are part of the
   `:vn_browse_cache` key hash.
 
-  The same shapes are reproduced on the frontend in
-  `src/app/(main)/(maxWidthWrapper)/browse/sections.ts`. Keep the two in
-  sync — the filter shape is the contract.
+  The filter shape is the contract for these sections.
   """
 
   require Logger

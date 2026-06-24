@@ -2,8 +2,7 @@ defmodule KaguyaWeb.UI.ImageCropper do
   @moduledoc """
   Reusable image cropper modal with presigned-direct-PUT uploads.
 
-  Mirrors `../personal/legacy-next-app/src/components/shared/ImageCropper.tsx` so the LiveView
-  surface stays in parity with the Next.js production app. The JS hook
+  The JS hook
   (`assets/js/hooks/image_cropper.js`) drives Cropper.js v1 inside the modal
   and uploads the cropped Blob directly to the temp bucket via a presigned
   URL — the LiveView process never proxies the bytes.

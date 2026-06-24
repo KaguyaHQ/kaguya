@@ -3,9 +3,9 @@ defmodule Kaguya.VisualNovels.VNPageCache do
   Origin-side cache for the viewer-independent core of the VN detail page
   (`/vn/:slug` → `KaguyaWeb.VNLive.Show`).
 
-  This is the replacement for the Cloudflare edge cache the legacy Next.js
-  page relied on (`Cache-Control: s-maxage=…`), which a LiveView page can't
-  carry (CSRF token + session + websocket upgrade). The assembled core is
+  A LiveView page can't carry an edge cache (`Cache-Control: s-maxage=…`)
+  because of the CSRF token + session + websocket upgrade, so the core is
+  cached origin-side instead. The assembled core is
   cached per VN × content-pref combo × mod visibility; per-user state (vote
   highlights, private lists) is *not* part of it — see
   `KaguyaWeb.VNLive.PageData.build_public_page/4`.

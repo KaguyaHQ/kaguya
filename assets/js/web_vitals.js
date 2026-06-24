@@ -1,11 +1,9 @@
-// Browser Web Vitals reporter — mirrors the Next.js
-// `createWebVitalsComponent` setup. Observes Core Web Vitals (CLS, INP,
+// Browser Web Vitals reporter. Observes Core Web Vitals (CLS, INP,
 // LCP, FCP, TTFB) and POSTs them to `/api/axiom`, which the Phoenix
 // controller forwards to the structured log pipeline.
 //
 // Drops "good" ratings client-side so we don't burn Axiom quota on
-// healthy page loads. Mirrors the `beforeSendTransaction` filter in
-// `../personal/legacy-next-app/src/instrumentation-client.ts`.
+// healthy page loads.
 
 import {onCLS, onFCP, onINP, onLCP, onTTFB} from "web-vitals"
 

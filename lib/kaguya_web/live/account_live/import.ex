@@ -727,7 +727,7 @@ defmodule KaguyaWeb.AccountLive.Import do
   defp status_label(_), do: "—"
 
   # Returns either `:none` or `%{label: "15 Mar 2024" | "1 Jan 2024 – 15 Mar 2024",
-  # from_vote?: boolean}`. Mirrors `ImportDateCell.tsx` display logic: vote_date
+  # from_vote?: boolean}`. vote_date
   # is only used as a finish-date fallback when the toggle is on AND status is Read.
   defp date_display(item, vote_fallback_applied?) do
     started = format_iso(item.date_started)

@@ -2,7 +2,6 @@ defmodule KaguyaWeb.Components.Activity.Helpers do
   @moduledoc """
   Pure verb / href / date helpers for activity rows.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/activity/activityUtils.ts`.
   Shared by the per-profile activity tab (`KaguyaWeb.Components.Profile.Activity`)
   and the signed-in home rail (`KaguyaWeb.Home.ActivityComponents`).
 
@@ -220,7 +219,7 @@ defmodule KaguyaWeb.Components.Activity.Helpers do
   def vn_tab_href(_, _), do: "#"
 
   # ---------------------------------------------------------------------------
-  # Verb resolution — mirrors `getActivityVerb` in activityUtils.ts.
+  # Verb resolution.
   # Returns %{text: "...", target: "...", suffix: "..."} (suffix optional).
   # ---------------------------------------------------------------------------
 

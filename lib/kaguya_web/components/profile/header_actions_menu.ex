@@ -1,6 +1,6 @@
 defmodule KaguyaWeb.Components.Profile.HeaderActionsMenu do
   @moduledoc """
-  Profile header "Mod" pill + dropdown — mirrors `UserModPanel.tsx`.
+  Profile header "Mod" pill + dropdown.
 
   Renders nothing unless the viewer has at least one moderation action
   available against the target profile (not self, not logged-out, has the

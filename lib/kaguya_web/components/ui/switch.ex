@@ -1,6 +1,6 @@
 defmodule KaguyaWeb.UI.Switch do
   @moduledoc """
-  Toggle switch matching Next.js's Radix `Switch` styling:
+  Toggle switch:
 
     * 36×20 track (`w-9 h-5`), 16×16 thumb (`size-4`).
     * Active track: `bg-primitives-palette-teal-base/45` (the teal we use

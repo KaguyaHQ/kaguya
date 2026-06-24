@@ -1,5 +1,4 @@
-// Mirror the client greeting behavior used by Next.js
-// (`../personal/legacy-next-app/src/lib/getGreeting.ts`). The browser owns local time, so
+// Client greeting behavior. The browser owns local time, so
 // this cosmetic text is computed client-side without a LiveView roundtrip.
 //
 // `applyHomeGreeting()` is called directly from app.js on load, so the

@@ -5,9 +5,7 @@ defmodule KaguyaWeb.VN.Panels.Releases do
   tables live here because they only matter inside this view; if a
   second caller ever needs them, promote them to the domain layer.
 
-  The `chip_color/1` palette mirrors `chipColor()` in
-  `../personal/legacy-next-app/src/components/vn/detail/releases/ReleaseRow.tsx` so a quick
-  visual scan reads the same across the two stacks.
+  The `chip_color/1` palette keeps a consistent visual scan across release rows.
   """
 
   use KaguyaWeb, :html

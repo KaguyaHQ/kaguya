@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.SEO do
   @moduledoc """
-  Builders that produce SEO assigns for LiveView pages, mirroring the Next.js
-  frontend's `generateMetadata` output for strict parity.
+  Builders that produce SEO assigns for LiveView pages.
 
   Each builder returns a map of socket assigns ready to splat into
   `assign/2`:
@@ -29,8 +28,7 @@ defmodule KaguyaWeb.SEO do
   # ============================================================
 
   @doc """
-  Builds SEO assigns for a VN detail page. Mirrors
-  ../personal/legacy-next-app/src/app/(main)/(maxWidthWrapper)/vn/[slug]/(root)/page.tsx
+  Builds SEO assigns for a VN detail page.
   """
   def vn(vn) do
     producer_name =
@@ -84,9 +82,7 @@ defmodule KaguyaWeb.SEO do
   end
 
   def vn_not_found do
-    # The legacy Next.js VN generateMetadata omitted `robots` on not-found,
-    # leaving 404s indexable. That was always questionable; we now noindex VN
-    # not-found like every other not-found state rather than preserve the quirk.
+    # We noindex VN not-found like every other not-found state.
     not_found_assigns(
       "Visual Novel Not Found",
       "The visual novel you are looking for does not exist."
@@ -98,8 +94,7 @@ defmodule KaguyaWeb.SEO do
   # ============================================================
 
   @doc """
-  Builds SEO assigns for a producer detail page. Mirrors
-  ../personal/legacy-next-app/src/app/(main)/(maxWidthWrapper)/developer/[slug]/page.tsx
+  Builds SEO assigns for a producer detail page.
   """
   def developer(producer, opts \\ []) do
     total_count = Keyword.get(opts, :total_count, 0)
@@ -155,8 +150,7 @@ defmodule KaguyaWeb.SEO do
   # ============================================================
 
   @doc """
-  Builds SEO assigns for a user-list detail page. Mirrors
-  ../personal/legacy-next-app/src/app/(main)/(maxWidthWrapper)/users/[username]/list/[slug]/page.tsx
+  Builds SEO assigns for a user-list detail page.
   """
   def list(list, owner, items, opts \\ []) do
     page = Keyword.get(opts, :page, 1)
@@ -287,8 +281,8 @@ defmodule KaguyaWeb.SEO do
   @doc """
   Encode a schema.org map for safe inclusion in a `<script>` tag.
 
-  Matches the Next.js frontend's `JSON.stringify` output (no `/` escaping) so
-  raw HTML diffs stay clean, while still escaping `</` → `<\\/` so a user-
+  Emits no `/` escaping so raw HTML diffs stay clean, while still escaping
+  `</` → `<\\/` so a user-
   supplied string containing `</script>` can't terminate the surrounding
   script element.
   """

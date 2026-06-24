@@ -1,10 +1,10 @@
 defmodule KaguyaWeb.SharedComponents.Search do
   @moduledoc """
-  Shared VN search UI primitives ported from the production Next app.
+  Shared VN search UI primitives.
 
-  Mirrors the `SearchInput`, `SearchVNInput`, `SearchVNList`, and
-  `RecentSearches` split in `../kaguya`, with `:default` and `:compact`
-  variants sharing the same result-row implementation.
+  Provides the search input, VN search input, VN result list, and recent
+  searches, with `:default` and `:compact` variants sharing the same
+  result-row implementation.
   """
 
   use KaguyaWeb, :html
@@ -485,7 +485,7 @@ defmodule KaguyaWeb.SharedComponents.Search do
 
   # Inline-replace mobile (navbar): popover escapes the flex-1 input container
   # to span near-full viewport — back-arrow (44px) + gap-2 (8px) = 52px offset,
-  # navbar px-5 = 40px total horizontal padding. Mirrors `MobileNavbar.tsx:120`.
+  # navbar px-5 = 40px total horizontal padding.
   defp popover_position_class(true, true) do
     "top-[52px] -left-[52px] w-[calc(100vw-40px)] max-h-[424px] rounded-[12px] bg-surface-elevated"
   end

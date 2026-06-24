@@ -4,10 +4,9 @@ defmodule KaguyaWeb.SharedComponents.FilterChip do
   rounded chips used across the app for applied filters (remove-me
   chips), navigation tags, and content-warning labels.
 
-  Not to be confused with `../personal/legacy-next-app/src/components/shared/TagChip.tsx`:
-  that Next.js component is the **VN-page tag chip** specifically (name
+  Not to be confused with the **VN-page tag chip** specifically (name
   link + percent zone + tag-vote popover + voted-pip + warning border).
-  Its LiveView equivalent lives in `lib/kaguya_web/components/vn/header.ex`
+  That chip lives in `lib/kaguya_web/components/vn/header.ex`
   as `defp tag_chip/1` + `defp tag_vote_trigger/1` + `defp tag_vote_menu/1`,
   kept local because of the embedded popover. Promoting it to a shared
   module is tracked under § 10 phase 2.

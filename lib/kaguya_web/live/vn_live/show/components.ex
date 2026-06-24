@@ -335,8 +335,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                   placeholder="Add a note..."
                 ><%= @form["note"] %></textarea>
                 <%!--
-                  Counter appears at 240+/280 to match Next.js
-                  (`ReviewEditor.tsx` ~ line 520). phx-change already round-trips
+                  Counter appears at 240+/280. phx-change already round-trips
                   on every keystroke, so server-rendering this is essentially
                   free — no extra hook needed.
                 --%>
@@ -400,7 +399,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
 
             We deliberately omit the HTML5 `minlength` attribute on the
             textarea: it triggers the browser's native validation tooltip
-            on submit, which doesn't match Next.js's inline error. We
+            on submit instead of our inline error. We
             enforce the 40-char minimum server-side via `save_review`,
             which sets `@review_min_length_error?` for the inline message
             below.

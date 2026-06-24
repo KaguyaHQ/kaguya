@@ -1,15 +1,13 @@
 defmodule KaguyaWeb.SharedComponents.StackedCovers do
   @moduledoc """
-  Overlapping group of VN covers — Phoenix-side port of
-  `../personal/legacy-next-app/src/components/shared/StackedCovers.tsx`.
+  Overlapping group of VN covers.
 
   Single source of truth for the rounded, overlapping cover thumbnail
   rows used across list cards, list rows, profile sidebar wishlist,
   stats most-liked sections, and the activity / feed showcases.
 
   Each item is rendered via `KaguyaWeb.SharedComponents.Cover.cover/1`,
-  so srcset, NSFW blur, and title fallback come for free — visually
-  identical to the Next.js stack.
+  so srcset, NSFW blur, and title fallback come for free.
 
   See `docs/migrations/nextjs-liveview/plans/component-parity-plan.md` § 12.
 
@@ -40,11 +38,11 @@ defmodule KaguyaWeb.SharedComponents.StackedCovers do
   attr :responsive_max_covers, :map,
     default: nil,
     doc:
-      "`%{mobile: n, desktop: n}` — overrides `:max_covers` per breakpoint, mirrors the Next.js `responsiveMaxCovers` prop. Items beyond the lower count are hidden on that breakpoint."
+      "`%{mobile: n, desktop: n}` — overrides `:max_covers` per breakpoint. Items beyond the lower count are hidden on that breakpoint."
 
   attr :container_class, :any,
     default: nil,
-    doc: "Class for the flex container. Default matches the Next.js base."
+    doc: "Class for the flex container."
 
   attr :item_class, :any,
     default: nil,

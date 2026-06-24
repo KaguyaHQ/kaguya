@@ -3,8 +3,6 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
   Moderation dialogs that overlay the profile overview when a privileged
   viewer opens the mod panel.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/UserModPanel.tsx`:
-
   - **Manage permissions** — toggle the user/discuss/review/list/mod flags
     via `Kaguya.Users.update_permissions/2`. Save is gated on a diff.
   - **Suppress / Restore Ratings** — confirm dialog routed through

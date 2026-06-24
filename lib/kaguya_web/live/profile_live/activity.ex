@@ -2,9 +2,6 @@ defmodule KaguyaWeb.ProfileLive.Activity do
   @moduledoc """
   `/@:username/activity` — user activity feed.
 
-  Mirrors `../personal/legacy-next-app/src/app/(main)/(maxWidthWrapper)/users/[username]/(tabs)/activity/page.tsx`
-  and the React components under `../personal/legacy-next-app/src/components/profile/activity/`:
-
     * Left column (lg:w-[71%]): paginated activity feed. Each row dispatches
       to a verb-specific layout via
       `KaguyaWeb.Components.Profile.Activity.activity_item/1`.
@@ -12,9 +9,9 @@ defmodule KaguyaWeb.ProfileLive.Activity do
       grid, or a "Members worth following" empty-state when the owner
       follows nobody.
 
-  Pagination is cursor-based. Production auto-loads the first two pages, then
-  switches to the manual "Load older activity" button; this LiveView uses
-  `phx-viewport-bottom` until 40 rows are loaded, then renders the button.
+  Pagination is cursor-based. This LiveView uses
+  `phx-viewport-bottom` until 40 rows are loaded, then renders the
+  "Load older activity" button.
   """
 
   use KaguyaWeb.ProfileLive, tab: :activity, title_suffix: "Activity"

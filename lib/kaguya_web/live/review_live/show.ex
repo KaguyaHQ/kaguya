@@ -2,9 +2,6 @@ defmodule KaguyaWeb.ReviewLive.Show do
   @moduledoc """
   LiveView for the single-review page (`/@:username/reviews/:vn_slug`).
 
-  Mirrors the Next.js implementation at
-  `../personal/legacy-next-app/src/app/(main)/(maxWidthWrapper)/users/[username]/reviews/[vnSlug]/page.tsx`:
-
     * Server-rendered first paint with route-specific metadata. Review JSON-LD
       is emitted as a Phoenix-side SEO addition using a Google-supported
       `VideoGame` reviewed item.
@@ -105,7 +102,7 @@ defmodule KaguyaWeb.ReviewLive.Show do
           <%!--
             Header + body + actions are grouped in one block so the parent
             `lg:gap-12` only spaces the comments/more-reviews sections away
-            from this entire review unit (matches Next.js SingleReview.tsx).
+            from this entire review unit.
           --%>
           <div>
             <ShowComponents.review_header :if={@review} review={@review} vn={@vn} owner={@owner} />
@@ -128,10 +125,9 @@ defmodule KaguyaWeb.ReviewLive.Show do
           </div>
 
           <%!--
-            Comments section header lives in the LV (prod renders it in the
-            page, not inside the comments component) so we can match
-            `SingleReview.tsx`'s typography and the separator that's only
-            visible on desktop.
+            Comments section header lives in the LV (not inside the comments
+            component) so we control its typography and the separator that's
+            only visible on desktop.
           --%>
           <section id="comments" class="pt-6 sm:max-lg:mb-5 lg:pt-0">
             <div class="flex items-center justify-between gap-4 max-lg:mb-4 max-lg:px-5">

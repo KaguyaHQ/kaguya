@@ -2,12 +2,11 @@ defmodule KaguyaWeb.ProfileLive.Favorites do
   @moduledoc """
   `/@:username/favorites` — VN + character favorites.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/FavoritesTab.tsx` for the
-  read-only favorites surface:
+  Read-only favorites surface:
 
     * ordered favorite VNs and characters
     * owner-only edit/add affordances
-    * favorite quotes intentionally hidden, matching the production tab
+    * favorite quotes intentionally hidden
   """
 
   use KaguyaWeb.ProfileLive, tab: :favorites, title_suffix: "Favorites"

@@ -1,7 +1,6 @@
 defmodule KaguyaWeb.SEO.JsonLd do
   @moduledoc """
-  Schema.org JSON-LD payload builders for SEO parity with the Next.js
-  frontend at /Users/zero/work/kaguya.
+  Schema.org JSON-LD payload builders for SEO.
 
   Each builder returns a plain map. Encode with
   `Jason.encode!(map, escape: :html_safe)` before injecting into a
@@ -202,9 +201,7 @@ defmodule KaguyaWeb.SEO.JsonLd do
 
   defp nonempty(_), do: nil
 
-  # JSON.stringify on undefined fields drops them; we mirror that for parity
-  # by removing top-level nil values from the schema map. Nested nil values
-  # remain (matches Next.js JSON.stringify treatment of `null`).
+  # Remove top-level nil values from the schema map. Nested nil values remain.
   defp drop_nil_values(map) when is_map(map) do
     map
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)

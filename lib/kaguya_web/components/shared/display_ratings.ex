@@ -1,6 +1,6 @@
 defmodule KaguyaWeb.Components.Shared.DisplayRatings do
   @moduledoc """
-  Shared read-only star renderer matching the Next.js `DisplayRatings` behavior.
+  Shared read-only star renderer.
 
   Supports:
     * half-rating text/icon mode

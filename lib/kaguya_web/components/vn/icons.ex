@@ -16,7 +16,7 @@ defmodule KaguyaWeb.VN.Icons do
   # Reading-status icons (used inside the sidebar status segments)
   #
   # Delegates to `KaguyaWeb.VN.StatusIcons` which holds the Phosphor-Icons
-  # paths copied from `src/utils/statusIcons.tsx` on the Next side. Kept as a
+  # paths. Kept as a
   # thin wrapper for backwards compatibility with existing callers; new code
   # should call `StatusIcons.status_icon/1` directly with `:weight`.
   # ---------------------------------------------------------------------------

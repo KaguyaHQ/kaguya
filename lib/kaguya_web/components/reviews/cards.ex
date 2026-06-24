@@ -4,9 +4,7 @@ defmodule KaguyaWeb.Components.Reviews.Cards do
   list a user's reviews (profile reviews tab, profile overview tab,
   single-review more-from-author grid).
 
-  Each card is the LiveView port of the production
-  `../personal/legacy-next-app/src/components/vn/cards/VnReviewCard.tsx`. The two visible
-  variants production exposes are:
+  The two visible variants are:
 
     * `user_review_card/1` — `hideUser` variant: VN cover on the left,
       VN title + rating + review preview on the right. Used on the

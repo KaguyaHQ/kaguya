@@ -2,9 +2,9 @@ defmodule KaguyaWeb.ProfileLive.Show do
   @moduledoc """
   `/@:username` — main profile (overview) tab.
 
-  Mirrors `../personal/legacy-next-app/src/components/profile/ProfileTab.tsx`. Owns:
+  Owns:
 
-    * The two-column grid body (left content / right sidebar) the production
+    * The two-column grid body (left content / right sidebar) the
       overview tab renders below the shared header.
     * The mod-panel dialogs (manage permissions / suppress ratings / delete
       user). The header is mounted here in its un-collapsed form, so this

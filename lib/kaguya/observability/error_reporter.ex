@@ -4,9 +4,8 @@ defmodule Kaguya.Observability.ErrorReporter do
   tag/extra shape.
 
   Replaces ad-hoc `Sentry.capture_exception(_, extra: %{...})` boilerplate
-  scattered through workers, plugs, and resolvers. Direct port of
-  `../personal/legacy-next-app/src/lib/errors/reporter.ts` so the Next.js and Phoenix
-  surfaces share field names ("operation", "resource_id", "critical").
+  scattered through workers, plugs, and resolvers. Uses a consistent field
+  shape ("operation", "resource_id", "critical") across all report sites.
 
   ## Usage
 

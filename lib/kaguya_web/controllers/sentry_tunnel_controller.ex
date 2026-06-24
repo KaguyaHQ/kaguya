@@ -3,7 +3,7 @@ defmodule KaguyaWeb.SentryTunnelController do
   Same-origin proxy for Sentry browser envelopes — bypasses adblockers
   that filter `*.ingest.sentry.io`.
 
-  Mirrors the Next.js `tunnel: "/_sen_tunnel"` setup. The browser SDK
+  The browser SDK
   POSTs envelopes here (Content-Type: `application/x-sentry-envelope`);
   this controller extracts the embedded DSN from the envelope header,
   validates it matches our configured `:sentry_browser` DSN (so we're

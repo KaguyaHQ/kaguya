@@ -1,8 +1,7 @@
 // Click-to-reveal handler for blurred adult covers / character images.
-// Mirrors Next.js `<Cover enableNsfwReveal>` + `<CharacterImage enableNsfwReveal>`:
-// the blur itself is the affordance — clicking the image once swaps in the
+// The blur itself is the affordance: clicking the image once swaps in the
 // revealed state for the rest of the session. A second click no longer toggles
-// it back (matches Next.js, where `nsfwRevealed` is one-way React state).
+// it back (the revealed state is one-way).
 //
 // Implementation notes:
 //
@@ -12,8 +11,7 @@
 //    by the pre-paint script from localStorage), nothing is blurred so the
 //    overlay is skipped and the click flows through.
 //  * Sets data-nsfw-revealed on the img itself rather than on a parent, so
-//    multiple covers in a grid reveal independently (parity with the
-//    `revealedIds` Set in VNCoversGrid.tsx).
+//    multiple covers in a grid reveal independently.
 
 document.addEventListener(
   "click",

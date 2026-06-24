@@ -2,7 +2,7 @@ defmodule KaguyaWeb.Components.Profile.Nav do
   @moduledoc """
   Profile tab navigation.
 
-  Mirrors `ProfileNav.tsx`. Visibility rules:
+  Visibility rules:
     * Reviews — hidden when `counts.reviews == 0`.
     * Lists — hidden when `counts.lists == 0` for non-owners.
     * Edits — hidden when `counts.edits == 0` for non-owners.
@@ -39,7 +39,7 @@ defmodule KaguyaWeb.Components.Profile.Nav do
 
   @doc """
   Whether the nav strip should be rendered for this tab. Followers/following
-  and votes pages hide it (matching `ProfileNav.tsx:105-109`).
+  and votes pages hide it.
   """
   def show_nav?(:followers), do: false
   def show_nav?(:following), do: false

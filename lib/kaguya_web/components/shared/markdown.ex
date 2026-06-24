@@ -74,7 +74,7 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
   attr :read_more_mobile_limit, :integer,
     default: nil,
     doc:
-      "Mobile (`<lg`) character budget. Set both this and `read_more_desktop_limit` to render two collapsed variants and swap via CSS — matches Next.js's responsive truncation (e.g. 330/794 for descriptions, 330/428 for reviews)."
+      "Mobile (`<lg`) character budget. Set both this and `read_more_desktop_limit` to render two collapsed variants and swap via CSS for responsive truncation (e.g. 330/794 for descriptions, 330/428 for reviews)."
 
   attr :read_more_desktop_limit, :integer,
     default: nil,

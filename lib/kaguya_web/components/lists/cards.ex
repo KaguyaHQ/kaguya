@@ -2,8 +2,8 @@ defmodule KaguyaWeb.Lists.Cards do
   @moduledoc """
   Shared list render primitives reused by profile and list surfaces.
 
-  These components mirror the existing Next.js list card/row treatment while
-  delegating VN cover rendering to `KaguyaWeb.SharedComponents.Cover`.
+  These components delegate VN cover rendering to
+  `KaguyaWeb.SharedComponents.Cover`.
   """
 
   use KaguyaWeb, :html

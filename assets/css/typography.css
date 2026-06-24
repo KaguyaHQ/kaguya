@@ -1,6 +1,5 @@
 /*
- * Production typography tokens. These mirror
- * ../personal/legacy-next-app/src/styles/typography/figma-text-styles.json and are registered as
+ * Production typography tokens. These are registered as
  * Tailwind v4 utilities so responsive variants such as
  * `lg:text-style-proseSemibold` compile when used in HEEx/JS.
  */

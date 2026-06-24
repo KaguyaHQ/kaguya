@@ -3,9 +3,8 @@ defmodule KaguyaWeb.SharedComponents.Badge do
   Shared badge primitive — single place for the small inline pill labels used
   across moderation queues, profile headers, and character role pills.
 
-  Mirrors the union of `../personal/legacy-next-app/src/components/ui/badge.tsx` (`default |
-  secondary | destructive | outline`) and the production
-  `ProfileBadge.tsx` tone palette (`developer | staff`),
+  Covers the base tones (`default | secondary | destructive | outline`) and
+  the profile tone palette (`developer | staff`),
   plus the moderation / status tones inline in this repo.
 
   Replaces:

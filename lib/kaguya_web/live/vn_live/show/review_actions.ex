@@ -7,7 +7,7 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
   alias KaguyaWeb.VNLive.PageData
   alias KaguyaWeb.VNLive.Show.Data
 
-  # Mirrors `ReviewEditor.tsx`'s `MIN_REVIEW_LENGTH = 40` — kept in lockstep
+  # Minimum review length — kept in lockstep
   # with `Kaguya.Reviews.Review`'s server-side changeset so the user sees the
   # same minimum communicated by the inline error and the server.
   @min_review_length 40
@@ -109,8 +109,7 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
     {:noreply,
      assign(socket,
        review_form: form,
-       # Clear the min-length error once the user crosses the threshold,
-       # matching the React `useEffect` in `ReviewEditor.tsx:238-242`.
+       # Clear the min-length error once the user crosses the threshold.
        review_min_length_error?:
          Map.get(socket.assigns, :review_min_length_error?, false) and
            content_length(form) < @min_review_length
@@ -142,7 +141,7 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
 
     case socket.assigns.current_user do
       %{id: _} = user ->
-        # Mirror `ReviewEditor.tsx:274-277`: don't round-trip to the
+        # Don't round-trip to the
         # server when content is non-empty but under the minimum. Flag the
         # error so the inline message shows; the user can keep typing and
         # the error clears via `update_review_form` once they cross 40.

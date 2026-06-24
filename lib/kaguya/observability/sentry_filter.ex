@@ -3,10 +3,8 @@ defmodule Kaguya.Observability.SentryFilter do
   Drops noisy / non-actionable errors before they ship to Sentry, and applies
   per-event sampling so quota survives traffic spikes.
 
-  Mirrors the `beforeSend` strategy in the Next.js client
-  (`../personal/legacy-next-app/src/instrumentation-client.ts`): events tagged
-  `critical=true` go through at 100%, everything else is sampled at
-  `@general_sample_rate`.
+  Events tagged `critical=true` go through at 100%, everything else is
+  sampled at `@general_sample_rate`.
 
   Wired in via `config :sentry, before_send: {Kaguya.Observability.SentryFilter, :before_send}`.
   """

@@ -603,7 +603,7 @@ html body[data-scroll-locked] {
   background-color: rgb(var(--button-background-neutral-hover));
 }
 
-/* Shared utility used heavily in the Next app for horizontal rails. */
+/* Shared utility for horizontal rails. */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

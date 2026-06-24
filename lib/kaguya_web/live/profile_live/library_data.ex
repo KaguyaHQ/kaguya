@@ -5,12 +5,6 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
   Owns the URL → query mapping, the shelf URL ↔ internal value mapping,
   and the sort kebab ↔ context atom mapping. Per the profile migration
   plan (§6.3) only context calls are allowed — no Ecto in LiveView.
-
-  Mirrors:
-    * `../personal/legacy-next-app/src/components/library/LibraryGridSection.tsx`
-    * `../personal/legacy-next-app/src/components/library/layout.tsx`
-    * `../personal/legacy-next-app/src/utils/statusUtils.tsx` (shelf URL mapping)
-    * `../personal/legacy-next-app/src/utils/librarySort.ts` (sort enum mapping)
   """
 
   alias Kaguya.{Library, Pagination, Producers, Shelves}
@@ -99,7 +93,7 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
   def shelf_path_segment({:custom, slug}), do: slug
 
   # ---------------------------------------------------------------------------
-  # Sort kebab ↔ atom mapping (mirror Next's librarySort.ts)
+  # Sort kebab ↔ atom mapping
   # ---------------------------------------------------------------------------
 
   @sort_kebab_to_atom %{
@@ -137,8 +131,7 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
   @doc """
   Parses raw query params (the `params` map from `handle_params/3` minus
   `:username` / `:shelf`) into a normalized filter map. Unknown keys are
-  ignored. Empty/blank strings become `nil` (matches production "remove
-  param" behavior).
+  ignored. Empty/blank strings become `nil` (the param is removed).
   """
   def parse_filters(params) when is_map(params) do
     %{
@@ -192,8 +185,7 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
   defp parse_rating(_), do: nil
 
   # ---------------------------------------------------------------------------
-  # Encoding state back to URL query string (preserves param order parity
-  # with the Next layout's URLSearchParams use)
+  # Encoding state back to URL query string (stable param order)
   # ---------------------------------------------------------------------------
 
   @param_keys [
