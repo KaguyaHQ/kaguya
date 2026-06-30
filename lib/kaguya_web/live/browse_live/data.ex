@@ -84,14 +84,12 @@ defmodule KaguyaWeb.BrowseLive.Data do
   def load(:characters, params, current_user) do
     page = params |> Map.get("page") |> parse_page(@max_character_pages)
     sort_param = normalize_character_sort_param(Map.get(params, "sort"))
-    appears_in_avn = params |> Map.get("appearsInAvn") |> parse_bool()
 
     result =
       Characters.list_characters(
         page: page,
         page_size: @character_page_size,
-        sort: Map.fetch!(@character_sort_from_param, sort_param),
-        appears_in_avn: appears_in_avn
+        sort: Map.fetch!(@character_sort_from_param, sort_param)
       )
 
     %{
@@ -101,7 +99,6 @@ defmodule KaguyaWeb.BrowseLive.Data do
       page_size: @character_page_size,
       sort_param: sort_param,
       sort_options: @character_sort_options,
-      appears_in_avn: appears_in_avn,
       result: result
     }
   end

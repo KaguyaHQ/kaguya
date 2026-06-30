@@ -58,7 +58,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     ~H"""
     <div class="flex flex-col gap-4 sm:gap-6 lg:gap-8">
       <div class="flex flex-wrap items-center gap-2 px-4 sm:px-0">
-        <.mode_controls mode={:characters} params={@params} />
+        <.mode_chip id="browse-type-popover" mode={:characters} params={@params} />
         <.character_sort_controls payload={@payload} params={@params} />
       </div>
 
@@ -81,32 +81,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         />
       </div>
     </div>
-    """
-  end
-
-  attr :mode, :atom, required: true
-  attr :params, :map, required: true
-
-  defp mode_controls(assigns) do
-    ~H"""
-    <nav class="flex flex-wrap items-center gap-2 px-4 sm:px-0">
-      <.link
-        patch={mode_href(:vn, @params)}
-        rel="nofollow"
-        class={mode_button_class(@mode == :vn)}
-        aria-current={if @mode == :vn, do: "page"}
-      >
-        <Lucide.gamepad_2 class="size-4" /> VNs
-      </.link>
-      <.link
-        patch={mode_href(:characters, @params)}
-        rel="nofollow"
-        class={mode_button_class(@mode == :characters)}
-        aria-current={if @mode == :characters, do: "page"}
-      >
-        <Lucide.user_round class="size-4" /> Characters
-      </.link>
-    </nav>
     """
   end
 
@@ -385,8 +359,9 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     ~H"""
     <.menu id={@id} align="start" class={filter_chip_class(false) <> "cursor-pointer"}>
       <:trigger aria-label="Change browse type">
-        <Lucide.gamepad_2 class="text-foreground-secondary size-4" />
-        <span>VNs</span>
+        <Lucide.gamepad_2 :if={@mode == :vn} class="text-foreground-secondary size-4" />
+        <Lucide.user_round :if={@mode == :characters} class="text-foreground-secondary size-4" />
+        <span>{if @mode == :characters, do: "Characters", else: "VNs"}</span>
         <Lucide.chevron_down class="text-foreground-tertiary size-3.5 transition-transform duration-150 data-[state=open]:rotate-180" />
       </:trigger>
       <div class={popover_content_class("w-[180px] p-1")}>
@@ -932,28 +907,19 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
   defp character_sort_controls(assigns) do
     ~H"""
-    <div class="flex flex-wrap gap-2">
-      <.link
+    <.link_popover_chip
+      label={character_sort_label(@payload)}
+      icon={:sort}
+      active={@payload.sort_param != "most-popular"}
+    >
+      <.menu_link
         :for={{label, value} <- @payload.sort_options}
-        patch={query_path("/browse/characters", @params, %{"sort" => value, "page" => nil})}
-        rel="nofollow"
-        class={small_chip_class(@payload.sort_param == value)}
+        href={query_path("/browse/characters", @params, %{"sort" => value, "page" => nil})}
+        selected?={@payload.sort_param == value}
       >
         {label}
-      </.link>
-      <.link
-        patch={
-          query_path("/browse/characters", @params, %{
-            "appearsInAvn" => toggle_avn(@payload.appears_in_avn),
-            "page" => nil
-          })
-        }
-        rel="nofollow"
-        class={small_chip_class(@payload.appears_in_avn == true)}
-      >
-        AVN appearances
-      </.link>
-    </div>
+      </.menu_link>
+    </.link_popover_chip>
     """
   end
 
@@ -1127,20 +1093,28 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
   defp character_card(assigns) do
     ~H"""
-    <.link
-      navigate={"/character/#{@character.slug}"}
-      class="flex flex-col items-center justify-start gap-2"
-    >
-      <KaguyaWeb.SharedComponents.CharacterImage.character_image
-        character={@character}
-        sizes="(max-width: 640px) 106px, (max-width: 768px) 140px, 155px"
-        class="size-[106px] object-cover object-center sm:size-[140px] md:size-[155px]"
-        fallback_class="size-[106px] sm:size-[140px] md:size-[155px] bg-[rgb(var(--surface-elevated))]"
-        rounded="rounded-[4px]"
-      />
-      <span class="text-foreground-primary line-clamp-2 w-full text-center text-sm leading-[17px] font-semibold lg:text-base lg:leading-[19px]">
-        {@character.name}
-      </span>
+    <.link navigate={"/character/#{@character.slug}"} class="group flex flex-col gap-2.5">
+      <div class="relative aspect-1/1.5 w-full overflow-hidden rounded-[12px] bg-[radial-gradient(115%_85%_at_50%_22%,#ffffff_0%,#f1f2f4_50%,#d7d8dc_100%)] shadow-[0_2px_6px_-1px_rgba(0,0,0,0.5)] transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_16px_34px_-12px_rgba(0,0,0,0.75)]">
+        <KaguyaWeb.SharedComponents.CharacterImage.character_image
+          character={@character}
+          sizes="(max-width: 640px) 106px, (max-width: 768px) 140px, 160px"
+          class="size-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          fallback_class="size-full bg-[rgb(var(--surface-elevated))]"
+          rounded=""
+        />
+        <div class="pointer-events-none absolute inset-0 rounded-[12px] ring-1 ring-inset ring-black/[0.08] transition group-hover:ring-black/[0.14]" />
+      </div>
+      <div class="flex flex-col gap-0.5 px-0.5">
+        <span class="text-foreground-primary line-clamp-1 text-sm font-semibold transition-colors group-hover:text-white">
+          {@character.name}
+        </span>
+        <span
+          :if={(@character.favorites_count || 0) > 0}
+          class="text-foreground-tertiary flex items-center gap-1 text-xs"
+        >
+          <Lucide.heart class="size-3" /> {short_count(@character.favorites_count)}
+        </span>
+      </div>
     </.link>
     """
   end
@@ -1209,13 +1183,13 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
   defp mode_href(:vn, params) do
     params
-    |> Map.drop(["type", "page", "appearsInAvn"])
+    |> Map.drop(["type", "page"])
     |> query_path_from_params("/browse", %{})
   end
 
   defp mode_href(:characters, params) do
     params
-    |> Map.take(["sort", "appearsInAvn"])
+    |> Map.take(["sort"])
     |> Map.drop(["page"])
     |> query_path_from_params("/browse/characters", %{})
   end
@@ -1237,14 +1211,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   defp page_param(1), do: nil
   defp page_param(page), do: to_string(page)
 
-  defp mode_button_class(true),
-    do:
-      "inline-flex h-9 items-center gap-2 rounded-[8px] bg-button-background-neutral-inverse-default px-3 text-sm font-semibold text-button-text-on-neutral-inverse"
-
-  defp mode_button_class(false),
-    do:
-      "inline-flex h-9 items-center gap-2 rounded-[8px] bg-button-background-neutral-default px-3 text-sm font-medium text-foreground-primary transition hover:bg-button-background-neutral-hover"
-
   defp browse_section_arrow_class(:prev), do: browse_section_arrow_class("-left-14")
   defp browse_section_arrow_class(:next), do: browse_section_arrow_class("-right-14")
 
@@ -1254,14 +1220,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
       position_class
     ]
   end
-
-  defp small_chip_class(true),
-    do:
-      "inline-flex h-9 items-center rounded-[8px] bg-button-background-neutral-inverse-default px-3 text-sm font-semibold text-button-text-on-neutral-inverse"
-
-  defp small_chip_class(false),
-    do:
-      "inline-flex h-9 items-center rounded-[8px] bg-button-background-neutral-default px-3 text-sm font-medium text-foreground-primary transition hover:bg-button-background-neutral-hover"
 
   defp filter_chip_class(active?) do
     base =
@@ -1359,9 +1317,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] text-foreground-primary outline-none transition hover:bg-white/[4%] focus:outline-none focus-visible:bg-white/[4%] focus-visible:outline-none"
   end
 
-  defp toggle_avn(true), do: nil
-  defp toggle_avn(_), do: "true"
-
   defp sort_label(_options, nil), do: "Default"
   defp sort_label(_options, ""), do: "Default"
 
@@ -1380,6 +1335,9 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   defp desktop_sort_label(%{sort_param: nil}), do: "Sort"
 
   defp desktop_sort_label(%{sort_options: options, sort_param: value}),
+    do: sort_label(options, value)
+
+  defp character_sort_label(%{sort_options: options, sort_param: value}),
     do: sort_label(options, value)
 
   defp single_chip_value(nil, _label_fun), do: nil

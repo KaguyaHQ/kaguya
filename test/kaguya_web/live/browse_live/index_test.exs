@@ -3,11 +3,24 @@ defmodule KaguyaWeb.BrowseLive.IndexTest do
 
   alias Kaguya.Characters.Character
   alias Kaguya.Repo
+  alias Kaguya.Tags.Tag
   alias Kaguya.VisualNovels.VisualNovel
+  alias Kaguya.VisualNovels.VNTag
+  alias KaguyaWeb.BrowseLive.TagSnapshot
 
   setup do
     Cachex.clear(:vn_browse_cache)
     Cachex.clear(:character_browse_cache)
+
+    # Browse filter chips render the tag vocabulary from TagSnapshot (DB-backed,
+    # held in persistent_term). Seed a tag with a counted VN association and
+    # rebuild the snapshot so chip assertions like "Female Protagonist" hold.
+    vn = insert_vn!("Tag Snapshot VN", [])
+    tag = insert_tag!("female-protagonist", "Female Protagonist")
+    tag_vn!(vn, tag)
+    TagSnapshot.invalidate()
+    on_exit(&TagSnapshot.invalidate/0)
+
     :ok
   end
 
@@ -97,7 +110,6 @@ defmodule KaguyaWeb.BrowseLive.IndexTest do
     assert html =~ "Most Popular"
     assert html =~ "Name A-Z"
     assert html =~ "Recently Added"
-    assert html =~ "AVN appearances"
   end
 
   defp insert_vn!(title, attrs) do
@@ -125,6 +137,33 @@ defmodule KaguyaWeb.BrowseLive.IndexTest do
     |> Character.changeset(%{
       name: "#{name} #{suffix}",
       favorites_count: 10
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_tag!(slug, name) do
+    suffix = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+
+    %Tag{}
+    |> Tag.changeset(%{
+      name: name,
+      slug: "#{slug}-#{suffix}",
+      vndb_tag_id: "g-test-#{suffix}",
+      category: :content,
+      kind: :theme
+    })
+    |> Repo.insert!()
+  end
+
+  defp tag_vn!(vn, tag) do
+    %VNTag{}
+    |> VNTag.changeset(%{
+      visual_novel_id: vn.id,
+      tag_id: tag.id,
+      vndb_vote_count: 3,
+      vndb_avg_score: 2.5,
+      spoiler_level: :none,
+      is_overruled: false
     })
     |> Repo.insert!()
   end
