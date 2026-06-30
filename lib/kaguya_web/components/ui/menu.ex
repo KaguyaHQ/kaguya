@@ -91,7 +91,7 @@ defmodule KaguyaWeb.UI.Menu do
         data-side-offset={@side_offset}
         data-align-offset={@align_offset}
         data-match-width={@match_width && "true"}
-        style="margin:0;position:fixed;inset:auto;"
+        style="margin:0;position:fixed;inset:auto;visibility:hidden;"
         {@rest}
       >
         {render_slot(@inner_block)}

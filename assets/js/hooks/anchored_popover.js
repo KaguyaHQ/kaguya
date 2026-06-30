@@ -114,10 +114,14 @@ const AnchoredPopover = {
           this.el.style.width = `${this.anchor.offsetWidth}px`
         }
         placePanel(this.el, this.anchor, this.opts)
+        // Reveal only after positioning — the panel renders visibility:hidden
+        // so the pre-placement paint at the default (top-left) spot never shows.
+        this.el.style.visibility = "visible"
         window.addEventListener("scroll", this._reposition, true)
         window.addEventListener("resize", this._reposition)
       } else {
         if (this.opts.matchWidth) this.el.style.width = ""
+        this.el.style.visibility = "hidden"
         window.removeEventListener("scroll", this._reposition, true)
         window.removeEventListener("resize", this._reposition)
       }
