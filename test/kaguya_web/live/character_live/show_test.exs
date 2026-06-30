@@ -66,6 +66,41 @@ defmodule KaguyaWeb.CharacterLive.ShowTest do
     assert html =~ "Main"
   end
 
+  test "favoriting a character adds it to the user's profile favorites", %{conn: conn} do
+    character =
+      %Character{}
+      |> Character.changeset(%{name: "Toggle Target"})
+      |> Repo.insert!()
+
+    user = insert_user!(username: "fav_clicker", display_name: "Fav Clicker")
+    conn = Plug.Test.init_test_session(conn, %{"current_user_id" => user.id})
+
+    {:ok, view, _html} = live(conn, ~p"/character/#{character.slug}")
+
+    view
+    |> element(~s(button[phx-click="toggle_favorite"]))
+    |> render_click()
+
+    assert Repo.exists?(
+             from cf in Kaguya.Characters.CharacterFavorite,
+               where: cf.character_id == ^character.id and cf.user_id == ^user.id
+           )
+
+    assert Repo.reload!(character).favorites_count == 1
+    assert render(view) =~ ~s(href="/character/#{character.slug}/fans")
+
+    view
+    |> element(~s(button[phx-click="toggle_favorite"]))
+    |> render_click()
+
+    refute Repo.exists?(
+             from cf in Kaguya.Characters.CharacterFavorite,
+               where: cf.character_id == ^character.id and cf.user_id == ^user.id
+           )
+
+    assert Repo.reload!(character).favorites_count == 0
+  end
+
   test "renders character fans", %{conn: conn} do
     character =
       %Character{}

@@ -446,6 +446,31 @@ defmodule Kaguya.Users do
       when is_binary(user_id) and is_binary(quote_id),
       do: remove_favorite_pin(user_id, :favorite_quotes, quote_id)
 
+  @doc """
+  Pin a single character to the caller's profile favorites. Idempotent —
+  re-pinning is a no-op. Errors with `{:error, :limit_exceeded}` when the
+  user is already at their favorites limit. The bulk
+  `update_user(favorite_characters: [...])` path is for the editor's
+  reorder/save flow.
+  """
+  def add_favorite_character(%{id: user_id}, character_id) when is_binary(character_id),
+    do: add_favorite_pin(user_id, :favorite_characters, character_id)
+
+  def add_favorite_character(user_id, character_id)
+      when is_binary(user_id) and is_binary(character_id),
+      do: add_favorite_pin(user_id, :favorite_characters, character_id)
+
+  @doc """
+  Unpin a single character. Idempotent — unpinning when not pinned is a
+  no-op. Same input flexibility as `add_favorite_character/2`.
+  """
+  def remove_favorite_character(%{id: user_id}, character_id) when is_binary(character_id),
+    do: remove_favorite_pin(user_id, :favorite_characters, character_id)
+
+  def remove_favorite_character(user_id, character_id)
+      when is_binary(user_id) and is_binary(character_id),
+      do: remove_favorite_pin(user_id, :favorite_characters, character_id)
+
   # Locks-and-fetches the user row, then runs the limit-checked insert.
   # Working from the freshly-fetched %User{} (not the caller's stale
   # struct/map) means the limit check sees the post-lock favorites

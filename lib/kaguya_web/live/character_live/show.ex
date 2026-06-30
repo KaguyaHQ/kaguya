@@ -47,6 +47,13 @@ defmodule KaguyaWeb.CharacterLive.Show do
   end
 
   @impl true
+  def handle_event("toggle_favorite", _params, socket) do
+    case socket.assigns.current_user do
+      %{id: user_id} -> toggle_favorite(socket, user_id)
+      _ -> {:noreply, put_flash(socket, :error, "Sign in to favorite characters")}
+    end
+  end
+
   def handle_event("toggle_quote_like", %{"quote-id" => quote_id}, socket) do
     case socket.assigns.current_user do
       %{id: _} = user ->
@@ -119,14 +126,39 @@ defmodule KaguyaWeb.CharacterLive.Show do
                   {@character.name}
                 </h1>
 
-                <.link
-                  :if={(@character.favorites_count || 0) > 0}
-                  navigate={"/character/#{@character.slug}/fans"}
-                  class="text-[13px] text-[rgb(var(--foreground-secondary))] tabular-nums transition-colors hover:text-[rgb(var(--foreground-primary))] lg:text-sm"
-                >
-                  {format_count(@character.favorites_count)}
-                  {if @character.favorites_count == 1, do: "Fan", else: "Fans"}
-                </.link>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    phx-click="toggle_favorite"
+                    aria-pressed={if @character.favorited_by_me, do: "true", else: "false"}
+                    aria-label={
+                      if @character.favorited_by_me,
+                        do: "Remove from favorites",
+                        else: "Add to favorites"
+                    }
+                    class={[
+                      "group/fav flex shrink-0 items-center text-[rgb(var(--foreground-secondary))] transition-colors hover:text-[rgb(var(--like-heart))]",
+                      @character.favorited_by_me && "text-[rgb(var(--like-heart))]"
+                    ]}
+                  >
+                    <Lucide.heart
+                      class={[
+                        "size-[18px] transition-colors duration-100 group-hover/fav:fill-[rgb(var(--like-heart))]",
+                        @character.favorited_by_me && "fill-[rgb(var(--like-heart))]"
+                      ]}
+                      aria-hidden
+                    />
+                  </button>
+
+                  <.link
+                    :if={(@character.favorites_count || 0) > 0}
+                    navigate={"/character/#{@character.slug}/fans"}
+                    class="text-[13px] text-[rgb(var(--foreground-secondary))] tabular-nums transition-colors hover:text-[rgb(var(--foreground-primary))] lg:text-sm"
+                  >
+                    {format_count(@character.favorites_count)}
+                    {if @character.favorites_count == 1, do: "Fan", else: "Fans"}
+                  </.link>
+                </div>
               </div>
 
               <div class="hidden shrink-0 items-center gap-1.5 lg:flex">
@@ -271,6 +303,36 @@ defmodule KaguyaWeb.CharacterLive.Show do
       </div>
     </div>
     """
+  end
+
+  defp toggle_favorite(socket, user_id) do
+    character = socket.assigns.character
+    favorited? = character.favorited_by_me || false
+    delta = if favorited?, do: -1, else: 1
+
+    optimistic = %{
+      character
+      | favorited_by_me: !favorited?,
+        favorites_count: max(0, (character.favorites_count || 0) + delta)
+    }
+
+    persist =
+      if favorited? do
+        Kaguya.Users.remove_favorite_character(user_id, character.id)
+      else
+        Kaguya.Users.add_favorite_character(user_id, character.id)
+      end
+
+    case persist do
+      {:ok, _} ->
+        {:noreply, assign(socket, character: optimistic)}
+
+      {:error, :limit_exceeded} ->
+        {:noreply, put_flash(socket, :error, "You've reached your favorite characters limit")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, format_error(reason))}
+    end
   end
 
   defp has_character_image?(character) do

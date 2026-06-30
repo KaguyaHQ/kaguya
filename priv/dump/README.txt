@@ -29,8 +29,7 @@ Tags:
   tags, tag_parents, vn_tags, vn_tag_votes
 
 Characters:
-  characters, character_images, vn_characters, character_likes,
-  character_favorites
+  characters, character_images, vn_characters, character_favorites
 
 User engagement (per-user, per-thing -- attribution is preserved):
   vn_image_likes, vn_screenshot_likes, vn_quote_likes,

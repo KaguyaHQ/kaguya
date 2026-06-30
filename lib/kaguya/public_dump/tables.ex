@@ -60,7 +60,6 @@ defmodule Kaguya.PublicDump.Tables do
       characters(),
       character_images(),
       vn_characters(),
-      character_likes(),
       character_favorites(),
 
       # ── Engagement (likes + follows) ──
@@ -527,19 +526,6 @@ defmodule Kaguya.PublicDump.Tables do
     }
   end
 
-  defp character_likes do
-    %Spec{
-      name: :character_likes,
-      primary_key: "user_id, character_id",
-      columns: [{:user_id, :user_fk}, :character_id, {:inserted_at, :date}],
-      where: "character_id IN (SELECT id FROM characters WHERE hidden_at IS NULL)",
-      foreign_keys: [
-        {:user_id, :users, :id},
-        {:character_id, :characters, :id}
-      ]
-    }
-  end
-
   defp character_favorites do
     %Spec{
       name: :character_favorites,
@@ -807,10 +793,6 @@ defmodule Kaguya.PublicDump.Tables do
              SELECT id FROM vn_quotes
               WHERE visual_novel_id IN (SELECT id FROM visual_novels WHERE hidden_at IS NULL)
            )
-        )
-        OR id IN (
-          SELECT user_id FROM character_likes
-           WHERE character_id IN (SELECT id FROM characters WHERE hidden_at IS NULL)
         )
         OR id IN (
           SELECT user_id FROM character_favorites

@@ -11,7 +11,6 @@ defmodule Kaguya.Characters do
   alias Kaguya.Characters.{
     Character,
     CharacterFavorite,
-    CharacterLike,
     VNCharacter,
     CharacterImage
   }
@@ -84,16 +83,16 @@ defmodule Kaguya.Characters do
     |> Repo.all()
   end
 
-  defp attach_viewer_state(character, nil), do: Map.put(character, :liked_by_me, false)
+  defp attach_viewer_state(character, nil), do: Map.put(character, :favorited_by_me, false)
 
   defp attach_viewer_state(character, %{id: user_id}) do
-    liked? =
+    favorited? =
       Repo.exists?(
-        from cl in CharacterLike,
-          where: cl.character_id == ^character.id and cl.user_id == ^user_id
+        from cf in CharacterFavorite,
+          where: cf.character_id == ^character.id and cf.user_id == ^user_id
       )
 
-    Map.put(character, :liked_by_me, liked?)
+    Map.put(character, :favorited_by_me, favorited?)
   end
 
   defp can_view_hidden?(%{mod_db: true}), do: true
@@ -114,8 +113,6 @@ defmodule Kaguya.Characters do
 
   @doc """
   Lists characters for the browse page. Accepts `:sort`, `:page`, `:page_size`.
-  This function does not join character_likes — callers that need
-  `liked_by_me` should batch that separately.
   """
   # Frontend caps pagination at 10 pages — an unbounded count(*) would be a
   # full seq scan over the whole `characters` heap.
@@ -126,17 +123,11 @@ defmodule Kaguya.Characters do
     sort = if sort in @valid_sorts, do: sort, else: :most_popular
     page = max(Keyword.get(opts, :page, 1), 1)
     page_size = Keyword.get(opts, :page_size, 20) |> min(100) |> max(1)
-    appears_in_avn = Keyword.get(opts, :appears_in_avn)
     max_count = @browse_max_pages * page_size + 1
 
-    # `as: :char` so filter_by_appears_in_avn/2 can reference the outer
-    # row via parent_as(:char) inside its EXISTS subquery — same pattern
-    # the VN browse resolver uses for available_languages, etc.
     filtered =
       Character
-      |> from(as: :char)
       |> where([c], is_nil(c.hidden_at))
-      |> filter_by_appears_in_avn(appears_in_avn)
 
     items =
       filtered
@@ -190,11 +181,8 @@ defmodule Kaguya.Characters do
     {items, pagination}
   end
 
-  # :most_popular sorts by the count of users who have this character in
-  # their profile's favorite_characters list — not by the separate
-  # likes_count counter (which tracks the heart/like button). These are
-  # two distinct signals; `favorites_count` is the product intent for the
-  # browse "popular" ranking.
+  # :most_popular sorts by `favorites_count` — the count of users who have
+  # this character in their profile's favorite_characters list.
   defp apply_sort(query, :most_popular),
     do: order_by(query, [c], desc: c.favorites_count, asc: c.id)
 
@@ -206,87 +194,6 @@ defmodule Kaguya.Characters do
 
   defp apply_sort(query, :recently_added),
     do: order_by(query, [c], desc: c.inserted_at, asc: c.id)
-
-  # Semi-join to visual_novels via vn_characters: a character matches when
-  # they appear in at least one VN whose is_avn flag matches the requested
-  # value. Index path is vn_characters_character_id_index → visual_novels
-  # PK → partial visual_novels_is_avn_index for the `true` case.
-  # Cold worst case (most-popular page 1, is_avn=true) is ~95ms because the
-  # popularity-ordered scan walks ~1,400 chars before finding 30 AVN-side
-  # matches; warmed and Cachex'd it lands at <10ms for everyone after.
-  defp filter_by_appears_in_avn(query, nil), do: query
-
-  defp filter_by_appears_in_avn(query, is_avn) when is_boolean(is_avn) do
-    where(
-      query,
-      [c],
-      exists(
-        from vc in "vn_characters",
-          join: vn in "visual_novels",
-          on: vn.id == vc.visual_novel_id,
-          where:
-            vc.character_id == parent_as(:char).id and
-              vn.is_avn == ^is_avn and
-              is_nil(vn.hidden_at),
-          select: 1
-      )
-    )
-  end
-
-  # ============================================================================
-  # Likes
-  # ============================================================================
-
-  @doc """
-  Like a character. Idempotent — re-liking is a no-op. Returns {:ok, true} on
-  success regardless of whether the row was newly inserted.
-  """
-  def like_character(character_id, user_id) do
-    Repo.transact(fn ->
-      case Repo.get(Character, character_id) do
-        nil ->
-          {:error, "Character not found"}
-
-        _character ->
-          now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-          {count, _} =
-            Repo.insert_all(
-              CharacterLike,
-              [%{user_id: user_id, character_id: character_id, inserted_at: now}],
-              on_conflict: :nothing,
-              conflict_target: [:user_id, :character_id]
-            )
-
-          if count > 0 do
-            from(c in Character, where: c.id == ^character_id)
-            |> Repo.update_all(inc: [likes_count: 1])
-          end
-
-          {:ok, true}
-      end
-    end)
-  end
-
-  @doc """
-  Unlike a character. Idempotent — unliking when not liked is a no-op.
-  """
-  def unlike_character(character_id, user_id) do
-    Repo.transact(fn ->
-      case Repo.get_by(CharacterLike, user_id: user_id, character_id: character_id) do
-        nil ->
-          {:ok, true}
-
-        like ->
-          Repo.delete!(like)
-
-          from(c in Character, where: c.id == ^character_id and c.likes_count > 0)
-          |> Repo.update_all(inc: [likes_count: -1])
-
-          {:ok, true}
-      end
-    end)
-  end
 
   # ============================================================================
   # Profile Favorites (character_favorites join table)
@@ -443,7 +350,7 @@ defmodule Kaguya.Characters do
   # represents moderation state.
   #
   # Intentionally excluded — denormalized counter / cache (matches VNDB pattern):
-  #   likes_count, favorites_count — maintained by like/favorite actions, not user edits
+  #   favorites_count — maintained by favorite actions, not user edits
   # Intentionally excluded — sync-managed external identifiers:
   #   vndb_id, vndb_image_id, temp_image_url
   @hist_fields ~w(name slug description sex spoiler_sex gender spoiler_gender

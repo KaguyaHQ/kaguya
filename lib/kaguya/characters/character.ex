@@ -41,9 +41,6 @@ defmodule Kaguya.Characters.Character do
     field :hidden_at, :utc_datetime
     field :is_locked, :boolean, default: false
 
-    # Denormalized like count, kept in sync by Characters.like_character/2 and unlike_character/2
-    field :likes_count, :integer, default: 0
-
     # Denormalized counter of users who have this character in their
     # profile's `favorite_characters` array. Kept in sync by
     # Users.update_user/2 and Users.delete_user/1. Backfilled by the
