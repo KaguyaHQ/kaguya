@@ -245,6 +245,64 @@ defmodule KaguyaWeb.Markdown.UserContentTest do
     end
   end
 
+  describe "review preset" do
+    test "indented prose renders as a paragraph, not a code block" do
+      # A user pasting a review with a 4-space indent must not turn the whole
+      # thing into a non-wrapping monospace <pre> block.
+      html = render("    A fantastic visual novel about Erika.", preset: :review)
+
+      refute html =~ "<pre>"
+      refute html =~ "<code>"
+      assert html =~ "<p>"
+      assert html =~ "A fantastic visual novel about Erika."
+    end
+
+    test "fenced code degrades to plain text (pre/code dropped)" do
+      html =
+        render(
+          """
+          intro
+
+          ```
+          not really code
+          ```
+          """,
+          preset: :review
+        )
+
+      refute html =~ "<pre>"
+      refute html =~ "<code>"
+      assert html =~ "not really code"
+    end
+
+    test "keeps prose formatting — bold, italic, links, lists, quotes" do
+      html =
+        render(
+          """
+          **bold** and *italic* with a [link](https://example.com)
+
+          > quoted
+
+          - one
+          - two
+          """,
+          preset: :review
+        )
+
+      assert html =~ "<strong>"
+      assert html =~ "<em>"
+      assert html =~ ~s(<a href="https://example.com")
+      assert html =~ "<blockquote>"
+      assert html =~ "<li>"
+    end
+
+    test "spoilers still work inside review preset" do
+      html = render("a ||hidden|| b", preset: :review)
+      assert html =~ ~s(data-spoiler)
+      assert html =~ "hidden"
+    end
+  end
+
   describe "bio preset" do
     test "strips link syntax to plain text" do
       html = render("see [my site](https://example.com) for more", preset: :bio)

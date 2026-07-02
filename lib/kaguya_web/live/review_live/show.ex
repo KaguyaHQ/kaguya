@@ -98,7 +98,7 @@ defmodule KaguyaWeb.ReviewLive.Show do
     ~H"""
     <main class="bg-surface-base text-foreground-primary min-h-screen">
       <section class="mx-auto mt-10 mb-[110px] max-w-[988px] gap-x-[44px] sm:mb-40 lg:grid lg:grid-cols-[1fr_180px] lg:px-0">
-        <div class="flex flex-col lg:gap-12">
+        <div class="flex min-w-0 flex-col lg:gap-12">
           <%!--
             Header + body + actions are grouped in one block so the parent
             `lg:gap-12` only spaces the comments/more-reviews sections away

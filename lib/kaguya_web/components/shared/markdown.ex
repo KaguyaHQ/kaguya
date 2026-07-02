@@ -48,7 +48,7 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
 
   attr :variant, :string,
     default: "user",
-    values: ~w(user comment bio policy plain),
+    values: ~w(user comment review bio policy plain),
     doc:
       "`user` wraps in `kaguya-markdown` typography; `comment` and `bio` use their tighter typography. `policy` and `plain` skip the wrapper class."
 
@@ -132,7 +132,7 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
   this the single entry point for rendering raw markdown binaries.
   """
   attr :content, :any, required: true
-  attr :variant, :string, default: "user", values: ~w(user comment bio policy plain)
+  attr :variant, :string, default: "user", values: ~w(user comment review bio policy plain)
 
   def markdown_inline(assigns) do
     assigns = assign(assigns, :rendered, render_content(assigns.content, assigns.variant))
@@ -162,6 +162,7 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
   defp render_content(_other, _variant), do: {:safe, ""}
 
   defp preset_for("comment"), do: :comment
+  defp preset_for("review"), do: :review
   defp preset_for("bio"), do: :bio
   defp preset_for(_), do: :default
 
@@ -308,6 +309,7 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
 
   defp wrapper_class("user"), do: "kaguya-markdown"
   defp wrapper_class("comment"), do: "kaguya-markdown"
+  defp wrapper_class("review"), do: "kaguya-markdown"
   defp wrapper_class("bio"), do: nil
   defp wrapper_class("policy"), do: nil
   defp wrapper_class("plain"), do: nil

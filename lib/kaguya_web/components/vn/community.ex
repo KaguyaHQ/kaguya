@@ -231,14 +231,18 @@ defmodule KaguyaWeb.VN.Community do
         elements (avatar, profile link, like button, comments link) are
         promoted above it with `relative z-10`.
       --%>
+      <%!--
+        Decorative mouse-only overlay (aria-hidden + not focusable): the review
+        is already keyboard/AT-reachable via the timestamp permalink below, so a
+        focusable overlay here would just be a duplicate tab stop.
+      --%>
       <.link
         :if={@review_href}
         navigate={@review_href}
-        aria-label={"Read review by #{@display_name}"}
         tabindex="-1"
+        aria-hidden="true"
         class="absolute inset-0 z-1 rounded-lg"
       >
-        <span class="sr-only">Read review by {@display_name}</span>
       </.link>
 
       <div class="flex w-full gap-[11px]">
@@ -314,7 +318,7 @@ defmodule KaguyaWeb.VN.Community do
               </span>
             </summary>
             <div class={review_content_class("mt-1")}>
-              <.markdown_inline content={@review.content} />
+              <.markdown_inline content={@review.content} variant="review" />
             </div>
           </details>
 
@@ -322,7 +326,7 @@ defmodule KaguyaWeb.VN.Community do
             :if={!@review.is_spoiler && present?(@review.content)}
             class={review_content_class("mt-3")}
           >
-            <.markdown_inline content={@review.content} />
+            <.markdown_inline content={@review.content} variant="review" />
           </div>
 
           <p
@@ -729,14 +733,17 @@ defmodule KaguyaWeb.VN.Community do
       id={"vn-discussion-#{@post.id}"}
       class="relative -mx-3 rounded-lg px-3 py-3.5 transition-colors first:pt-0 lg:py-4 lg:hover:bg-white/2"
     >
+      <%!--
+        Real, focusable stretched link — the discussion title is plain text
+        (not a link), so this overlay is the only way to open the post. It must
+        be reachable by keyboard/AT, hence no aria-hidden/tabindex=-1.
+      --%>
       <.link
         :if={@href != "#"}
         navigate={@href}
-        class="absolute inset-0 z-1 rounded-lg"
-        tabindex="-1"
-        aria-hidden="true"
+        class="absolute inset-0 z-1 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--foreground-primary))]"
       >
-        <span class="sr-only">Open discussion</span>
+        <span class="sr-only">Open discussion: {@post.title}</span>
       </.link>
 
       <div class="flex gap-3">

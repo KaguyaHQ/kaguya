@@ -169,11 +169,15 @@ defmodule KaguyaWeb.Components.VN.Cards do
         not @full_width && "max-w-[548px]"
       ]}>
         <%= if @review_href do %>
+          <%!--
+            Real, focusable stretched link — NOT aria-hidden/tabindex=-1, so
+            keyboard and screen-reader users can reach the review (the visible
+            VN title links to the VN, not the review). The sr-only text is its
+            accessible name; a focus ring makes the whole-card focus visible.
+          --%>
           <.link
             navigate={@review_href}
-            class="absolute inset-0 z-1 rounded-lg"
-            tabindex="-1"
-            aria-hidden="true"
+            class="absolute inset-0 z-1 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--foreground-primary))]"
           >
             <span class="sr-only">Open review</span>
           </.link>
@@ -282,13 +286,20 @@ defmodule KaguyaWeb.Components.VN.Cards do
 
           <%= cond do %>
             <% @review.is_spoiler and present?(@review.content) -> %>
+              <%!--
+                `pointer-events-none` lets clicks on the revealed body fall
+                through to the card's absolute overlay link (`z-1`) so it opens
+                the full review — same as a non-spoiler body. The `<summary>`
+                re-enables pointer events so "Show review" still toggles.
+                Mirrors the spoiler `<details>` in `vn/community.ex`.
+              --%>
               <details
                 id={"#{@id_prefix}-#{@review.id}-spoiler"}
                 phx-hook="SpoilerScope"
                 data-spoiler-scope={"review:#{@review.id}"}
-                class="group/spoiler relative z-10 mt-3"
+                class="group/spoiler pointer-events-none relative z-10 mt-3"
               >
-                <summary class="cursor-pointer list-none text-sm/6 text-[rgb(var(--foreground-secondary))] italic group-open/spoiler:hidden marker:hidden [&::-webkit-details-marker]:hidden">
+                <summary class="pointer-events-auto relative z-10 cursor-pointer list-none text-sm/6 text-[rgb(var(--foreground-secondary))] italic group-open/spoiler:hidden marker:hidden [&::-webkit-details-marker]:hidden">
                   This review may contain spoilers.
                   <span class="ml-1 font-medium text-[rgb(var(--foreground-primary))] not-italic transition-colors">
                     Show review
@@ -298,7 +309,7 @@ defmodule KaguyaWeb.Components.VN.Cards do
                   Contains spoilers
                 </p>
                 <div class="mt-1 line-clamp-5 text-sm/6 text-[rgb(var(--foreground-secondary))] md:text-base md:leading-[26px] [&_p]:my-1 first:[&_p]:mt-0 last:[&_p]:mb-0">
-                  <.markdown_inline content={@review.content} />
+                  <.markdown_inline content={@review.content} variant="review" />
                 </div>
               </details>
             <% @review.is_spoiler -> %>
@@ -307,7 +318,7 @@ defmodule KaguyaWeb.Components.VN.Cards do
               </p>
             <% present?(@review.content) -> %>
               <div class="mt-3 line-clamp-5 text-sm/6 text-[rgb(var(--foreground-secondary))] md:text-base md:leading-[26px] [&_p]:my-1 first:[&_p]:mt-0 last:[&_p]:mb-0">
-                <.markdown_inline content={@review.content} />
+                <.markdown_inline content={@review.content} variant="review" />
               </div>
             <% true -> %>
           <% end %>

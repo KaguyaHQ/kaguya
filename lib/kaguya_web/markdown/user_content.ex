@@ -16,6 +16,11 @@ defmodule KaguyaWeb.Markdown.UserContent do
 
   @default_allowed_tags ~w(p br strong b em i del a span blockquote ul ol li pre code)
   @comment_allowed_tags @default_allowed_tags
+  # Review preset — prose only. Reviews are VN write-ups, never code, so
+  # `<pre>`/`<code>` are dropped and leading indentation is stripped in the
+  # preprocess (see `review_preprocess/1`) so pasted-indented prose renders
+  # as paragraphs instead of an accidental indented code block.
+  @review_allowed_tags @default_allowed_tags -- ~w(pre code)
   # Bio preset — no anchors, no lists/code/blockquotes,
   # no `<b>`/`<i>`/`<span>` (the wider set the comment preset allows).
   @bio_allowed_tags ~w(p br strong em del)
@@ -23,10 +28,12 @@ defmodule KaguyaWeb.Markdown.UserContent do
   # Presets bundle an allowlist with a preprocess fn so callers pick one name
   # instead of wiring both:
   # - :default / :comment → full block markdown
+  # - :review → prose only, no code, indentation stripped
   # - :bio → no links, no lists, escaped numbered prefixes
   @presets %{
     default: {@default_allowed_tags, :identity},
     comment: {@comment_allowed_tags, :comment_preprocess},
+    review: {@review_allowed_tags, :review_preprocess},
     bio: {@bio_allowed_tags, :bio_preprocess}
   }
 
@@ -225,6 +232,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
 
   defp apply_preprocess(content, :identity), do: content
   defp apply_preprocess(content, :comment_preprocess), do: comment_preprocess(content)
+  defp apply_preprocess(content, :review_preprocess), do: review_preprocess(content)
   defp apply_preprocess(content, :bio_preprocess), do: bio_preprocess(content)
   defp apply_preprocess(content, fun) when is_function(fun, 1), do: fun.(content)
   defp apply_preprocess(content, _), do: content
@@ -246,6 +254,27 @@ defmodule KaguyaWeb.Markdown.UserContent do
     |> unescape_trailing_newlines()
     |> pad_blank_lines()
   end
+
+  @doc """
+  Review preprocessing.
+
+  Reviews are prose, never code. Strip leading indentation from every line so
+  a paragraph a user pasted with a 4-space indent doesn't get parsed as an
+  indented code block (`<pre><code>`) and render as a non-wrapping monospace
+  blob. Combined with the `:review` allowlist dropping `pre`/`code`, any
+  fenced code also degrades to plain prose.
+  """
+  def review_preprocess(content) when is_binary(content) do
+    content
+    |> normalize_newlines()
+    |> strip_leading_indentation()
+  end
+
+  # Drop leading horizontal whitespace on every line. Reviews don't need
+  # indentation-based formatting, and removing it kills the indented-code-block
+  # trigger while leaving list markers, `>` quotes, and inline text intact.
+  defp strip_leading_indentation(content),
+    do: Regex.replace(~r/^[ \t]+/m, content, "")
 
   @doc """
   Bio preprocessing.

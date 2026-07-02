@@ -508,12 +508,15 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
       class="group kaguya-thread-enter relative border-t border-white/6 py-4 transition-colors first:border-t-0 lg:-mx-3 lg:px-3 lg:py-5 lg:hover:bg-white/2"
       style={"animation-delay: #{rem(@index, 12) * 35}ms"}
     >
+      <%!--
+        Real, focusable stretched link — the title is plain text, so this is the
+        only way to open the post; it must be reachable by keyboard/AT.
+      --%>
       <.link
         navigate={@post.url}
-        class="absolute inset-0 z-1 rounded-lg"
-        tabindex="-1"
-        aria-hidden="true"
+        class="absolute inset-0 z-1 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--foreground-primary))]"
       >
+        <span class="sr-only">Open discussion: {@post.title}</span>
       </.link>
 
       <div class="flex gap-3.5 lg:gap-4">

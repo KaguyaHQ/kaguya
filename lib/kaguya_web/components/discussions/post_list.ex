@@ -65,12 +65,15 @@ defmodule KaguyaWeb.Components.Discussions.PostList do
 
     ~H"""
     <div class="relative -mx-3 rounded-lg px-3 py-3.5 transition-colors lg:py-4 lg:hover:bg-white/2">
+      <%!--
+        Real, focusable stretched link — the title is plain text, so this is the
+        only way to open the post; it must be reachable by keyboard/AT.
+      --%>
       <.link
         navigate={@href}
-        class="absolute inset-0 z-1 rounded-lg"
-        tabindex="-1"
-        aria-hidden="true"
+        class="absolute inset-0 z-1 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--foreground-primary))]"
       >
+        <span class="sr-only">Open discussion: {@display_title}</span>
       </.link>
 
       <div class="flex gap-3">
