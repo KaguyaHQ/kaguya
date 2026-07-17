@@ -190,7 +190,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
          {:ok, new_status} <- status_from_value(status),
          %{} = item <- socket.assigns.items_state[vn_id] do
       previous_status = item.status
-      updated = %{item | status: new_status}
+      updated = autofill_item_dates(%{item | status: new_status})
 
       # Optimistic: stream-insert the patched item (or drop it if the row no
       # longer belongs to the active shelf), then shift count badges to match.
@@ -384,18 +384,6 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
       case Shelves.set_reading_status(socket.assigns.profile.id, vn_id, attrs) do
         {:ok, _} ->
-          # `Shelves.upsert_statuses/3` treats `nil` as "leave the field alone".
-          # When the user goes range → single, the orphaned column would persist
-          # — run a targeted UPDATE to null it out.
-          maybe_clear_orphan_dates(
-            socket.assigns.profile.id,
-            vn_id,
-            item.date_started,
-            item.date_finished,
-            next_started,
-            next_finished
-          )
-
           updated = %{item | date_started: next_started, date_finished: next_finished}
           {:noreply, apply_item_update(socket, updated)}
 
@@ -527,30 +515,19 @@ defmodule KaguyaWeb.ProfileLive.Library do
   end
 
   # ---------------------------------------------------------------------------
-  # Date/orphan helpers
+  # Date helpers
   # ---------------------------------------------------------------------------
 
-  defp maybe_clear_orphan_dates(
-         user_id,
-         vn_id,
-         prev_started,
-         prev_finished,
-         next_started,
-         next_finished
-       ) do
-    fields =
-      []
-      |> add_clear(:date_started, prev_started, next_started)
-      |> add_clear(:date_finished, prev_finished, next_finished)
+  # Mirrors the date auto-fill in `Shelves.set_reading_status/3` so the row shows
+  # the stamped date right away instead of holding a stale blank until the next
+  # load. Same rule as the context: fill a blank, never touch an existing date.
+  defp autofill_item_dates(%{status: :read, date_finished: nil} = item),
+    do: %{item | date_finished: Date.utc_today()}
 
-    case fields do
-      [] -> :ok
-      list -> Shelves.clear_reading_status_fields(user_id, vn_id, list)
-    end
-  end
+  defp autofill_item_dates(%{status: :currently_reading, date_started: nil} = item),
+    do: %{item | date_started: Date.utc_today()}
 
-  defp add_clear(list, key, previous, nil) when not is_nil(previous), do: [key | list]
-  defp add_clear(list, _key, _previous, _next), do: list
+  defp autofill_item_dates(item), do: item
 
   defp parse_date(nil), do: nil
   defp parse_date(""), do: nil

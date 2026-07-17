@@ -97,6 +97,158 @@ defmodule Kaguya.ShelvesTest do
     end
   end
 
+  describe "set_reading_status/3 — date_finished auto-fill" do
+    test "stamps today when marking a VN read without a date" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("finished-autofill-new")
+
+      assert {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :read})
+
+      assert %ReadingStatus{date_finished: d} = get_status(user.id, vn.id)
+      assert d == Date.utc_today()
+    end
+
+    test "never overwrites a read date the user already set" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("finished-autofill-preserve")
+      manual = ~D[2019-06-02]
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{status: :read, date_finished: manual})
+
+      {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :read})
+
+      assert %ReadingStatus{date_finished: ^manual} = get_status(user.id, vn.id)
+    end
+
+    test "respects an explicit :date_finished key passed by importers (even when nil)" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("finished-autofill-importer")
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{status: :read, date_finished: nil})
+
+      assert %ReadingStatus{date_finished: nil} = get_status(user.id, vn.id)
+    end
+
+    test "does not fill date_finished for other statuses" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("finished-autofill-other")
+
+      {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :currently_reading})
+
+      assert %ReadingStatus{date_finished: nil} = get_status(user.id, vn.id)
+    end
+  end
+
+  describe "set_reading_status/3 — explicit clears" do
+    test "an explicit nil clears a date that was previously set" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("clear-explicit")
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{
+          status: :read,
+          date_started: ~D[2024-01-01],
+          date_finished: ~D[2024-01-10]
+        })
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{
+          status: :read,
+          date_started: nil,
+          date_finished: ~D[2024-01-10]
+        })
+
+      assert %ReadingStatus{date_started: nil, date_finished: ~D[2024-01-10]} =
+               get_status(user.id, vn.id)
+    end
+
+    test "an omitted key leaves the stored date alone" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("clear-omitted")
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{
+          status: :read,
+          date_started: ~D[2024-01-01],
+          date_finished: ~D[2024-01-10]
+        })
+
+      {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :read})
+
+      assert %ReadingStatus{date_started: ~D[2024-01-01], date_finished: ~D[2024-01-10]} =
+               get_status(user.id, vn.id)
+    end
+  end
+
+  describe "set_reading_status/3 — inferring :read from a finish date" do
+    test "a finish date with no status at all implies :read" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("coerce-implied")
+
+      {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{date_finished: ~D[2024-02-02]})
+
+      assert %ReadingStatus{status: :read} = get_status(user.id, vn.id)
+    end
+
+    test "a newly set finish date implies :read even against an explicit status" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("coerce-newly-set")
+
+      {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :currently_reading})
+
+      # Picking a started→finished range in the library grid sends the item's
+      # own status alongside a finish date it did not have before.
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{
+          status: :currently_reading,
+          date_started: ~D[2024-01-01],
+          date_finished: ~D[2024-01-10]
+        })
+
+      assert %ReadingStatus{status: :read, date_finished: ~D[2024-01-10]} =
+               get_status(user.id, vn.id)
+    end
+
+    test "an unchanged finish date riding along does not drag a reread back to :read" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("coerce-reread")
+      finished = ~D[2024-02-02]
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{status: :read, date_finished: finished})
+
+      # The review dialog round-trips date_finished as a hidden input, so the
+      # stored date rides along unchanged when the user starts a reread.
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{
+          status: :currently_reading,
+          date_finished: finished
+        })
+
+      assert %ReadingStatus{status: :currently_reading, date_finished: ^finished} =
+               get_status(user.id, vn.id)
+    end
+
+    test "clearing the finish date leaves an explicit status alone" do
+      user = UserFixtures.insert_user!()
+      vn = insert_vn!("coerce-cleared")
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{status: :read, date_finished: ~D[2024-02-02]})
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, vn.id, %{
+          status: :currently_reading,
+          date_finished: nil
+        })
+
+      assert %ReadingStatus{status: :currently_reading, date_finished: nil} =
+               get_status(user.id, vn.id)
+    end
+  end
+
   defp insert_vn!(title) do
     Repo.insert!(%VisualNovel{
       id: Ecto.UUID.generate(),

@@ -85,6 +85,7 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
          assign(socket,
            review_dialog_open: true,
            review_date_picker_open?: false,
+           review_date_touched?: false,
            action_drawer_open: false,
            review_form: form,
            review_save_error: nil,
@@ -132,11 +133,15 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
       |> Map.put("date_started", started || "")
       |> Map.put("date_finished", finished || "")
 
-    {:noreply, assign(socket, review_form: form)}
+    {:noreply, assign(socket, review_form: form, review_date_touched?: true)}
   end
 
   def save_review(socket, %{"review" => attrs}) do
-    form = normalize_review_form(attrs)
+    form =
+      attrs
+      |> normalize_review_form()
+      |> maybe_seed_read_date(Map.get(socket.assigns, :review_date_touched?, false))
+
     length = content_length(form)
 
     case socket.assigns.current_user do
@@ -167,6 +172,21 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
         {:noreply, put_flash(socket, :error, "Sign in to write a review")}
     end
   end
+
+  # The dialog always submits date_finished, so the context can't tell "never
+  # picked a date" from "deliberately cleared it" — a present key is precisely
+  # how it knows the user stated the value. Only this LiveView knows the picker
+  # was never opened, so the ambiguity is resolved here: logging a read without
+  # touching the dates means today, which is what keeps the entry out of the
+  # nulls-last basement of every "Recently read" sort. A date the user cleared
+  # was touched, so it stays cleared.
+  defp maybe_seed_read_date(
+         %{"status" => "READ", "date_started" => "", "date_finished" => ""} = form,
+         false
+       ),
+       do: Map.put(form, "date_finished", Date.to_iso8601(Date.utc_today()))
+
+  defp maybe_seed_read_date(form, _touched?), do: form
 
   defp content_length(form) when is_map(form),
     do: form |> Map.get("content", "") |> to_string() |> String.trim() |> String.length()
@@ -218,6 +238,7 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
       review_dialog_open: false,
       review_delete_dialog_open?: false,
       review_date_picker_open?: false,
+      review_date_touched?: false,
       review_form: %{},
       review_save_error: nil,
       review_min_length_error?: false

@@ -763,8 +763,6 @@ defmodule KaguyaWeb.AccountLive.Import do
     status_atom = status_atom_for(item)
     next_started = parse_iso_date(started)
     next_finished = parse_iso_date(finished)
-    prev_started = parse_iso_date(item && item["date_started"])
-    prev_finished = parse_iso_date(item && item["date_finished"])
 
     attrs = %{
       status: status_atom,
@@ -774,18 +772,6 @@ defmodule KaguyaWeb.AccountLive.Import do
 
     case Shelves.set_reading_status(user_id, vn_id, attrs) do
       {:ok, _} ->
-        # `upsert_statuses/3` ignores nil fields. If the user collapsed a range
-        # to a single date here, the orphan column still holds the old value —
-        # null it out explicitly. Same pattern as the library cover picker.
-        clear_orphan_import_dates(
-          user_id,
-          vn_id,
-          prev_started,
-          prev_finished,
-          next_started,
-          next_finished
-        )
-
         socket
         |> update_import_item(vn_id, started, finished)
         |> refresh_vote_fallback()
@@ -807,28 +793,6 @@ defmodule KaguyaWeb.AccountLive.Import do
   end
 
   defp parse_iso_date(_), do: nil
-
-  defp clear_orphan_import_dates(
-         user_id,
-         vn_id,
-         prev_started,
-         prev_finished,
-         next_started,
-         next_finished
-       ) do
-    fields =
-      []
-      |> orphan_field(:date_started, prev_started, next_started)
-      |> orphan_field(:date_finished, prev_finished, next_finished)
-
-    case fields do
-      [] -> :ok
-      list -> Shelves.clear_reading_status_fields(user_id, vn_id, list)
-    end
-  end
-
-  defp orphan_field(list, key, previous, nil) when not is_nil(previous), do: [key | list]
-  defp orphan_field(list, _key, _previous, _next), do: list
 
   defp find_imported_item(%VndbImport{result: %{"imported_items" => items}}, vn_id) do
     Enum.find(items, &(&1["id"] == vn_id))

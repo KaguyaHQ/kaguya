@@ -18,18 +18,10 @@ defmodule KaguyaWeb.VNLive.Show.ReviewCalendar do
             put_single_review_date(form, parsed)
 
           started ->
-            if Date.compare(parsed, started) == :eq do
-              clear_review_dates(form)
-            else
-              put_review_date_range(form, started, parsed)
-            end
+            extend_or_replace(form, parsed, started, :gt)
 
           finished ->
-            if Date.compare(parsed, finished) == :eq do
-              clear_review_dates(form)
-            else
-              put_review_date_range(form, finished, parsed)
-            end
+            extend_or_replace(form, parsed, finished, :lt)
 
           true ->
             put_single_review_date(form, parsed)
@@ -37,6 +29,20 @@ defmodule KaguyaWeb.VNLive.Show.ReviewCalendar do
 
       _ ->
         form
+    end
+  end
+
+  # One date is already set and the user clicks another. Clicking it again
+  # clears. Clicking on the `widen` side of it grows the selection into a
+  # started→finished range, which is how you add the missing half. Clicking the
+  # other side would have to demote the existing date into the opposite field —
+  # silently rewriting a read date the user never touched — so replace instead
+  # and let the click mean exactly what it looks like it means.
+  defp extend_or_replace(form, %Date{} = parsed, %Date{} = existing, widen) do
+    case Date.compare(parsed, existing) do
+      :eq -> clear_review_dates(form)
+      ^widen -> put_review_date_range(form, existing, parsed)
+      _ -> put_single_review_date(form, parsed)
     end
   end
 

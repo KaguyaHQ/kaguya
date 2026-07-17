@@ -308,6 +308,92 @@ defmodule KaguyaWeb.VNLive.ShowTest do
     refute html =~ "2 Jan 2024"
   end
 
+  test "logging a read without touching the dates stamps today", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+    vn = review_date_vn!("seed-read-date-vn", "Seed Read Date VN")
+
+    {:ok, view, _html} =
+      conn
+      |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+      |> live_and_wait(~p"/vn/#{vn.slug}")
+
+    render_click(view, "open_review_dialog")
+    render_submit(view, "save_review", %{"review" => blank_review_params()})
+
+    assert %ReadingStatus{status: :read, date_finished: finished} =
+             Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id)
+
+    assert finished == Date.utc_today()
+  end
+
+  test "logging a read with a picked date keeps the picked date", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+    vn = review_date_vn!("picked-read-date-vn", "Picked Read Date VN")
+
+    {:ok, view, _html} =
+      conn
+      |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+      |> live_and_wait(~p"/vn/#{vn.slug}")
+
+    render_click(view, "open_review_dialog")
+    render_click(view, "toggle_review_date_picker")
+    shift_picker_to(view, ~D[2019-06-01])
+    render_click(element(view, "#review-date-range-picker button[phx-value-date='2019-06-02']"))
+
+    render_submit(view, "save_review", %{
+      "review" => %{blank_review_params() | "date_finished" => "2019-06-02"}
+    })
+
+    assert %ReadingStatus{status: :read, date_finished: ~D[2019-06-02]} =
+             Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id)
+  end
+
+  test "clearing the read date leaves it cleared instead of re-stamping today", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+    vn = review_date_vn!("cleared-read-date-vn", "Cleared Read Date VN")
+
+    {:ok, _} =
+      Shelves.set_reading_status(user.id, vn.id, %{status: :read, date_finished: ~D[2019-06-02]})
+
+    {:ok, view, _html} =
+      conn
+      |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+      |> live_and_wait(~p"/vn/#{vn.slug}")
+
+    render_click(view, "open_review_dialog")
+    render_click(view, "toggle_review_date_picker")
+
+    # The picker opens on the stored date's month, so no shifting is needed.
+    # Clicking the selected day again clears it — a touched, deliberately blank
+    # date must not be re-seeded on save.
+    render_click(element(view, "#review-date-range-picker button[phx-value-date='2019-06-02']"))
+    render_submit(view, "save_review", %{"review" => blank_review_params()})
+
+    assert %ReadingStatus{date_finished: nil} =
+             Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id)
+  end
+
+  defp blank_review_params do
+    %{
+      "status" => "READ",
+      "rating" => "",
+      "content" => "",
+      "note" => "",
+      "date_started" => "",
+      "date_finished" => ""
+    }
+  end
+
+  defp review_date_vn!(slug, title) do
+    %VisualNovel{}
+    |> VisualNovel.changeset(%{
+      title: title,
+      slug: slug,
+      description: "A" <> String.duplicate(" read date visual novel description", 3)
+    })
+    |> Repo.insert!()
+  end
+
   defp shift_picker_to(view, %Date{} = target) do
     today = Date.utc_today()
     delta = (target.year - today.year) * 12 + (target.month - today.month)
