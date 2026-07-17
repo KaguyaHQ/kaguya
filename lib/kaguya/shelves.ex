@@ -32,9 +32,7 @@ defmodule Kaguya.Shelves do
   Sets reading status for one or more VNs.
   """
   def set_reading_status(user_id, visual_novel_ids, attrs) when is_list(visual_novel_ids) do
-    # The stored rows answer two questions: did the status actually change (so
-    # activity is recorded once), and is an incoming date_finished new (so :read
-    # is only inferred from a date the user just set).
+    # Stored status detects real changes; stored date_finished detects a newly set date.
     existing =
       from(s in ReadingStatus,
         where: s.user_id == ^user_id and s.visual_novel_id in ^visual_novel_ids,
@@ -76,11 +74,8 @@ defmodule Kaguya.Shelves do
     end
   end
 
-  # A finish date implies :read only when the user just set it. The review
-  # dialog round-trips date_finished as a hidden input, so an unchanged date
-  # rides along with every save — inferring :read from that would drag a reread
-  # back out of :currently_reading. A caller that sends a date and no status at
-  # all is still stating the read happened, so that infers :read too.
+  # Only a *newly set* finish date implies :read — the review dialog round-trips
+  # an unchanged date on every save, and that must not drag a reread back to :read.
   defp maybe_infer_read_status(attrs, visual_novel_ids, existing) do
     date_finished = Map.get(attrs, :date_finished)
 
@@ -245,8 +240,6 @@ defmodule Kaguya.Shelves do
     if note_provided? && note != nil && String.length(note) > 280 do
       {:error, "Note must be 280 characters or less"}
     else
-      # `maybe_infer_read_status/3` has already resolved whether this finish date
-      # means :read, so both values are taken as given here.
       status = Map.get(args, :status)
       date_finished = Map.get(args, :date_finished)
 
@@ -282,9 +275,8 @@ defmodule Kaguya.Shelves do
     end
   end
 
-  # Key present (even as nil) means the caller is stating the field's value, so
-  # nil clears it. Key absent means "leave alone" — that's what lets partial
-  # updates like `%{status: :read}` keep the dates the user already set.
+  # Key present (even as nil) = caller states the value, so nil clears.
+  # Key absent = leave alone, which is what makes partial updates work.
   defp maybe_put(list, _key, false, _value), do: list
   defp maybe_put(list, key, true, value), do: Keyword.put(list, key, value)
 
@@ -312,12 +304,8 @@ defmodule Kaguya.Shelves do
 
   defp maybe_autofill_date_started(_user_id, _vn_ids, _status, _attrs), do: :ok
 
-  # Marking something read is the user stating "I finished this" — and the only
-  # defensible date for a present-tense statement is today. Without this, the
-  # quick status button leaves `date_finished` NULL and the entry sinks to the
-  # bottom of every `desc_nulls_last` "Recently read" sort, i.e. never shows up
-  # until the user goes hunting for a calendar. Fills a blank only; an existing
-  # date is history and is never overwritten here.
+  # A dateless :read row sinks in every `desc_nulls_last` "Recently read" sort.
+  # Fills a blank only; an existing date is never overwritten.
   defp maybe_autofill_date_finished(user_id, visual_novel_ids, :read, attrs) do
     if Map.has_key?(attrs, :date_finished) do
       :ok

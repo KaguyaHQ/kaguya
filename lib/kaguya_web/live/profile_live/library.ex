@@ -518,9 +518,8 @@ defmodule KaguyaWeb.ProfileLive.Library do
   # Date helpers
   # ---------------------------------------------------------------------------
 
-  # Mirrors the date auto-fill in `Shelves.set_reading_status/3` so the row shows
-  # the stamped date right away instead of holding a stale blank until the next
-  # load. Same rule as the context: fill a blank, never touch an existing date.
+  # Mirrors the auto-fill in `Shelves.set_reading_status/3` so the optimistic
+  # row shows the stamped date immediately. Fills a blank only.
   defp autofill_item_dates(%{status: :read, date_finished: nil} = item),
     do: %{item | date_finished: Date.utc_today()}
 

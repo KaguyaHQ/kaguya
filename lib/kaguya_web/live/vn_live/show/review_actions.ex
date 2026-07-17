@@ -173,13 +173,8 @@ defmodule KaguyaWeb.VNLive.Show.ReviewActions do
     end
   end
 
-  # The dialog always submits date_finished, so the context can't tell "never
-  # picked a date" from "deliberately cleared it" — a present key is precisely
-  # how it knows the user stated the value. Only this LiveView knows the picker
-  # was never opened, so the ambiguity is resolved here: logging a read without
-  # touching the dates means today, which is what keeps the entry out of the
-  # nulls-last basement of every "Recently read" sort. A date the user cleared
-  # was touched, so it stays cleared.
+  # The form always submits date_finished, so only this LiveView can tell
+  # "never touched the picker" (seed today) from "deliberately cleared" (keep blank).
   defp maybe_seed_read_date(
          %{"status" => "READ", "date_started" => "", "date_finished" => ""} = form,
          false
