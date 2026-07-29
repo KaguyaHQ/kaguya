@@ -168,7 +168,7 @@ defmodule KaguyaWeb.AuthLive.AccountSetup do
   def render(assigns) do
     ~H"""
     <.image_cropper id="onboarding-avatar-cropper" variant="profile" image_type={:avatar} />
-    <div class="bg-surface-base text-foreground-primary relative flex min-h-dvh justify-center max-lg:min-h-[468px]">
+    <div class="bg-surface-base text-foreground-primary relative flex min-h-dvh justify-center overflow-x-clip max-lg:min-h-[468px]">
       <div class={[
         "w-full px-5 py-10 max-lg:pb-10 lg:px-10 lg:pt-[68px]",
         @step == 3 && !@show_import_instructions && "max-w-[680px]",
@@ -199,13 +199,13 @@ defmodule KaguyaWeb.AuthLive.AccountSetup do
 
           <div class="flex flex-col justify-between gap-[22px] lg:flex-1 lg:justify-start lg:gap-[56px]">
             <div class={[
-              "relative w-full overflow-x-clip overflow-y-visible transition-all duration-300 ease-out",
+              "relative w-full transition-all duration-300 ease-out",
               !(@step == 3 && !@show_import_instructions) && "max-w-[500px]"
             ]}>
               <%= case @step do %>
                 <% 1 -> %>
                   <section class="step-section">
-                    <h1 class="text-foreground-primary mb-2 text-xl/6 font-semibold max-sm:mb-1.5 sm:text-[28px]/9 lg:mb-4 lg:text-[32px] lg:leading-[32px] lg:whitespace-nowrap">
+                    <h1 class="text-foreground-primary mb-2 text-xl/6 font-semibold max-sm:mb-1.5 sm:text-[28px]/9 lg:mb-4 lg:w-max lg:text-[32px] lg:leading-[32px] lg:whitespace-nowrap">
                       What should we call you?
                     </h1>
                     <p class="text-foreground-secondary mb-7 text-sm font-normal max-sm:leading-[150%] sm:mb-9 sm:text-base lg:text-[14px] lg:leading-[20px]">
