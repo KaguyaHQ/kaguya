@@ -75,7 +75,6 @@ defmodule Kaguya.MixProject do
 
       # Email
       {:swoosh, "~> 1.25"},
-      {:gen_smtp, "~> 1.2"},
 
       # Numerical — powers the Nx port of the rec inference pipeline
       # (replacing the Python shell-out in prod). EXLA is the hot path:

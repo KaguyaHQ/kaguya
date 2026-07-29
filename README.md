@@ -218,7 +218,7 @@ Optional integrations:
 | `SSR_SECRET` | SSR rate-limit bypass secret |
 | `AXIOM_TOKEN`, `AXIOM_DATASET` | Axiom log drain |
 | `SENTRY_DSN`, `SENTRY_BROWSER_DSN` | Error reporting |
-| `SES_SMTP_USERNAME`, `SES_SMTP_PASSWORD`, `SES_SMTP_HOST` | SMTP mailer |
+| `RESEND_API_KEY` | Resend mailer |
 | `CF_ZONE_ID`, `CF_API_TOKEN` | Cloudflare cache purge |
 | `SKIP_IMAGE_DOWNLOAD` | Skip image download during dump image step |
 | `DATABASE_POOL_SIZE`, `DATABASE_TIMEOUT`, `USE_IPV4` | Production DB tuning |

@@ -134,31 +134,12 @@ if config_env() != :test do
   config :kaguya, KaguyaWeb.Endpoint, server: true
 end
 
-# Swoosh with Amazon SES via SMTP (for dev and prod)
+# Swoosh with Resend (for dev and prod)
 if config_env() in [:dev, :prod] do
-  ses_username = System.get_env("SES_SMTP_USERNAME")
-  ses_password = System.get_env("SES_SMTP_PASSWORD")
-
-  if ses_username && ses_password do
-    ses_relay = System.get_env("SES_SMTP_HOST") || "email-smtp.us-east-1.amazonaws.com"
-
+  if resend_api_key = System.get_env("RESEND_API_KEY") do
     config :kaguya, Kaguya.Mailer,
-      adapter: Swoosh.Adapters.SMTP,
-      relay: ses_relay,
-      port: 587,
-      username: ses_username,
-      password: ses_password,
-      tls: :always,
-      tls_options: [
-        server_name_indication: String.to_charlist(ses_relay),
-        verify: :verify_peer,
-        depth: 3,
-        cacertfile: CAStore.file_path()
-      ],
-      auth: :always,
-      ssl: false,
-      retries: 1,
-      no_mx_lookups: true
+      adapter: Swoosh.Adapters.Resend,
+      api_key: resend_api_key
   end
 end
 

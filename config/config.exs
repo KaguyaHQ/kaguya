@@ -206,8 +206,8 @@ config :sentry,
 # Swoosh mailer config (adapter configured in runtime.exs)
 config :kaguya, Kaguya.Mailer, adapter: Swoosh.Adapters.Local
 
-# Disable Swoosh API client (we use SMTP adapter)
-config :swoosh, :api_client, false
+# Swoosh API client (used by the Resend adapter)
+config :swoosh, :api_client, Swoosh.ApiClient.Req
 
 # Observability config - set enabled?: false to disable all telemetry logging
 config :kaguya, :observability,
