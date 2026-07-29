@@ -514,7 +514,7 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
       --%>
       <.link
         navigate={@post.url}
-        class="absolute inset-0 z-1 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--foreground-primary))]"
+        class="absolute inset-0 z-1 rounded-lg focus-visible:ring-2 focus-visible:ring-[rgb(var(--foreground-primary))] focus-visible:outline-hidden focus-visible:ring-inset"
       >
         <span class="sr-only">Open discussion: {@post.title}</span>
       </.link>

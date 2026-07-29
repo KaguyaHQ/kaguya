@@ -1102,7 +1102,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           fallback_class="size-full bg-[rgb(var(--surface-elevated))]"
           rounded=""
         />
-        <div class="pointer-events-none absolute inset-0 rounded-[12px] ring-1 ring-inset ring-black/[0.08] transition group-hover:ring-black/[0.14]" />
+        <div class="pointer-events-none absolute inset-0 rounded-[12px] ring-1 ring-black/8 transition ring-inset group-hover:ring-black/[0.14]" />
       </div>
       <div class="flex flex-col gap-0.5 px-0.5">
         <span class="text-foreground-primary line-clamp-1 text-sm font-semibold transition-colors group-hover:text-white">

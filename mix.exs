@@ -113,7 +113,12 @@ defmodule Kaguya.MixProject do
       setup: ["deps.get", "ecto.setup", "assets.setup", "cmd sh scripts/setup-git-hooks.sh"],
       "ecto.setup": ["ecto.create", "ecto.load --skip-if-loaded", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.load --skip-if-loaded --quiet", "ecto.migrate --quiet", "test"],
+      test: [
+        "ecto.create --quiet",
+        "ecto.load --skip-if-loaded --quiet",
+        "ecto.migrate --quiet",
+        "test"
+      ],
       "assets.setup": [
         "tailwind.install --if-missing",
         "esbuild.install --if-missing",

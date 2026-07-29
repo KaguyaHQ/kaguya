@@ -167,7 +167,10 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
     >
       <.spoiler_banner :if={@review.is_spoiler} />
       <div class="kaguya-markdown">
-        <KaguyaWeb.SharedComponents.Markdown.markdown_inline content={@review.content} variant="review" />
+        <KaguyaWeb.SharedComponents.Markdown.markdown_inline
+          content={@review.content}
+          variant="review"
+        />
       </div>
     </article>
     """
