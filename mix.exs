@@ -59,7 +59,7 @@ defmodule Kaguya.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_dashboard, "~> 0.8"},
       {:phoenix_live_reload, "~> 1.6.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      {:phoenix_live_view, "~> 1.2.0"},
       {:phoenix_pubsub, "~> 2.2"},
       {:canonical_tailwind, "~> 0.2.0", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.17"},
