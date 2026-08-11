@@ -372,8 +372,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
             <span class={[
               "bg-surface-base block size-4 rounded-full transition-transform",
               @show_dates && "translate-x-4"
-            ]}>
-            </span>
+            ]}></span>
           </span>
         </button>
 
@@ -395,8 +394,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
             <span class={[
               "bg-surface-base block size-4 rounded-full transition-transform",
               @fade_read && "translate-x-4"
-            ]}>
-            </span>
+            ]}></span>
           </span>
         </button>
       </div>

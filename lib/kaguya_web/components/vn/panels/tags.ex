@@ -124,8 +124,7 @@ defmodule KaguyaWeb.VN.Panels.Tags do
       <span
         :if={@has_vote}
         class="pointer-events-none absolute right-[2px] bottom-[2px] z-10 size-[3px] rounded-full bg-[rgb(var(--foreground-primary))]"
-      >
-      </span>
+      ></span>
       <.link
         navigate={~p"/browse?tags=#{@tag.slug}"}
         class="text-style-captionRegular px-[8px] py-[4px] text-white transition-colors hover:text-white"
@@ -307,8 +306,7 @@ defmodule KaguyaWeb.VN.Panels.Tags do
           dot <= @value && !@selected && "bg-[rgb(var(--foreground-tertiary))]",
           dot > @value && "bg-[rgb(var(--border-divider))]"
         ]}
-      >
-      </span>
+      ></span>
     </span>
     """
   end

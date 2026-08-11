@@ -242,8 +242,7 @@ defmodule KaguyaWeb.VN.Community do
         tabindex="-1"
         aria-hidden="true"
         class="absolute inset-0 z-1 rounded-lg"
-      >
-      </.link>
+      ></.link>
 
       <div class="flex w-full gap-[11px]">
         <.review_avatar user={@review.user} href={@user_href} />

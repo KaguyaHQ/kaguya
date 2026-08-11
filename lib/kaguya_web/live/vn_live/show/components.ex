@@ -376,8 +376,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                   "absolute top-0.5 left-0.5 size-4 rounded-full transition",
                   @form["is_spoiler"] && "translate-x-4 bg-white",
                   !@form["is_spoiler"] && "bg-[rgb(var(--foreground-tertiary))]"
-                ]}>
-                </span>
+                ]}></span>
               </span>
               Spoiler
             </label>
@@ -458,8 +457,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                     "absolute top-0.5 left-0.5 size-4 rounded-full transition",
                     @form["is_spoiler"] && "translate-x-4 bg-white",
                     !@form["is_spoiler"] && "bg-[rgb(var(--foreground-tertiary))]"
-                  ]}>
-                  </span>
+                  ]}></span>
                 </span>
                 Spoiler
               </label>
@@ -554,16 +552,14 @@ defmodule KaguyaWeb.VNLive.Show.Components do
         phx-value-rating={@half_value}
         aria-label={"Rate #{@half_value} of 5"}
         class="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer"
-      >
-      </button>
+      ></button>
       <button
         type="button"
         phx-click="set_review_form_rating"
         phx-value-rating={@full_value}
         aria-label={"Rate #{@full_value} of 5"}
         class="absolute inset-y-0 right-0 z-10 w-1/2 cursor-pointer"
-      >
-      </button>
+      ></button>
     </span>
     """
   end
@@ -915,8 +911,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                       checked={true}
                       class="size-4 shrink-0"
                     />
-                    <span class="size-7 shrink-0 rounded-full bg-[rgb(var(--surface-elevated))]">
-                    </span>
+                    <span class="size-7 shrink-0 rounded-full bg-[rgb(var(--surface-elevated))]"></span>
                     <span class="truncate text-sm text-[rgb(var(--foreground-primary))]">
                       No character attribution
                     </span>
@@ -985,8 +980,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
         data-modal-cancel
         class="absolute inset-0 cursor-pointer"
         aria-label="Close media preview"
-      >
-      </button>
+      ></button>
 
       <div
         data-modal-panel

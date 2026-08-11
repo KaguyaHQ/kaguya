@@ -233,16 +233,14 @@ defmodule KaguyaWeb.VN.Icons do
         phx-value-rating={@half_value}
         aria-label={"Rate #{rating_label(@half_value)} of 5"}
         class="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer"
-      >
-      </button>
+      ></button>
       <button
         type="button"
         phx-click="set_rating"
         phx-value-rating={@full_value}
         aria-label={"Rate #{rating_label(@full_value)} of 5"}
         class="absolute inset-y-0 right-0 z-10 w-1/2 cursor-pointer"
-      >
-      </button>
+      ></button>
     </span>
     """
   end

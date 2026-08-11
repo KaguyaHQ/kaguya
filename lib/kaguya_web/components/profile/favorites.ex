@@ -451,8 +451,7 @@ defmodule KaguyaWeb.Components.Profile.Favorites do
         phx-click="close_favorite_search"
         class="absolute inset-0 cursor-default"
         aria-label="Close favorites search"
-      >
-      </button>
+      ></button>
 
       <div
         role="dialog"

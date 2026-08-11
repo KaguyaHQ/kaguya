@@ -607,8 +607,7 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
                 class="size-1.5 rounded-full bg-[#34D399]"
                 title="Active recently"
                 aria-hidden
-              >
-              </span>
+              ></span>
               <time
                 datetime={datetime_attr(@post.activity_at)}
                 title={datetime_title(@post.activity_at)}

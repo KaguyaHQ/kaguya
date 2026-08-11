@@ -167,8 +167,7 @@ defmodule KaguyaWeb.Home.FeedComponents do
           class="absolute inset-0 z-1 rounded-lg"
           tabindex="-1"
           aria-hidden="true"
-        >
-        </.link>
+        ></.link>
 
         <.link :if={post_cover?(@post)} navigate={@post.entity.href} class="relative z-10 shrink-0">
           <.cover vn={@post.entity.visual_novel} class="w-[100px] rounded-[4px]" />

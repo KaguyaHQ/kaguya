@@ -71,8 +71,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           <span
             :if={@saving}
             class="size-5 animate-spin rounded-full border-2 border-[rgb(var(--foreground-tertiary))] border-t-[rgb(var(--foreground-primary))]"
-          >
-          </span>
+          ></span>
           <.icon :if={!@saving} name={:check} class="size-5" />
         </button>
       </div>
@@ -215,8 +214,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
                 <span class={[
                   "absolute top-0.5 left-0.5 size-3 rounded-full bg-[rgb(var(--surface-base))] transition-transform",
                   @is_ranked && "translate-x-3"
-                ]}>
-                </span>
+                ]}></span>
               </button>
               <div class="flex items-center gap-1.5">
                 <p class="text-[13px]/5 font-normal text-[rgb(var(--foreground-primary))]">
@@ -571,8 +569,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
               <span
                 :if={@deleting}
                 class="size-3 animate-spin rounded-full border-2 border-white/40 border-t-white"
-              >
-              </span>
+              ></span>
               Delete
             </button>
           </div>

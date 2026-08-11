@@ -207,8 +207,7 @@ defmodule KaguyaWeb.VN.Sidebar do
         phx-click="close_action_drawer"
         class="absolute inset-0 cursor-default bg-black/45"
         aria-label="Close actions"
-      >
-      </button>
+      ></button>
 
       <div class="absolute inset-x-0 bottom-0 px-3 pb-3">
         <div class="bg-[rgb(var(--surface-base))] text-[rgb(var(--foreground-primary))] shadow-[0_-8px_10px_rgba(0,0,0,0.4)]">
@@ -307,8 +306,7 @@ defmodule KaguyaWeb.VN.Sidebar do
               "absolute -top-0.5 -right-0.5 size-2 rounded-full",
               overflow_indicator_class(@active)
             ]}
-          >
-          </span>
+          ></span>
         </:trigger>
         <div class="w-[216px] overflow-hidden rounded-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] p-0 text-[rgb(var(--foreground-secondary))] shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
           <.menu_item
