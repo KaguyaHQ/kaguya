@@ -90,7 +90,7 @@ defmodule Kaguya.Uploads.ImageVariantProcessor do
   end
 
   defp do_process(args) do
-    {:error, "ImageVariantProcessor: unknown args shape #{inspect(args)}"}
+    {:error, {:invalid_args, "ImageVariantProcessor: unknown args shape #{inspect(args)}"}}
   end
 
   defp archive_original_if_enabled(type, id, mime) do

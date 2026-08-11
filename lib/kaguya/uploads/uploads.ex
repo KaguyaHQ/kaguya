@@ -3,7 +3,7 @@ defmodule Kaguya.Uploads do
   Provides functions for managing file uploads, including generating presigned URLs and processing uploaded files.
   """
 
-  alias Kaguya.ImageProcessor
+  alias Kaguya.{ImageProcessor, ImageStorage}
   require Logger
 
   # Hard cap for VNDB XML exports. Real-world exports observed in our backfill
@@ -36,8 +36,9 @@ defmodule Kaguya.Uploads do
   Uploads a local file to the temporary uploads bucket and returns the staged upload ID.
   """
   def stage_local_file(path) when is_binary(path) do
-    with {:ok, %{upload_url: url, upload_id: upload_id}} <- generate_upload_url(),
-         {:ok, body} <- File.read(path),
+    with {:ok, body} <- File.read(path),
+         {:ok, _metadata} <- ImageStorage.validate_image_bytes(body),
+         {:ok, %{upload_url: url, upload_id: upload_id}} <- generate_upload_url(),
          {:ok, %Req.Response{status: status}} when status in 200..299 <-
            Req.put(url, Keyword.merge([body: body], upload_req_options())) do
       {:ok, upload_id}
@@ -46,6 +47,9 @@ defmodule Kaguya.Uploads do
         {:error, "Upload failed with status #{status}"}
 
       {:error, reason} when is_binary(reason) ->
+        {:error, reason}
+
+      {:error, {:invalid_image, reason}} ->
         {:error, reason}
 
       {:error, reason} ->

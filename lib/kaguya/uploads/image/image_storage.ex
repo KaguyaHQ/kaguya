@@ -35,10 +35,30 @@ defmodule Kaguya.ImageStorage do
         {:ok, %{mime: mime, width: w, height: h}}
 
       {mime, _, _, _} ->
-        {:error, "Unsupported image format: #{mime}"}
+        {:error, {:invalid_image, "Unsupported image format: #{mime}"}}
 
       nil ->
-        {:error, "Could not extract image metadata"}
+        {:error, {:invalid_image, "Could not extract image metadata"}}
+    end
+  end
+
+  @doc """
+  Validates staged image bytes before they are uploaded or enqueued.
+
+  Invalid and unsupported images are tagged so asynchronous callers can
+  distinguish permanent input errors from retryable storage failures.
+  """
+  def validate_image_bytes(image_data) when is_binary(image_data) do
+    with {:ok, metadata} <- get_image_metadata(image_data),
+         {:ok, _image} <- decode_image(image_data) do
+      {:ok, metadata}
+    end
+  end
+
+  defp decode_image(image_data) do
+    case Image.from_binary(image_data) do
+      {:ok, image} -> {:ok, image}
+      {:error, reason} -> {:error, {:invalid_image, "Could not decode image: #{inspect(reason)}"}}
     end
   end
 

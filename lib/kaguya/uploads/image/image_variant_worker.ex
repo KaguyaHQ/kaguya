@@ -30,13 +30,28 @@ defmodule Kaguya.Uploads.ImageVariantWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}) do
-    case ImageVariantProcessor.process(args) do
+    args
+    |> ImageVariantProcessor.process()
+    |> handle_result(args)
+  end
+
+  @doc false
+  def handle_result(result, args) do
+    case result do
       :ok ->
         :ok
 
-      {:error, reason} = err ->
-        Logger.error("ImageVariantWorker failed: #{inspect(reason)} args=#{inspect(args)}")
-        err
+      {:error, {kind, reason}} when kind in [:invalid_image, :invalid_args] ->
+        Logger.warning("Image variant job cancelled: #{reason}",
+          error_kind: kind,
+          image_type: args["type"],
+          image_id: args["id"]
+        )
+
+        {:cancel, reason}
+
+      {:error, _reason} = error ->
+        error
     end
   end
 end

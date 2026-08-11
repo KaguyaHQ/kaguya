@@ -2,7 +2,6 @@ defmodule Kaguya.ImageProcessor do
   @moduledoc "Resize + upload variants, then hand off to ImageSwapper."
 
   alias Kaguya.{Images, ImageStorage, ImageSwapper}
-  require Logger
 
   # ─── PUBLIC ENTRY POINT ──────────────────────────────────────────
   @doc "Process a user avatar upload."
@@ -54,13 +53,6 @@ defmodule Kaguya.ImageProcessor do
          {:ok, %{width: w, height: h}} <-
            generate_and_upload_variants(raw, upload_id, type, variants) do
       {:ok, %{width: w, height: h, mime: mime}}
-    else
-      {:error, reason} = err ->
-        Logger.error(
-          "ImageProcessor.generate_variants_for #{type}/#{upload_id} failed: #{inspect(reason)}"
-        )
-
-        err
     end
   end
 
@@ -74,20 +66,23 @@ defmodule Kaguya.ImageProcessor do
          {:ok, _context} <- generate_and_upload_variants(raw, upload_id, type, variants),
          {:ok, result} <- swap_callback.(meta) do
       {:ok, result}
-    else
-      {:error, reason} = err ->
-        Logger.error("ImageProcessor.#{type} failed: #{inspect(reason)}")
-        err
     end
   end
 
   # ─── VARIANT GENERATION ─────────────────────────────────────────
   defp generate_and_upload_variants(raw, upload_id, type, variants) do
-    with {:ok, image} <- Image.from_binary(raw),
+    with {:ok, image} <- decode_image(raw),
          {:ok, uploaded} <- upload_variants(variants, image, upload_id, type) do
       # libvips already decoded the source image; reading dimensions
       # from the Image struct is O(1), no extra work.
       {:ok, %{variants: uploaded, width: Image.width(image), height: Image.height(image)}}
+    end
+  end
+
+  defp decode_image(raw) do
+    case Image.from_binary(raw) do
+      {:ok, image} -> {:ok, image}
+      {:error, reason} -> {:error, {:invalid_image, "Could not decode image: #{inspect(reason)}"}}
     end
   end
 

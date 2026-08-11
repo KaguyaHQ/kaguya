@@ -14,23 +14,38 @@ defmodule Kaguya.Uploads.ImageVariantWorkerTest do
 
   alias Kaguya.Uploads.ImageVariantWorker
 
-  describe "perform/1 with unknown args" do
-    test "returns an error tuple for an unrecognized type" do
+  describe "perform/1 with invalid args" do
+    test "cancels an unrecognized type without retrying" do
       job = %Oban.Job{args: %{"type" => "nonsense"}}
-      assert {:error, msg} = ImageVariantWorker.perform(job)
+      assert {:cancel, msg} = ImageVariantWorker.perform(job)
       assert msg =~ "unknown args shape"
     end
 
-    test "returns an error tuple for empty args" do
+    test "cancels empty args without retrying" do
       job = %Oban.Job{args: %{}}
-      assert {:error, msg} = ImageVariantWorker.perform(job)
+      assert {:cancel, msg} = ImageVariantWorker.perform(job)
       assert msg =~ "unknown args shape"
     end
 
-    test "returns an error tuple when type is missing" do
+    test "cancels when type is missing without retrying" do
       job = %Oban.Job{args: %{"id" => "abc", "vn_id" => "def"}}
-      assert {:error, msg} = ImageVariantWorker.perform(job)
+      assert {:cancel, msg} = ImageVariantWorker.perform(job)
       assert msg =~ "unknown args shape"
+    end
+  end
+
+  describe "handle_result/2" do
+    test "cancels an undecodable image without retrying" do
+      assert {:cancel, "Could not extract image metadata"} =
+               ImageVariantWorker.handle_result(
+                 {:error, {:invalid_image, "Could not extract image metadata"}},
+                 %{"type" => "vn_cover", "id" => "cover-id"}
+               )
+    end
+
+    test "leaves transient failures retryable" do
+      error = {:error, "Failed to fetch temporary image"}
+      assert ^error = ImageVariantWorker.handle_result(error, %{"type" => "vn_cover"})
     end
   end
 
