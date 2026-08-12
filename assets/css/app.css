@@ -457,6 +457,15 @@ html body[data-scroll-locked] {
   padding-right: 0 !important;
 }
 
+html[data-modal-scroll-locked] {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+html body[data-modal-scroll-locked] {
+  overflow-y: hidden !important;
+}
+
 [data-phx-session],
 [data-phx-teleported-src] {
   display: contents;

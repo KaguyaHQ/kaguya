@@ -17,7 +17,11 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
   end
 
   def open_media_lightbox(socket, params) do
-    entries = media_lightbox_entries(socket.assigns.active_tab, socket.assigns.tabs)
+    active_tab = socket.assigns.active_tab
+
+    entries =
+      media_lightbox_entries(active_tab, socket.assigns.tabs, socket.assigns.current_user)
+
     image_url = params["url"]
     index = Enum.find_index(entries, &(Map.get(&1, :src) == image_url)) || 0
 
@@ -27,6 +31,7 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
           %{
             id: image_url,
             src: image_url,
+            thumb: image_url,
             alt: params["title"] || socket.assigns.display_vn.title
           }
         ]
@@ -36,7 +41,16 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
 
     {:noreply,
      assign(socket,
-       media_lightbox: put_media_lightbox_entry(%{entries: entries}, index)
+       media_lightbox:
+         put_media_lightbox_entry(
+           %{
+             entries: entries,
+             heading: media_heading(active_tab),
+             context: socket.assigns.display_vn.title,
+             kind: active_tab
+           },
+           index
+         )
      )}
   end
 
@@ -48,6 +62,15 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
 
   def next_media(socket, _params),
     do: {:noreply, shift_media_lightbox(socket, 1)}
+
+  def select_media(socket, %{"index" => index}) do
+    case Integer.parse(index) do
+      {index, ""} -> {:noreply, select_media_lightbox(socket, index)}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def select_media(socket, _params), do: {:noreply, socket}
 
   defp toggle_media_like(socket, tab, item_id, kind) do
     case socket.assigns.current_user do
@@ -91,6 +114,16 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
     end
   end
 
+  defp select_media_lightbox(socket, index) do
+    case socket.assigns.media_lightbox do
+      %{entries: entries} = lightbox when entries != [] ->
+        assign(socket, media_lightbox: put_media_lightbox_entry(lightbox, index))
+
+      _ ->
+        socket
+    end
+  end
+
   defp put_media_lightbox_entry(%{entries: entries} = lightbox, index) do
     count = length(entries)
     safe_index = min(max(index, 0), max(count - 1, 0))
@@ -101,12 +134,15 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
     |> Map.merge(%{index: safe_index, count: count})
   end
 
-  defp media_lightbox_entries(active_tab, tabs) when active_tab in [:covers, :screenshots] do
+  defp media_lightbox_entries(active_tab, tabs, current_user)
+       when active_tab in [:covers, :screenshots] do
     case Map.get(tabs, active_tab) do
       {:ok, items} ->
-        items
+        visible_items = visible_media(items, active_tab, current_user)
+
+        visible_items
         |> Enum.with_index()
-        |> Enum.map(&media_lightbox_entry(active_tab, &1, length(items)))
+        |> Enum.map(&media_lightbox_entry(active_tab, &1, length(visible_items)))
         |> Enum.reject(&(is_nil(&1.src) || &1.src == ""))
 
       _ ->
@@ -114,12 +150,13 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
     end
   end
 
-  defp media_lightbox_entries(_active_tab, _tabs), do: []
+  defp media_lightbox_entries(_active_tab, _tabs, _current_user), do: []
 
   defp media_lightbox_entry(:covers, {cover, index}, count) do
     %{
       id: Map.get(cover, :id) || "cover-#{index}",
       src: image_src(cover, [:large, :medium, :small]),
+      thumb: image_src(cover, [:small, :medium, :large]),
       alt: cover_label(cover),
       title: "Cover #{index + 1} of #{count}"
     }
@@ -129,12 +166,32 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
     %{
       id: Map.get(screenshot, :id) || "screenshot-#{index}",
       src: image_src(screenshot, [:large, :medium, :small]),
+      thumb: image_src(screenshot, [:small, :medium, :large]),
       alt: screenshot_label(screenshot),
       title: "Screenshot #{index + 1} of #{count}"
     }
   end
 
   defp media_lightbox_entry(_tab, _item, _count), do: nil
+
+  defp visible_media(items, :screenshots, current_user) do
+    show_nsfw = Map.get(current_user || %{}, :show_nsfw_screenshots, false)
+    show_brutal = Map.get(current_user || %{}, :show_brutal_screenshots, false)
+
+    Enum.reject(items, fn screenshot ->
+      (media_flag?(screenshot, :is_nsfw) and not show_nsfw) or
+        (media_flag?(screenshot, :is_brutal) and not show_brutal)
+    end)
+  end
+
+  defp visible_media(items, _active_tab, _current_user), do: items
+
+  defp media_flag?(media, key),
+    do: Map.get(media, key, false) || Map.get(media, to_string(key), false)
+
+  defp media_heading(:covers), do: "Covers"
+  defp media_heading(:screenshots), do: "Screenshots"
+  defp media_heading(_active_tab), do: "Media"
 
   defp cover_label(cover) do
     Enum.filter([Map.get(cover, :language), year(Map.get(cover, :release_date))], & &1)

@@ -973,7 +973,8 @@ defmodule KaguyaWeb.VNLive.Show.Components do
     <div
       id="media-lightbox"
       phx-hook="ModalDialog"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-0 backdrop-blur-[2px]"
+      data-media-lightbox
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/90 p-0 backdrop-blur-md"
       role="presentation"
     >
       <button
@@ -988,54 +989,130 @@ defmodule KaguyaWeb.VNLive.Show.Components do
         data-modal-panel
         role="dialog"
         aria-modal="true"
-        aria-label="Media preview"
-        class="pointer-events-none relative flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw] items-center justify-center"
+        aria-label={"#{@media.heading} viewer"}
+        class="pointer-events-none relative flex size-full flex-col p-3 sm:p-5"
       >
-        <button
-          type="button"
-          phx-click="close_media_lightbox"
-          data-modal-cancel
-          data-modal-initial-focus
-          class="pointer-events-auto absolute top-2 right-2 z-20 flex size-11 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-black/90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70"
-          aria-label="Close image viewer"
-        >
-          <Lucide.x class="size-5" aria-hidden="true" />
-        </button>
-
-        <button
-          :if={@media.count > 1}
-          type="button"
-          phx-click="previous_media"
-          class="pointer-events-auto absolute top-1/2 left-4 z-10 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border-none bg-black/70 text-white transition hover:bg-black/90 lg:inline-flex"
-          aria-label="Previous image"
-        >
-          <Lucide.chevron_left class="size-5" aria-hidden="true" />
-        </button>
-
-        <div class="relative flex size-full items-center justify-center p-4">
-          <img
-            src={@media.src}
-            alt={@media.alt || "Expanded image"}
-            class="pointer-events-auto relative size-auto max-h-[90vh] max-w-[90vw] object-contain"
-          />
-        </div>
-
-        <button
-          :if={@media.count > 1}
-          type="button"
-          phx-click="next_media"
-          class="pointer-events-auto absolute top-1/2 right-4 z-10 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border-none bg-black/70 text-white transition hover:bg-black/90 lg:inline-flex"
-          aria-label="Next image"
-        >
-          <Lucide.chevron_right class="size-5" aria-hidden="true" />
-        </button>
+        <header class="pointer-events-auto z-20 mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-1 pb-2 text-white">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold sm:text-base">{@media.heading}</p>
+            <p class="truncate text-xs text-white/55">{@media.context}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="hidden text-xs text-white/45 md:inline">← → navigate · Esc close</span>
+            <button
+              type="button"
+              phx-click="close_media_lightbox"
+              data-modal-cancel
+              data-modal-initial-focus
+              class="flex size-10 items-center justify-center rounded-full border border-white/10 bg-black/45 text-white backdrop-blur-xl transition hover:border-white/20 hover:bg-white/15 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70"
+              aria-label="Close image viewer"
+            >
+              <Lucide.x class="size-5" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
 
         <div
-          :if={@media.count > 1}
-          class="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-sm text-white"
+          data-media-stage
+          class="pointer-events-auto relative mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 items-center justify-center overflow-hidden px-1 py-2"
         >
-          {@media.index + 1} / {@media.count}
+          <figure class="relative flex max-h-full max-w-full items-center justify-center">
+            <img
+              src={@media.src}
+              alt={@media.alt || "Expanded image"}
+              data-media-image
+              class={[
+                "block size-auto max-w-full object-contain select-none",
+                if(@media.count > 1,
+                  do: "max-h-[calc(100dvh-14rem)]",
+                  else: "max-h-[calc(100dvh-8rem)]"
+                )
+              ]}
+            />
+
+            <button
+              :if={@media.count > 1}
+              type="button"
+              phx-click="previous_media"
+              data-modal-previous
+              class="absolute top-1/2 left-2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-black/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 sm:left-3 sm:size-11"
+              aria-label="Previous image"
+            >
+              <Lucide.chevron_left class="size-5" aria-hidden="true" />
+            </button>
+
+            <button
+              :if={@media.count > 1}
+              type="button"
+              phx-click="next_media"
+              data-modal-next
+              class="absolute top-1/2 right-2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-black/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 sm:right-3 sm:size-11"
+              aria-label="Next image"
+            >
+              <Lucide.chevron_right class="size-5" aria-hidden="true" />
+            </button>
+          </figure>
         </div>
+
+        <footer class="pointer-events-auto z-20 mx-auto flex w-full max-w-full flex-col gap-1 overflow-hidden rounded-2xl border border-white/10 bg-black/45 p-1.5 text-white shadow-2xl backdrop-blur-xl sm:w-fit">
+          <div
+            :if={@media.count > 1}
+            data-media-strip
+            class="scrollbar-none flex w-full max-w-full snap-x gap-1.5 overflow-x-auto p-0.5 sm:w-fit sm:max-w-[calc(100vw-3rem)]"
+            aria-label="Media thumbnails"
+          >
+            <button
+              :for={{entry, index} <- Enum.with_index(@media.entries)}
+              id={"media-thumbnail-#{index}"}
+              type="button"
+              phx-click="select_media"
+              phx-value-index={index}
+              data-media-thumbnail
+              data-media-src={entry.src}
+              data-media-selected={if index == @media.index, do: "true", else: "false"}
+              class={[
+                "relative shrink-0 snap-center overflow-hidden rounded-lg border-2 bg-white/5 transition focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70",
+                if(index == @media.index,
+                  do: "border-white opacity-100",
+                  else: "border-transparent opacity-55 hover:opacity-90"
+                ),
+                if(@media.kind == :covers, do: "w-11 sm:w-12", else: "w-20 sm:w-24")
+              ]}
+              aria-label={"View #{entry.title}"}
+              aria-current={if index == @media.index, do: "true"}
+            >
+              <img
+                src={entry.thumb || entry.src}
+                alt=""
+                loading="lazy"
+                class={[
+                  "w-full object-cover",
+                  if(@media.kind == :covers, do: "aspect-2/3", else: "aspect-video")
+                ]}
+              />
+            </button>
+          </div>
+
+          <div class={[
+            "flex items-center justify-between gap-3 px-2 py-1",
+            @media.count > 1 && "border-t border-white/10 pt-2"
+          ]}>
+            <p class="min-w-14 text-sm font-medium text-white/80 tabular-nums">
+              {@media.index + 1} of {@media.count}
+            </p>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                data-modal-fullscreen
+                class="flex size-9 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70"
+                aria-label="Enter fullscreen"
+                aria-pressed="false"
+              >
+                <Lucide.maximize class="size-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
     """

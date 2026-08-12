@@ -361,6 +361,8 @@ defmodule KaguyaWeb.VNLive.Show do
 
   def handle_event("next_media", params, socket), do: MediaActions.next_media(socket, params)
 
+  def handle_event("select_media", params, socket), do: MediaActions.select_media(socket, params)
+
   @impl true
   def handle_async({:vn_tab, :releases, slug}, {:ok, {:ok, release_data}}, socket) do
     if socket.assigns.slug == slug do

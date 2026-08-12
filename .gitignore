@@ -98,6 +98,7 @@ __pycache__/
 !priv/data/vn_tags.json
 
 .claude/
+.playwright-cli/
 
 # Internal docs — not part of the public repo
 docs/
