@@ -451,7 +451,7 @@ defmodule KaguyaWeb.ChangesLive.Show do
   defp history_href(:producer, %{slug: slug}) when is_binary(slug),
     do: "/developer/#{slug}/history"
 
-  defp history_href(:series, %{slug: slug}) when is_binary(slug), do: "/series/#{slug}/history"
+  defp history_href(:series, %{slug: slug}) when is_binary(slug), do: "/history?type=series"
   defp history_href(:release, %{vn_slug: slug}) when is_binary(slug), do: "/vn/#{slug}/history"
   defp history_href(_, _), do: nil
 

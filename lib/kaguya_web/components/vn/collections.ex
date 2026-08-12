@@ -424,32 +424,12 @@ defmodule KaguyaWeb.VN.Collections do
   attr :slug, :string, default: nil
 
   def popular_lists_section(assigns) do
-    assigns =
-      assigns
-      |> assign(:lists_href, if(present?(assigns.slug), do: "/vn/#{assigns.slug}/lists"))
-
     ~H"""
     <section :if={@lists != []} class="px-4 lg:px-8">
       <div class="flex items-center justify-between gap-4">
-        <%= if @lists_href do %>
-          <.link
-            navigate={@lists_href}
-            class="text-[18px] leading-[22px] font-normal text-[rgb(var(--foreground-primary))] transition lg:hover:text-[rgb(var(--text-link-hover))]"
-          >
-            Popular Lists
-          </.link>
-        <% else %>
-          <h2 class="text-[18px] leading-[22px] font-normal text-[rgb(var(--foreground-primary))]">
-            Popular Lists
-          </h2>
-        <% end %>
-        <.link
-          :if={@lists_href}
-          navigate={@lists_href}
-          class="text-xs font-medium tracking-wider text-[rgb(var(--foreground-secondary))] uppercase transition hover:text-[rgb(var(--text-link-hover))]"
-        >
-          More
-        </.link>
+        <h2 class="text-[18px] leading-[22px] font-normal text-[rgb(var(--foreground-primary))]">
+          Popular Lists
+        </h2>
       </div>
       <div class="mt-3 mb-5 hidden h-px bg-[rgb(var(--border-divider))] md:block"></div>
       <div class="mt-4 flex flex-col gap-5 lg:mt-0 lg:gap-6">
@@ -530,7 +510,4 @@ defmodule KaguyaWeb.VN.Collections do
   defp vote_count_class(:up), do: "text-[rgb(var(--icons-user-star))]"
   defp vote_count_class(:down), do: "text-[#07BBB8]"
   defp vote_count_class(_vote), do: "text-white/90"
-
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_), do: false
 end

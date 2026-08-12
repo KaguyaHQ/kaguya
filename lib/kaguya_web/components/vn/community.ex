@@ -623,26 +623,12 @@ defmodule KaguyaWeb.VN.Community do
   attr :viewer_username, :string, default: nil
 
   def friend_reviews_section(assigns) do
-    assigns =
-      assign(
-        assigns,
-        :more_href,
-        friend_reviews_more_href(assigns.viewer_username, assigns.vn_slug)
-      )
-
     ~H"""
     <section :if={@review_items != []} class="lg:rounded-[12px] lg:px-8 lg:py-6">
       <div class="mb-4 flex items-center justify-between gap-4 max-lg:px-4 max-lg:md:px-5 lg:mb-0">
         <h2 class="text-[18px] leading-[22px] font-normal text-[rgb(var(--foreground-primary))]">
           Reviews from Friends
         </h2>
-        <.link
-          :if={@more_href}
-          navigate={@more_href}
-          class="text-sm text-[rgb(var(--foreground-tertiary))] transition hover:text-[rgb(var(--foreground-primary))]"
-        >
-          More
-        </.link>
       </div>
       <div class="mt-3 mb-5 hidden h-px bg-[rgb(var(--border-divider))] lg:block"></div>
       <div class="lg:space-y-5">
@@ -661,13 +647,6 @@ defmodule KaguyaWeb.VN.Community do
     """
   end
 
-  defp friend_reviews_more_href(viewer_username, vn_slug)
-       when is_binary(viewer_username) and viewer_username != "" and is_binary(vn_slug) and
-              vn_slug != "",
-       do: "/@#{viewer_username}/friends/vn/#{vn_slug}/reviews"
-
-  defp friend_reviews_more_href(_, _), do: nil
-
   # ---------------------------------------------------------------------------
   # Discussions (flat divided list, only shown when the async load finishes
   # with a non-empty list — or while loading.)
@@ -682,13 +661,13 @@ defmodule KaguyaWeb.VN.Community do
       <div class="flex items-center justify-between gap-4">
         <%= if present?(@vn_slug) do %>
           <.link
-            navigate={"/vn/#{@vn_slug}/discussions"}
+            navigate={~p"/discussions/visual-novels"}
             class="text-[18px] leading-[22px] font-normal text-[rgb(var(--foreground-primary))] transition lg:hover:text-[rgb(var(--text-link-hover))]"
           >
             Discussions
           </.link>
           <.link
-            navigate={"/vn/#{@vn_slug}/discussions"}
+            navigate={~p"/discussions/visual-novels"}
             class="text-xs font-medium tracking-wider text-[rgb(var(--foreground-secondary))] uppercase transition hover:text-[rgb(var(--text-link-hover))]"
           >
             More

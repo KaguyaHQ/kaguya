@@ -79,6 +79,7 @@ defmodule KaguyaWeb.Router do
       live "/vn-recommender", RecommendationLive.Index, :index
       live "/vn-recommender/:vndb_user_id", RecommendationLive.Index, :index
       live "/lists", ListLive.Index, :index
+      live "/lists/popular", ListLive.Popular, :index
       live "/list/new", ListLive.Form, :new
       live "/settings", SettingsLive.Index, :index
       live "/settings/integrations", SettingsLive.Index, :integrations

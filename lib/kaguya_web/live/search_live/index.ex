@@ -451,7 +451,7 @@ defmodule KaguyaWeb.SearchLive.Index do
     "/@#{username}/list/#{slug}"
   end
 
-  defp list_href(%{slug: slug}), do: "/lists/#{slug}"
+  defp list_href(%{slug: _slug}), do: "/lists"
 
   defp search_result_cover_vn(vn) do
     cover_sensitive = bool(Map.get(vn, :has_ero) || Map.get(vn, "has_ero"))

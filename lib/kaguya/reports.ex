@@ -309,7 +309,7 @@ defmodule Kaguya.Reports do
       "user" ->
         case safe_get(User, entity_id) do
           %{username: username} when is_binary(username) ->
-            "/users/#{username}/discussions/#{short_id}"
+            "/@#{username}/discussions/#{short_id}"
 
           _ ->
             nil

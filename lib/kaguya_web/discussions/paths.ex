@@ -15,23 +15,19 @@ defmodule KaguyaWeb.Discussions.Paths do
   def standalone_post_url(short_id, slug) when is_binary(short_id),
     do: "/discussions/p/#{short_id}/#{slug || "post"}"
 
-  def list_url(%{category_type: type} = post) do
+  def list_url(%{category_type: type}) do
     case normalize_category(type) do
       "visual_novel" ->
-        with %{slug: slug} when is_binary(slug) <- Map.get(post, :visual_novel),
-             do: "/vn/#{slug}/discussions"
+        "/discussions/visual-novels"
 
       "producer" ->
-        with %{slug: slug} when is_binary(slug) <- Map.get(post, :producer),
-             do: "/developer/#{slug}/discussions"
+        "/discussions/producers"
 
       "character" ->
-        with %{slug: slug} when is_binary(slug) <- Map.get(post, :character),
-             do: "/character/#{slug}/discussions"
+        "/discussions/characters"
 
       "user" ->
-        with %{username: username} when is_binary(username) <- Map.get(post, :target_user),
-             do: "/users/#{username}/discussions"
+        "/discussions/users"
 
       "announcements" ->
         "/discussions/announcements"
@@ -82,7 +78,7 @@ defmodule KaguyaWeb.Discussions.Paths do
 
       "user" ->
         with %{username: username} when is_binary(username) <- Map.get(post, :target_user),
-             do: "/users/#{username}/discussions/#{post.short_id}"
+             do: "/@#{username}/discussions/#{post.short_id}"
 
       _ ->
         nil

@@ -35,7 +35,7 @@ defmodule KaguyaWeb.ListLive.IndexTest do
 
     assert {:ok, true} = Lists.like_list(popular.id, liker.id)
 
-    {:ok, _view, html} = live(conn, ~p"/lists")
+    {:ok, view, html} = live(conn, ~p"/lists")
 
     assert html =~ "Start Your Own List"
     assert html =~ "Popular Lists"
@@ -46,6 +46,7 @@ defmodule KaguyaWeb.ListLive.IndexTest do
     assert html =~ "A list with a description"
     assert html =~ "Fresh Index Picks"
     assert html =~ "/@#{owner.username}/list/#{popular.slug}"
+    assert has_element?(view, ~s(a[href="/lists/popular"][data-phx-link="redirect"]))
     refute html =~ "The public index is still being ported"
   end
 

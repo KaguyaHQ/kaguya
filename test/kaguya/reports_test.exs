@@ -4,6 +4,7 @@ defmodule Kaguya.ReportsTest do
   import Ecto.Query
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias Kaguya.Discussions
   alias Kaguya.Repo
   alias Kaguya.Reports
   alias Kaguya.Social.Notification
@@ -140,6 +141,21 @@ defmodule Kaguya.ReportsTest do
     test "returns nil instead of raising for malformed target ids" do
       assert Reports.entity_path_for_report(%{entity_type: "post", entity_id: "not-a-uuid"}) ==
                nil
+    end
+
+    test "returns the registered route for user discussion posts", %{reporter: reporter} do
+      target = UserFixtures.insert_user!(username: "reported_user")
+
+      {:ok, post} =
+        Discussions.create_post(reporter.id, %{
+          title: "Reported user discussion",
+          content: "Discussion body",
+          category_type: :user,
+          entity_id: target.id
+        })
+
+      assert Reports.entity_path_for_report(%{entity_type: "post", entity_id: post.id}) ==
+               "/@#{target.username}/discussions/#{post.short_id}"
     end
   end
 

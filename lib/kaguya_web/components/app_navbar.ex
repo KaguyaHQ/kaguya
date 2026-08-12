@@ -16,10 +16,8 @@ defmodule KaguyaWeb.AppNavbar do
   drawer open/close is driven entirely by `Phoenix.LiveView.JS` so no
   LiveView round-trip is needed for menu toggling.
 
-  Many of the linked destinations are not yet implemented as routes in
-  this Phoenix app — they're intentional dead links so the navbar
-  reaches UX parity with production while the LiveView surfaces are
-  ported one-by-one.
+  Linked destinations must resolve to registered Phoenix routes. Surfaces that
+  have not been ported are omitted until their routes exist.
   """
 
   use KaguyaWeb, :html

@@ -620,7 +620,7 @@ defmodule KaguyaWeb.ProfileLive.Edits do
   defp entity_href(:series, %{slug: slug}) when is_binary(slug), do: "/series/#{slug}"
 
   defp entity_href(:release, %Release{visual_novel: %{slug: slug}}) when is_binary(slug),
-    do: "/vn/#{slug}/releases"
+    do: "/vn/#{slug}"
 
   defp entity_href(_, _), do: nil
 

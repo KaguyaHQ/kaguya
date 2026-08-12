@@ -69,6 +69,23 @@ defmodule KaguyaWeb.ListLive.Data do
     end
   end
 
+  def load_popular_lists(viewer, cursor, limit \\ 10) do
+    viewer_id = viewer_id(viewer)
+    allowed = TitleCategory.allowed_categories(viewer || %{})
+
+    with {:ok, page} <-
+           Lists.list_most_liked_lists_for_viewer(viewer_id, cursor, limit,
+             allowed_categories: allowed
+           ) do
+      {:ok,
+       %{
+         items: hydrate_index_lists(page.items, 5),
+         next_cursor: page.next_cursor,
+         has_next: page.has_next
+       }}
+    end
+  end
+
   def load_show_page(username, slug, page, viewer, opts \\ []) do
     viewer_id = viewer_id(viewer)
     comments_page = Keyword.get(opts, :comments_page, 1)

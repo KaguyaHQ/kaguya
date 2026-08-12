@@ -194,7 +194,7 @@ defmodule KaguyaWeb.ChangesLive.Data do
 
   defp revision_href(_, _entity, change_id), do: "/history/#{change_id}"
 
-  defp release_href(%{visual_novel: %{slug: slug}, id: id}), do: "/vn/#{slug}/release/#{id}"
+  defp release_href(%{visual_novel: %{slug: slug}}), do: "/vn/#{slug}"
   defp release_href(_entity), do: nil
 
   defp release_parent_slug(%{visual_novel: %{slug: slug}}), do: slug
