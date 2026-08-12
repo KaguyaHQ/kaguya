@@ -313,32 +313,49 @@ defmodule KaguyaWeb.VNLive.PageData do
     end
   end
 
-  def list_shelves_for_user(%{id: user_id}) do
-    with {:ok, shelves} <- Shelves.list_shelves_for_user(user_id) do
-      {:ok, Enum.map(shelves, &Normalizer.normalize_shelf/1)}
+  def list_lists_for_vn(slug, %{id: user_id}) do
+    with {:ok, vn} <- require_vn(slug),
+         {:ok, lists} <- Lists.list_my_lists_with_membership(user_id, vn.id) do
+      {:ok, Enum.map(lists, &Normalizer.normalize_list_membership/1)}
     end
   end
 
-  def save_shelves_for_vn(slug, %{id: user_id} = viewer, shelf_ids) do
+  def save_lists_for_vn(slug, %{id: user_id}, selected_list_ids) do
     with {:ok, vn} <- require_vn(slug),
-         {:ok, current_shelves} <- Shelves.list_user_shelves_for_vn(user_id, vn.id) do
-      current_ids = MapSet.new(Enum.map(current_shelves, & &1.id))
-      next_ids = MapSet.new(shelf_ids)
-      add_ids = MapSet.difference(next_ids, current_ids) |> MapSet.to_list()
-      remove_ids = MapSet.difference(current_ids, next_ids) |> MapSet.to_list()
+         {:ok, lists} <- Lists.list_my_lists_with_membership(user_id, vn.id),
+         {:ok, next_ids} <- validate_owned_list_ids(lists, selected_list_ids) do
+      current_ids =
+        lists
+        |> Enum.filter(& &1.contains_vn)
+        |> Enum.map(& &1.id)
+        |> MapSet.new()
 
-      with {:ok, _} <- maybe_add_to_shelves(user_id, add_ids, [vn.id]),
-           {:ok, _} <- maybe_remove_from_shelves(user_id, remove_ids, [vn.id]) do
-        get_viewer_bundle(slug, viewer)
+      add_ids = MapSet.difference(next_ids, current_ids)
+      remove_ids = MapSet.difference(current_ids, next_ids)
+
+      with :ok <- update_list_memberships(add_ids, &Lists.add_vns_to_list(&1, [vn.id], user_id)),
+           :ok <-
+             update_list_memberships(
+               remove_ids,
+               &Lists.remove_vns_from_list(&1, [vn.id], user_id)
+             ) do
+        VNPageCache.invalidate(vn.id)
+        :ok
       end
     end
   end
 
-  def create_shelf_for_vn(slug, %{id: user_id} = viewer, name) do
+  def create_list_for_vn(slug, %{id: user_id}, name) do
     with {:ok, vn} <- require_vn(slug),
-         {:ok, shelf} <- Shelves.create_shelf(%{user_id: user_id, name: String.trim(name)}),
-         {:ok, _} <- Shelves.add_vns_to_shelves(user_id, [shelf.id], [vn.id]) do
-      get_viewer_bundle(slug, viewer)
+         {:ok, list} <-
+           Lists.create_list(%{
+             user_id: user_id,
+             name: String.trim(name),
+             is_public: false,
+             vn_ids: [vn.id]
+           }) do
+      VNPageCache.invalidate(vn.id)
+      {:ok, Normalizer.normalize_list_membership(%{list | contains_vn: true})}
     end
   end
 
@@ -444,11 +461,12 @@ defmodule KaguyaWeb.VNLive.PageData do
   end
 
   # The public VN page core. Cached because it carries no per-user state:
-  # tag/recommendation vote highlights and the viewer's private lists are
-  # *not* baked in — they hydrate via the `:vn_viewer` async bundle
-  # (`my_votes`, built by `build_my_votes/2`). What remains varies only by
-  # content prefs (`allowed`) and mod visibility (`privileged?`), both bounded
-  # (~4 pref combos × 2), so a handful of entries per VN serve every viewer.
+  # tag/recommendation vote highlights are *not* baked in — they hydrate via
+  # the `:vn_viewer` async bundle (`my_votes`, built by `build_my_votes/2`).
+  # Owned-list membership is loaded on demand when the list dialog opens. What
+  # remains varies only by content prefs (`allowed`) and mod visibility
+  # (`privileged?`), both bounded (~4 pref combos × 2), so a handful of entries
+  # per VN serve every viewer.
   # This is an origin-side cache; a LiveView page can't carry `s-maxage`. See
   # docs/migrations/nextjs-liveview/plans/vn-page-performance-plan.md.
   defp build_public_page(vn, viewer, page, sort) do
@@ -461,8 +479,8 @@ defmodule KaguyaWeb.VNLive.PageData do
 
   defp build_public_page_payload(vn, allowed, page, sort) do
     # Intentionally nil: the cached core is viewer-independent, so per-user
-    # vote highlights and private lists are dropped here and hydrate via the
-    # viewer bundle's `my_votes`.
+    # vote highlights are dropped here and hydrate via the viewer bundle's
+    # `my_votes`; owned-list membership is loaded only when its dialog opens.
     viewer_id = nil
 
     {:ok, reviews} =
@@ -498,32 +516,27 @@ defmodule KaguyaWeb.VNLive.PageData do
   end
 
   defp build_viewer_vn(vn, user_id) do
-    # These five reads are independent, so fan them out concurrently rather
-    # than paying five sequential round-trips. Runs inside the `:vn_viewer`
+    # These four reads are independent, so fan them out concurrently rather
+    # than paying four sequential round-trips. Runs inside the `:vn_viewer`
     # async task; in tests the sandbox is in shared mode (ConnCase,
     # async: false), so the spawned tasks share the checked-out connection.
     [
       {:ok, my_rating},
       {:ok, my_reading_status},
       {:ok, my_review_likes},
-      {:ok, my_shelves},
       my_review
     ] =
       Task.await_many([
         Task.async(fn -> Ratings.get_user_rating(vn.id, user_id) end),
         Task.async(fn -> Shelves.get_reading_status(user_id, vn.id) end),
         Task.async(fn -> Reviews.liked_review_ids_for_vn_id(user_id, vn.id) end),
-        Task.async(fn -> Shelves.list_user_shelves_for_vn(user_id, vn.id) end),
         Task.async(fn -> Reviews.get_review_by_vn_and_user(vn.id, user_id) end)
       ])
-
-    my_shelves = unwrap_ok(my_shelves)
 
     %{
       my_rating: my_rating,
       my_reading_status: Normalizer.normalize_reading_status(my_reading_status),
       my_review: Normalizer.normalize_my_review(my_review),
-      my_shelves: Enum.map(my_shelves, &Normalizer.normalize_shelf/1),
       my_review_likes: my_review_likes,
       average_rating: vn.average_rating,
       ratings_count: vn.ratings_count,
@@ -662,9 +675,6 @@ defmodule KaguyaWeb.VNLive.PageData do
     )
   end
 
-  defp unwrap_ok({:ok, value}), do: value
-  defp unwrap_ok(value), do: value
-
   defp blank_to_nil(value) when value in [nil, ""], do: nil
   defp blank_to_nil(value), do: value
 
@@ -771,15 +781,25 @@ defmodule KaguyaWeb.VNLive.PageData do
     end
   end
 
-  defp maybe_add_to_shelves(_user_id, [], _vn_ids), do: {:ok, %{success: true}}
+  defp validate_owned_list_ids(lists, selected_list_ids) when is_list(selected_list_ids) do
+    owned_ids = lists |> Enum.map(& &1.id) |> MapSet.new()
+    selected_ids = MapSet.new(selected_list_ids)
 
-  defp maybe_add_to_shelves(user_id, shelf_ids, vn_ids),
-    do: Shelves.add_vns_to_shelves(user_id, shelf_ids, vn_ids)
+    if MapSet.subset?(selected_ids, owned_ids),
+      do: {:ok, selected_ids},
+      else: {:error, :unauthorized}
+  end
 
-  defp maybe_remove_from_shelves(_user_id, [], _vn_ids), do: {:ok, %{success: true}}
+  defp validate_owned_list_ids(_lists, _selected_list_ids), do: {:error, :unauthorized}
 
-  defp maybe_remove_from_shelves(user_id, shelf_ids, vn_ids),
-    do: Shelves.remove_vns_from_shelves(user_id, shelf_ids, vn_ids)
+  defp update_list_memberships(list_ids, update_fun) do
+    Enum.reduce_while(list_ids, :ok, fn list_id, :ok ->
+      case update_fun.(list_id) do
+        {:ok, _result} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
 
   defp apply_similarity_vote(vn_id, similar_vn_id, user_id, vote)
        when vote in ["1", 1, :up, "up"] do

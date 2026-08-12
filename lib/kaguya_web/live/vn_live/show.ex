@@ -56,10 +56,11 @@ defmodule KaguyaWeb.VNLive.Show do
        review_save_error: nil,
        review_min_length_error?: false,
        list_dialog_open: false,
-       shelves: [],
-       selected_shelf_ids: [],
-       new_shelf_name: "",
-       create_shelf_error: nil,
+       lists: [],
+       selected_list_ids: [],
+       initial_list_ids: [],
+       new_list_name: "",
+       create_list_error: nil,
        recommendation_dialog_open: false,
        recommendation_slug: "",
        quote_dialog_open: false,
@@ -141,8 +142,11 @@ defmodule KaguyaWeb.VNLive.Show do
             review_save_error: nil,
             review_min_length_error?: false,
             list_dialog_open: false,
-            new_shelf_name: "",
-            create_shelf_error: nil,
+            lists: [],
+            selected_list_ids: [],
+            initial_list_ids: [],
+            new_list_name: "",
+            create_list_error: nil,
             recommendation_dialog_open: false,
             quote_dialog_open: false,
             quote_text: "",
@@ -279,22 +283,22 @@ defmodule KaguyaWeb.VNLive.Show do
     do: socket |> ensure_viewer_bundle() |> ReviewActions.delete_review(params)
 
   def handle_event("open_list_dialog", params, socket),
-    do: socket |> ensure_viewer_bundle() |> ListActions.open_list_dialog(params)
+    do: ListActions.open_list_dialog(socket, params)
 
   def handle_event("close_list_dialog", params, socket),
     do: ListActions.close_list_dialog(socket, params)
 
-  def handle_event("change_shelf_name", params, socket),
-    do: ListActions.change_shelf_name(socket, params)
+  def handle_event("change_list_name", params, socket),
+    do: ListActions.change_list_name(socket, params)
 
   def handle_event("update_list_membership", params, socket),
     do: ListActions.update_list_membership(socket, params)
 
   def handle_event("save_list_membership", params, socket),
-    do: socket |> ensure_viewer_bundle() |> ListActions.save_list_membership(params)
+    do: ListActions.save_list_membership(socket, params)
 
-  def handle_event("create_shelf", params, socket),
-    do: socket |> ensure_viewer_bundle() |> ListActions.create_shelf(params)
+  def handle_event("create_list", params, socket),
+    do: ListActions.create_list(socket, params)
 
   def handle_event("open_recommendation_dialog", params, socket),
     do: RecommendationActions.open_recommendation_dialog(socket, params)
@@ -555,12 +559,12 @@ defmodule KaguyaWeb.VNLive.Show do
       <Components.clear_status_dialog :if={@clear_status_dialog_open?} />
       <Components.list_dialog
         :if={@list_dialog_open}
-        shelves={@shelves}
-        selected_ids={@selected_shelf_ids}
-        initial_ids={Enum.map(get_in(@viewer_vn || %{}, [:my_shelves]) || [], & &1.id)}
+        lists={@lists}
+        selected_ids={@selected_list_ids}
+        initial_ids={@initial_list_ids}
         vn_title={@display_vn.title}
-        new_shelf_name={@new_shelf_name}
-        create_shelf_error={@create_shelf_error}
+        new_list_name={@new_list_name}
+        create_list_error={@create_list_error}
       />
       <Components.recommendation_dialog :if={@recommendation_dialog_open} />
       <Components.tag_dialog

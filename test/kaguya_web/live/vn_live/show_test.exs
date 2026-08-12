@@ -5,6 +5,7 @@ defmodule KaguyaWeb.VNLive.ShowTest do
   alias Kaguya.Characters.{Character, VNCharacter}
   alias Kaguya.Discussions
   alias Kaguya.Lists
+  alias Kaguya.Lists.List, as: VnList
   alias Kaguya.Producers.{Producer, VNProducer}
   alias Kaguya.Releases.Release
   alias Kaguya.Reviews
@@ -231,6 +232,177 @@ defmodule KaguyaWeb.VNLive.ShowTest do
     assert html =~ "Popular VN Picks"
     assert html =~ "Popular List Owner"
     assert html =~ ~s(href="/@#{owner.username}/list/#{list.slug}")
+  end
+
+  test "list dialog shows private and public lists and saves VN membership", %{conn: conn} do
+    user = UserFixtures.insert_user!(username: "list_dialog_owner")
+    other_user = UserFixtures.insert_user!(username: "other_list_owner")
+
+    vn =
+      %VisualNovel{}
+      |> VisualNovel.changeset(%{
+        title: "List Dialog VN",
+        slug: "list-dialog-vn",
+        description: "A visual novel used to test user-list membership."
+      })
+      |> Repo.insert!()
+
+    other_vn =
+      %VisualNovel{}
+      |> VisualNovel.changeset(%{
+        title: "Other List Dialog VN",
+        slug: "other-list-dialog-vn",
+        description: "A different visual novel used as an existing list item."
+      })
+      |> Repo.insert!()
+
+    assert {:ok, private_list} =
+             Lists.create_list(%{
+               user_id: user.id,
+               name: "Private Picks",
+               is_public: false,
+               vn_ids: [vn.id]
+             })
+
+    assert {:ok, public_list} =
+             Lists.create_list(%{
+               user_id: user.id,
+               name: "Public Picks",
+               is_public: true,
+               vn_ids: [other_vn.id]
+             })
+
+    assert {:ok, other_private_list} =
+             Lists.create_list(%{
+               user_id: other_user.id,
+               name: "Someone Else's Picks",
+               is_public: false,
+               vn_ids: [vn.id]
+             })
+
+    {:ok, view, _html} =
+      conn
+      |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+      |> live_and_wait(~p"/vn/#{vn.slug}")
+
+    render_click(view, "open_list_dialog")
+
+    assert has_element?(view, "#list-dialog")
+    assert has_element?(view, "#list-membership-#{private_list.id}")
+    assert has_element?(view, "#list-membership-#{public_list.id}")
+    refute has_element?(view, "#list-membership-#{other_private_list.id}")
+
+    assert has_element?(view, "#list-membership-#{private_list.id} input[checked]")
+    refute has_element?(view, "#list-membership-#{public_list.id} input[checked]")
+
+    render_change(element(view, "#list-membership-form"), %{
+      "lists" => %{"ids" => [public_list.id]}
+    })
+
+    refute has_element?(view, "#list-membership-#{private_list.id} input[checked]")
+    assert has_element?(view, "#list-membership-#{public_list.id} input[checked]")
+
+    render_submit(element(view, "#list-membership-form"), %{
+      "lists" => %{"ids" => [public_list.id]}
+    })
+
+    refute has_element?(view, "#list-dialog")
+
+    assert {:ok, memberships} = Lists.list_my_lists_with_membership(user.id, vn.id)
+    refute Enum.find(memberships, &(&1.id == private_list.id)).contains_vn
+    assert Enum.find(memberships, &(&1.id == public_list.id)).contains_vn
+  end
+
+  test "list dialog rejects list IDs not owned by the current user", %{conn: conn} do
+    user = UserFixtures.insert_user!(username: "safe_list_owner")
+    other_user = UserFixtures.insert_user!(username: "unsafe_list_owner")
+
+    vn =
+      %VisualNovel{}
+      |> VisualNovel.changeset(%{
+        title: "List Ownership VN",
+        slug: "list-ownership-vn",
+        description: "A visual novel used to test list ownership checks."
+      })
+      |> Repo.insert!()
+
+    other_vn =
+      %VisualNovel{}
+      |> VisualNovel.changeset(%{
+        title: "Other List Ownership VN",
+        slug: "other-list-ownership-vn",
+        description: "A different visual novel used as an existing list item."
+      })
+      |> Repo.insert!()
+
+    assert {:ok, owned_list} =
+             Lists.create_list(%{
+               user_id: user.id,
+               name: "Owned Private Picks",
+               is_public: false,
+               vn_ids: [vn.id]
+             })
+
+    assert {:ok, other_list} =
+             Lists.create_list(%{
+               user_id: other_user.id,
+               name: "Unowned Private Picks",
+               is_public: false,
+               vn_ids: [other_vn.id]
+             })
+
+    {:ok, view, _html} =
+      conn
+      |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+      |> live_and_wait(~p"/vn/#{vn.slug}")
+
+    render_click(view, "open_list_dialog")
+
+    render_submit(element(view, "#list-membership-form"), %{
+      "lists" => %{"ids" => [other_list.id]}
+    })
+
+    assert has_element?(view, "#list-dialog")
+
+    assert {:ok, memberships} = Lists.list_my_lists_with_membership(user.id, vn.id)
+    assert Enum.find(memberships, &(&1.id == owned_list.id)).contains_vn
+
+    assert {:ok, [other_membership]} =
+             Lists.list_my_lists_with_membership(other_user.id, vn.id)
+
+    refute other_membership.contains_vn
+  end
+
+  test "quick-create makes a private user list containing the VN", %{conn: conn} do
+    user = UserFixtures.insert_user!(username: "quick_list_owner")
+
+    vn =
+      %VisualNovel{}
+      |> VisualNovel.changeset(%{
+        title: "Quick List VN",
+        slug: "quick-list-vn",
+        description: "A visual novel used to test quick list creation."
+      })
+      |> Repo.insert!()
+
+    {:ok, view, _html} =
+      conn
+      |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+      |> live_and_wait(~p"/vn/#{vn.slug}")
+
+    render_click(view, "open_list_dialog")
+
+    render_submit(element(view, "#create-list-form"), %{
+      "list" => %{"name" => "Quick Private Picks"}
+    })
+
+    list = Repo.get_by!(VnList, user_id: user.id, name: "Quick Private Picks")
+
+    refute list.is_public
+    assert has_element?(view, "#list-membership-#{list.id} input[checked]")
+
+    assert {:ok, [membership]} = Lists.list_my_lists_with_membership(user.id, vn.id)
+    assert membership.contains_vn
   end
 
   test "renders VN-scoped discussions", %{conn: conn} do

@@ -564,12 +564,12 @@ defmodule KaguyaWeb.VNLive.Show.Components do
     """
   end
 
-  attr :shelves, :list, required: true
+  attr :lists, :list, required: true
   attr :selected_ids, :list, required: true
   attr :initial_ids, :list, required: true
   attr :vn_title, :string, default: nil
-  attr :new_shelf_name, :string, default: ""
-  attr :create_shelf_error, :string, default: nil
+  attr :new_list_name, :string, default: ""
+  attr :create_list_error, :string, default: nil
 
   def list_dialog(assigns) do
     selected = MapSet.new(assigns.selected_ids)
@@ -579,6 +579,8 @@ defmodule KaguyaWeb.VNLive.Show.Components do
       assigns
       |> assign(:selected, selected)
       |> assign(:has_list_changes?, !MapSet.equal?(selected, initial_selected))
+      |> assign(:membership_form, to_form(%{}, as: :lists))
+      |> assign(:new_list_form, to_form(%{"name" => assigns.new_list_name}, as: :list))
 
     ~H"""
     <div
@@ -607,34 +609,34 @@ defmodule KaguyaWeb.VNLive.Show.Components do
 
         <.form
           id="list-membership-form"
-          for={%{}}
-          as={:shelves}
+          for={@membership_form}
           phx-change="update_list_membership"
           phx-submit="save_list_membership"
         >
           <div class="max-h-[320px] min-h-[200px] overflow-y-auto">
             <label
-              :for={shelf <- @shelves}
+              :for={list <- @lists}
+              id={"list-membership-#{list.id}"}
               class={[
                 "flex cursor-pointer items-center gap-3 px-7 py-3.5 text-sm transition-colors hover:bg-[rgb(var(--surface-menu-item-hover))] active:bg-[rgb(var(--surface-menu-item-pressed))]/80",
-                MapSet.member?(@selected, shelf.id) && "bg-[rgb(var(--surface-elevated))]/60"
+                MapSet.member?(@selected, list.id) && "bg-[rgb(var(--surface-elevated))]/60"
               ]}
             >
               <input
                 type="checkbox"
-                name="shelves[ids][]"
-                value={shelf.id}
-                checked={MapSet.member?(@selected, shelf.id)}
+                name="lists[ids][]"
+                value={list.id}
+                checked={MapSet.member?(@selected, list.id)}
                 class="size-[18px] rounded-[4px] border-[rgb(var(--foreground-secondary))]/30 bg-[rgb(var(--surface-base))] accent-[rgb(var(--button-background-brand-default))]"
               />
               <span class="min-w-0 flex-1 truncate font-medium text-[rgb(var(--foreground-primary))]">
-                {shelf.name}
+                {list.name}
               </span>
               <span class="flex shrink-0 items-center gap-1.5">
                 <span class="text-xs text-[rgb(var(--foreground-secondary))]/50 tabular-nums">
-                  {shelf_vns_count(shelf)}
+                  {list_vns_count(list)}
                 </span>
-                <%= if shelf_public?(shelf) do %>
+                <%= if list_public?(list) do %>
                   <Lucide.globe
                     class="size-3.5 text-[rgb(var(--foreground-secondary))]/40"
                     aria-hidden="true"
@@ -649,7 +651,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
             </label>
 
             <div
-              :if={@shelves == []}
+              :if={@lists == []}
               class="flex h-[240px] flex-col items-center justify-center gap-4 px-7"
             >
               <p class="text-center text-sm text-[rgb(var(--foreground-tertiary))]">No lists yet</p>
@@ -659,17 +661,17 @@ defmodule KaguyaWeb.VNLive.Show.Components do
 
         <div class="border-t border-[rgb(var(--border-divider))] px-7 py-5">
           <.form
-            for={%{"name" => @new_shelf_name}}
-            as={:shelf}
-            phx-change="change_shelf_name"
-            phx-submit="create_shelf"
+            id="create-list-form"
+            for={@new_list_form}
+            phx-change="change_list_name"
+            phx-submit="create_list"
             class="flex flex-col gap-2"
           >
             <div class="flex items-center gap-2">
               <input
                 type="text"
-                name="shelf[name]"
-                value={@new_shelf_name}
+                name="list[name]"
+                value={@new_list_name}
                 maxlength="80"
                 placeholder="Create a new list"
                 data-modal-initial-focus
@@ -683,8 +685,8 @@ defmodule KaguyaWeb.VNLive.Show.Components do
               </button>
             </div>
           </.form>
-          <p :if={@create_shelf_error} class="mt-2 text-sm text-[rgb(255_99_99)]" role="alert">
-            {@create_shelf_error}
+          <p :if={@create_list_error} class="mt-2 text-sm text-[rgb(255_99_99)]" role="alert">
+            {@create_list_error}
           </p>
 
           <div class="mt-5 flex items-center justify-end gap-3">
@@ -697,7 +699,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
               Cancel
             </button>
             <button
-              :if={@shelves != []}
+              :if={@lists != []}
               type="submit"
               form="list-membership-form"
               disabled={!@has_list_changes?}
@@ -1067,11 +1069,11 @@ defmodule KaguyaWeb.VNLive.Show.Components do
       Map.get(images, "large")
   end
 
-  defp shelf_vns_count(shelf) do
-    Map.get(shelf, :vns_count) || Map.get(shelf, "vns_count") || 0
+  defp list_vns_count(list) do
+    Map.get(list, :vns_count) || Map.get(list, "vns_count") || 0
   end
 
-  defp shelf_public?(shelf), do: Map.get(shelf, :is_public) || Map.get(shelf, "is_public")
+  defp list_public?(list), do: Map.get(list, :is_public) || Map.get(list, "is_public")
 
   defp character_name(character),
     do: Map.get(character, :name) || Map.get(character, "name") || ""

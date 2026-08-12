@@ -220,6 +220,17 @@ defmodule KaguyaWeb.VNLive.PageData.Normalizer do
 
   # ---- Lists ----
 
+  def normalize_list_membership(list) do
+    %{
+      id: list.id,
+      name: list.name,
+      slug: list.slug,
+      is_public: list.is_public,
+      vns_count: list.vns_count || 0,
+      contains_vn: list.contains_vn
+    }
+  end
+
   def normalize_list(list, loaded_vns) do
     items =
       list
@@ -268,7 +279,7 @@ defmodule KaguyaWeb.VNLive.PageData.Normalizer do
     }
   end
 
-  # ---- Reading status / Shelves ----
+  # ---- Reading status ----
 
   def normalize_reading_status(nil), do: nil
 
@@ -281,8 +292,6 @@ defmodule KaguyaWeb.VNLive.PageData.Normalizer do
       note: status.note,
       library_added_at: status.library_added_at
     }
-
-  def normalize_shelf(shelf), do: %{id: shelf.id, name: shelf.name, slug: shelf.slug}
 
   # ---- Producers ----
 
