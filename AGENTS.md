@@ -41,7 +41,7 @@ context-driven browser surfaces and controller/API boundaries.
 
 ## Tooling
 
-- **Elixir `~> 1.19` / OTP 27** (installed locally: 1.19.5)
+- **Elixir `~> 1.20.4` / OTP 27**
 - Phoenix `~> 1.8.0`, Phoenix LiveView `~> 1.1.0`
 - Tailwind **v4** (no `tailwind.config.js`; uses the `@import "tailwindcss"` + `@source` syntax in `assets/css/app.css`)
 - Dev DB: `kaguya_dev2` on `localhost:5432`, user `postgres`
