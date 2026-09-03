@@ -206,6 +206,7 @@ defmodule KaguyaWeb.VNLive.EditTest do
     assert Repo.get_by(Relation, visual_novel_id: related.id, related_vn_id: vn.id) == nil
   end
 
+  @tag :requires_image
   test "adds new screenshots and covers from uploads", %{conn: conn} do
     vn = insert_vn!("Upload VN", "upload-vn")
     insert_title!(vn, "ja", "Upload VN")
@@ -378,6 +379,7 @@ defmodule KaguyaWeb.VNLive.EditTest do
     assert_redirected(view, "/vn/#{vn.slug}")
   end
 
+  @tag :requires_image
   test "preserves form values and surfaces upload error on upload failure", %{conn: conn} do
     previous = Application.get_env(:kaguya, :upload_req_options)
 
