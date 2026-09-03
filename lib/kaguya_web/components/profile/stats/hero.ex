@@ -81,7 +81,7 @@ defmodule KaguyaWeb.Components.Profile.Stats.Hero do
               data-share-button
               aria-label="Share stats"
               title="Share stats"
-              class="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border-divider))] bg-linear-to-b from-[rgb(var(--button-background-brand-default))]/12 via-[rgb(var(--button-background-brand-default))]/4 to-[rgb(var(--button-background-brand-default))]/7 p-1 transition hover:bg-white/4 lg:h-[32px] lg:w-[32px] lg:p-2"
+              class="flex size-[26px] shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border-divider))] bg-linear-to-b from-[rgb(var(--button-background-brand-default))]/12 via-[rgb(var(--button-background-brand-default))]/4 to-[rgb(var(--button-background-brand-default))]/7 p-1 transition hover:bg-white/4 lg:h-[32px] lg:w-[32px] lg:p-2"
             >
               <Lucide.link_2
                 class="size-3.5 text-[rgb(var(--foreground-primary))] lg:size-4"
