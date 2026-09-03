@@ -2,7 +2,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
   @moduledoc """
   Safe markdown renderer for user-authored content.
 
-  Pipeline: CommonMark + GFM via Earmark, then an AST
+  Pipeline: CommonMark + GFM via MDEx, then an HTML tree
   transform pass for Discord-style `||spoilers||`, link sanitization +
   VNDB-relative href rewriting, and a tag allowlist.
 
@@ -37,7 +37,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
     bio: {@bio_allowed_tags, :bio_preprocess}
   }
 
-  # Private-Use Area sentinels — chosen because Earmark/CommonMark won't
+  # Private-Use Area sentinels — chosen because MDEx/CommonMark won't
   # treat them as syntactically meaningful, so we can stash spoilers in
   # the source string and reliably find them in the parsed AST.
   @spoiler_open <<0xE000::utf8>>
@@ -59,13 +59,13 @@ defmodule KaguyaWeb.Markdown.UserContent do
     content = apply_preprocess(content, preprocess)
     {source, spoilers} = stash_spoilers(content)
 
-    case Earmark.as_ast(source, gfm: true, breaks: true, smartypants: false) do
-      {result, ast, _messages} when result in [:ok, :error] ->
+    case parse_markdown(source, hardbreaks: true) do
+      {:ok, ast} ->
         html =
           ast
           |> walk(spoilers)
           |> filter(allowed)
-          |> Earmark.Transform.transform()
+          |> Floki.raw_html()
           |> String.replace(@spoiler_escape, "||")
 
         {:safe, html}
@@ -75,14 +75,28 @@ defmodule KaguyaWeb.Markdown.UserContent do
     end
   end
 
+  defp parse_markdown(source, opts) do
+    hardbreaks = Keyword.fetch!(opts, :hardbreaks)
+
+    with {:ok, html} <-
+           MDEx.to_html(source,
+             extension: [autolink: true, strikethrough: true],
+             parse: [smart: false],
+             render: [escape: true, hardbreaks: hardbreaks]
+           ),
+         {:ok, ast} <- Floki.parse_fragment(html) do
+      {:ok, ast}
+    end
+  end
+
   # ---------------------------------------------------------------------------
-  # Spoiler stash — runs over the source string before Earmark parses, so
+  # Spoiler stash — runs over the source string before MDEx parses, so
   # spoilers can wrap markdown that gets parsed normally inside.
   # ---------------------------------------------------------------------------
 
   defp stash_spoilers(content) do
     # `\||` is the documented escape for a literal `||` — swap to a
-    # sentinel that survives Earmark and gets restored at the end.
+    # sentinel that survives MDEx and gets restored at the end.
     content = String.replace(content, "\\||", @spoiler_escape)
 
     {final, inners, _idx} =
@@ -107,10 +121,10 @@ defmodule KaguyaWeb.Markdown.UserContent do
 
   defp walk_node(text, spoilers) when is_binary(text), do: inflate_spoilers(text, spoilers)
 
-  defp walk_node({"code", _, _, _} = node, _spoilers), do: [node]
-  defp walk_node({"pre", _, _, _} = node, _spoilers), do: [node]
+  defp walk_node({"code", _, _} = node, _spoilers), do: [node]
+  defp walk_node({"pre", _, _} = node, _spoilers), do: [node]
 
-  defp walk_node({"a", attrs, children, meta}, spoilers) do
+  defp walk_node({"a", attrs, children}, spoilers) do
     href =
       attrs
       |> List.keyfind("href", 0, {"href", ""})
@@ -124,11 +138,11 @@ defmodule KaguyaWeb.Markdown.UserContent do
       {"rel", "noopener noreferrer nofollow"}
     ]
 
-    [{"a", new_attrs, walk(children, spoilers), meta}]
+    [{"a", new_attrs, walk(children, spoilers)}]
   end
 
-  defp walk_node({tag, attrs, children, meta}, spoilers),
-    do: [{tag, attrs, walk(children, spoilers), meta}]
+  defp walk_node({tag, attrs, children}, spoilers),
+    do: [{tag, attrs, walk(children, spoilers)}]
 
   # ---------------------------------------------------------------------------
   # Spoiler inflation — split text on `IDX`, render each
@@ -157,14 +171,14 @@ defmodule KaguyaWeb.Markdown.UserContent do
   end
 
   # Render a spoiler's inner content as inline markdown — parse with
-  # Earmark, then unwrap the surrounding `<p>` so the children land
+  # MDEx, then unwrap the surrounding `<p>` so the children land
   # inside the spoiler span without producing a block.
   defp render_inline(text, spoilers) do
-    case Earmark.as_ast(text, gfm: true, breaks: false, smartypants: false) do
-      {result, [{"p", _, children, _}], _} when result in [:ok, :error] ->
+    case parse_markdown(text, hardbreaks: false) do
+      {:ok, [{"p", _, children}]} ->
         walk(children, spoilers)
 
-      {result, ast, _} when result in [:ok, :error] ->
+      {:ok, ast} ->
         walk(ast, spoilers)
 
       _ ->
@@ -181,7 +195,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
        {"tabindex", "0"},
        {"aria-label", "Spoiler, click to reveal"},
        {"aria-hidden", "true"}
-     ], children, %{}}
+     ], children}
   end
 
   # ---------------------------------------------------------------------------
@@ -192,11 +206,11 @@ defmodule KaguyaWeb.Markdown.UserContent do
 
   defp filter_node(text, _allowed) when is_binary(text), do: [text]
 
-  defp filter_node({tag, attrs, children, meta}, allowed) do
+  defp filter_node({tag, attrs, children}, allowed) do
     filtered_children = filter(children, allowed)
 
     if MapSet.member?(allowed, tag) do
-      [{tag, attrs, filtered_children, meta}]
+      [{tag, attrs, filtered_children}]
     else
       filtered_children
     end
@@ -226,7 +240,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
 
   # ---------------------------------------------------------------------------
   # Preprocess presets — applied to the raw markdown source before spoiler
-  # stashing + Earmark. Public so tests + future surfaces can reuse them
+  # stashing + MDEx. Public so tests + future surfaces can reuse them
   # directly; the `:preprocess` opt also accepts an arbitrary 1-arity fn.
   # ---------------------------------------------------------------------------
 
@@ -305,7 +319,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
   defp unescape_trailing_newlines(content), do: String.replace(content, "\\\n", "\n")
 
   # Replace runs of 2+ consecutive newlines with `\n\xA0\n…\n`, putting an
-  # NBSP on every "blank" line so Earmark (with breaks: true) renders them as
+  # NBSP on every "blank" line so MDEx (with hardbreaks: true) renders them as
   # soft breaks inside one paragraph rather than splitting into multiple.
   defp pad_blank_lines(content) do
     Regex.replace(~r/(?:[ \t]*\n){2,}/, content, fn match ->

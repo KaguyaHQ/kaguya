@@ -42,7 +42,7 @@ defmodule Kaguya.MixProject do
       {:credo, "~> 1.7.18", only: [:dev, :test], runtime: false},
       {:dns_cluster, "~> 0.2"},
       {:dotenvy, "~> 1.1"},
-      {:earmark, "~> 1.4"},
+      {:mdex, "~> 0.13.5"},
       {:ecto_sql, "~> 3.13"},
       {:ex_aws, "~> 2.7"},
       {:ex_aws_s3, "~> 2.5.9"},

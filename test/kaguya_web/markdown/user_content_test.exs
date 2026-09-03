@@ -73,6 +73,12 @@ defmodule KaguyaWeb.Markdown.UserContentTest do
       refute html =~ "javascript:"
       refute html =~ "//evil.example"
     end
+
+    test "does not allow markdown URLs to inject HTML attributes" do
+      html = render(~S|[click](https://example.com/?a=x" onerror="alert(1))|)
+
+      assert Floki.find(html, "[onerror]") == []
+    end
   end
 
   describe "spoilers" do
@@ -194,7 +200,7 @@ defmodule KaguyaWeb.Markdown.UserContentTest do
     test "preserves blank-line visual spacing as soft breaks (NBSP trick)" do
       # Two paragraphs separated by a blank line. Without the comment preprocess
       # this would render as two <p> blocks; with it, we get a single paragraph
-      # with the blank position filled by NBSP so Earmark's break: true makes it
+      # with the blank position filled by NBSP so MDEx's hardbreaks: true makes it
       # a soft break instead of a paragraph boundary.
       html = render("first\n\nsecond", preset: :comment)
 
