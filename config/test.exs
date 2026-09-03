@@ -1,5 +1,8 @@
 import Config
 
+# Keep tests portable across Windows and Linux; production uses EXLA.Backend.
+config :nx, :default_backend, Nx.BinaryBackend
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used

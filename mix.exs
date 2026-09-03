@@ -50,7 +50,6 @@ defmodule Kaguya.MixProject do
       {:finch, "~> 0.22"},
       {:floki, "~> 0.38"},
       {:hammer, "~> 7.3"},
-      {:image, "~> 0.67"},
       {:jason, "~> 1.4.4"},
       {:nimble_csv, "~> 1.2"},
       {:oban, "~> 2.22"},
@@ -86,7 +85,9 @@ defmodule Kaguya.MixProject do
       # required, no Bazel build. Adds ~150–200MB to the image; we
       # recover that by dropping Python + numpy/scipy once EXLA is live.
       {:nx, "~> 0.9"},
-      {:exla, "~> 0.9"},
+      # EXLA does not publish Windows binaries. Tests use Nx.BinaryBackend so
+      # the suite remains portable and does not need the native XLA runtime.
+      {:exla, "~> 0.9", only: [:dev, :prod]},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:lazy_html, ">= 0.1.0"},
@@ -99,7 +100,17 @@ defmodule Kaguya.MixProject do
        app: false,
        compile: false,
        depth: 1}
-    ]
+    ] ++ image_deps()
+  end
+
+  # Vix, which backs the Image package, does not ship a Windows build. Keep
+  # image processing in every normal environment and in Linux/macOS tests,
+  # while allowing unrelated tests to run natively on Windows.
+  defp image_deps do
+    case {:os.type(), Mix.env()} do
+      {{:win32, _}, :test} -> []
+      _ -> [{:image, "~> 0.67"}]
+    end
   end
 
   # Aliases are shortcuts or tasks specific to the current project.
