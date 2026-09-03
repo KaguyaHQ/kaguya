@@ -63,7 +63,7 @@ defmodule Kaguya.MixProject do
       {:canonical_tailwind, "~> 0.2.0", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.17"},
       {:postgrex, "~> 0.22"},
-      {:req, "~> 0.5.8"},
+      {:req, "~> 0.6.1"},
       {:sentry, "~> 13.0"},
       {:slugify, "~> 1.3.1"},
       {:sweet_xml, "~> 0.7.5"},
