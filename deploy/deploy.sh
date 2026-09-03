@@ -9,6 +9,12 @@ APP="${1:-kaguya}"
 cd /home/deploy/kaguya
 
 if [ "$APP" = "kaguya" ]; then
+    CURRENT_CONTAINER="$(docker compose ps -q kaguya || true)"
+    PREVIOUS_IMAGE=""
+    if [ -n "$CURRENT_CONTAINER" ]; then
+        PREVIOUS_IMAGE="$(docker inspect --format '{{.Image}}' "$CURRENT_CONTAINER")"
+    fi
+
     echo "==> Running Ecto migrations..."
     docker compose run --rm kaguya /app/bin/migrate
 
@@ -24,8 +30,46 @@ else
     exit 1
 fi
 
-echo "==> Waiting for containers..."
-sleep 10
+echo "==> Waiting for kaguya health check..."
+HEALTHY=false
+for attempt in $(seq 1 24); do
+    if docker compose exec -T kaguya sh -c \
+        'curl -fsS http://127.0.0.1:8080/health | grep -q healthy'; then
+        HEALTHY=true
+        break
+    fi
+
+    sleep 5
+done
+
+if [ "$HEALTHY" != "true" ]; then
+    echo "==> New kaguya container failed its health check" >&2
+    docker compose ps kaguya >&2
+    docker compose logs --tail=100 kaguya >&2
+
+    if [ -n "$PREVIOUS_IMAGE" ] && docker image inspect "$PREVIOUS_IMAGE" >/dev/null 2>&1; then
+        echo "==> Rolling back to previous image $PREVIOUS_IMAGE..." >&2
+        docker tag "$PREVIOUS_IMAGE" ghcr.io/kaguyahq/kaguya:latest
+        docker compose up -d --no-deps --force-recreate kaguya
+
+        for attempt in $(seq 1 24); do
+            if docker compose exec -T kaguya sh -c \
+                'curl -fsS http://127.0.0.1:8080/health | grep -q healthy'; then
+                echo "==> Rollback healthy" >&2
+                exit 1
+            fi
+
+            sleep 5
+        done
+
+        echo "==> Rollback also failed its health check" >&2
+        docker compose logs --tail=100 kaguya >&2
+    fi
+
+    exit 1
+fi
+
+echo "==> Kaguya is healthy"
 
 # Ingress (Caddy) lives in the separate edge project (/home/deploy/edge); this
 # script only manages the kaguya app + meilisearch. Routing changes are handled
