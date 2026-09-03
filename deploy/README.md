@@ -1,7 +1,7 @@
 # Deploying Kaguya
 
-Kaguya ships as a single Docker image (Phoenix LiveView app), with Meilisearch
-for search and (optionally) Grafana Alloy for metrics.
+Kaguya ships as a Phoenix LiveView app with a dedicated Postgres database,
+Meilisearch for search, and (optionally) Grafana Alloy for metrics.
 
 There are two ways to run it:
 
@@ -111,12 +111,28 @@ See `.env.example` for the full list. Runtime essentials:
 
 | Variable           | Purpose                          |
 | ------------------ | -------------------------------- |
-| `DATABASE_URL`     | Postgres connection string       |
-| `PHX_HOST`         | Public hostname                  |
-| `SECRET_KEY_BASE`  | Phoenix secret                   |
-| `MEILI_MASTER_KEY` | Meilisearch auth                 |
-| `SUPABASE_*`       | Auth (JWKS verification)         |
-| `SENTRY_DSN`       | Error tracking (optional)        |
+| `DATABASE_URL`                    | Postgres connection string                |
+| `KAGUYA_POSTGRES_ADMIN_PASSWORD` | Dedicated Postgres administrator password |
+| `PHX_HOST`                        | Public hostname                           |
+| `SECRET_KEY_BASE`                 | Phoenix secret                            |
+| `MEILI_MASTER_KEY`                | Meilisearch auth                          |
+| `SENTRY_DSN`                      | Error tracking (optional)                 |
+
+## Database backups
+
+`backup-postgres.sh` streams a custom-format Postgres dump directly into an
+encrypted Restic repository. On the production host it runs daily from the
+`deploy` user's crontab and retains 7 daily, 4 weekly, and 6 monthly snapshots.
+It expects `/home/deploy/kaguya/.backup.env` with `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `RESTIC_PASSWORD`, and an R2
+`RESTIC_REPOSITORY` URL.
+
+```bash
+# Run and verify a backup manually
+ssh deploy@$HETZNER_HOST 'cd /home/deploy/kaguya && ./backup-postgres.sh'
+ssh deploy@$HETZNER_HOST \
+  'cd /home/deploy/kaguya && docker run --rm --env-file .backup.env restic/restic:0.18.1 check'
+```
 
 ## Monitoring (optional)
 
