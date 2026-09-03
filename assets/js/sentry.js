@@ -20,6 +20,15 @@ import * as Sentry from "@sentry/browser"
 
 const GENERAL_SAMPLE_RATE = 0.25
 
+// Production bundles define this value and receive matching per-bundle
+// annotations from @sentry/esbuild-plugin. The default Phoenix development
+// watcher does neither, so keep the integration disabled there rather than
+// misclassifying every unmarked development frame as third-party code.
+const applicationKey =
+  typeof __KAGUYA_SENTRY_APPLICATION_KEY__ === "string"
+    ? __KAGUYA_SENTRY_APPLICATION_KEY__
+    : null
+
 const meta = name => document.querySelector(`meta[name='${name}']`)?.content || null
 
 const dsn = meta("sentry-dsn")
@@ -53,6 +62,16 @@ if (dsn) {
     // ship at 100% regardless of the general rate.
     sampleRate: 1.0,
     tracesSampleRate: 0,
+
+    ...(applicationKey && {
+      integrations: defaultIntegrations => [
+        ...defaultIntegrations,
+        Sentry.thirdPartyErrorFilterIntegration({
+          filterKeys: [applicationKey],
+          behaviour: "drop-error-if-exclusively-contains-third-party-frames",
+        }),
+      ],
+    }),
 
     initialScope: scope => {
       scope.setTag("source", "liveview")

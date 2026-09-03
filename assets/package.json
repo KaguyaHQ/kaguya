@@ -1,8 +1,10 @@
 {
   "private": true,
   "scripts": {
-    "build:list-layout-island": "cd .. && mix esbuild list_layout_island",
-    "deploy:list-layout-island": "cd .. && mix esbuild list_layout_island --minify"
+    "build": "node build.mjs",
+    "deploy": "node build.mjs --deploy",
+    "build:list-layout-island": "node build.mjs --only=list_layout_island",
+    "deploy:list-layout-island": "node build.mjs --only=list_layout_island --deploy"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
@@ -15,5 +17,9 @@
     "react-dom": "19.2.4",
     "topbar": "^3.0.1",
     "web-vitals": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sentry/esbuild-plugin": "^5.4.0",
+    "esbuild": "^0.25.4"
   }
 }

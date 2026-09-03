@@ -137,9 +137,7 @@ defmodule Kaguya.MixProject do
       ],
       "assets.build": [
         "tailwind kaguya",
-        "esbuild kaguya",
-        "esbuild list_layout_island",
-        "esbuild favorites_dnd_island"
+        "cmd npm run build --prefix assets"
       ],
       "assets.deploy": [
         "tailwind kaguya --minify",
@@ -149,9 +147,7 @@ defmodule Kaguya.MixProject do
         # stack traces resolve back to original source. Maps are served
         # publicly via Plug.Static — acceptable trade-off for this repo;
         # see docs/operations/observability/source-maps.md for the private-upload path.
-        "esbuild kaguya --minify --sourcemap=linked",
-        "esbuild list_layout_island --minify --sourcemap=linked",
-        "esbuild favorites_dnd_island --minify --sourcemap=linked",
+        "cmd npm run deploy --prefix assets",
         "phx.digest"
       ]
     ]
