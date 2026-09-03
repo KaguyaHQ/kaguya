@@ -188,6 +188,31 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
     assert is_binary(stash.verifier)
   end
 
+  test "google rate limit uses the forwarded client IP behind the proxy" do
+    for _ <- 1..20 do
+      conn =
+        build_conn()
+        |> put_req_header("cf-connecting-ip", "203.0.113.10")
+        |> get("/auth/google")
+
+      assert URI.parse(redirected_to(conn)).host == "accounts.google.com"
+    end
+
+    blocked_conn =
+      build_conn()
+      |> put_req_header("cf-connecting-ip", "203.0.113.10")
+      |> get("/auth/google")
+
+    assert redirected_to(blocked_conn) == "/"
+
+    other_client_conn =
+      build_conn()
+      |> put_req_header("cf-connecting-ip", "203.0.113.11")
+      |> get("/auth/google")
+
+    assert URI.parse(redirected_to(other_client_conn)).host == "accounts.google.com"
+  end
+
   test "google callback logs in an existing linked identity" do
     user = UserFixtures.insert_user!()
     insert_google_identity!(user, provider_uid: "google-existing", email: user.email)

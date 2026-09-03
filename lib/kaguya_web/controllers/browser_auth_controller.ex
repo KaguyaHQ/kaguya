@@ -4,6 +4,7 @@ defmodule KaguyaWeb.BrowserAuthController do
   alias Kaguya.Auth
   alias Kaguya.Auth.{Google, OAuthState}
   alias Kaguya.Users
+  alias KaguyaWeb.Plugs.ClientIP
   alias KaguyaWeb.UserAuth
 
   require Logger
@@ -274,18 +275,12 @@ defmodule KaguyaWeb.BrowserAuthController do
   defp validate_new_email(_current_email, _new_email), do: {:error, :invalid_email}
 
   defp rate_limit_auth(conn, operation, limit) do
-    bucket = "auth:#{operation}:#{client_ip(conn)}"
+    bucket = "auth:#{operation}:#{ClientIP.get(conn)}"
 
     case Kaguya.RateLimit.hit(bucket, :timer.minutes(15), limit) do
       {:allow, _} -> :ok
       {:deny, _} -> {:error, :rate_limited}
     end
-  end
-
-  defp client_ip(conn) do
-    conn.remote_ip
-    |> Tuple.to_list()
-    |> Enum.join(".")
   end
 
   defp safe_return_to(path) when is_binary(path) do
