@@ -434,7 +434,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
               to the right edge. Without this, an empty left slot collapses
               and Save drifts to the start.
             --%>
-            <div class="flex flex-1 items-center">
+            <div class="flex flex-1 items-center gap-4">
               <button
                 :if={@has_review?}
                 type="button"
@@ -444,7 +444,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                 Delete
               </button>
               <label
-                :if={!@has_review? && @content_length > 0}
+                :if={@has_review? || @content_length > 0}
                 for="review-is-spoiler-input"
                 class="flex items-center gap-2 text-[13px] text-[rgb(var(--foreground-secondary))] transition-colors sm:hidden"
               >

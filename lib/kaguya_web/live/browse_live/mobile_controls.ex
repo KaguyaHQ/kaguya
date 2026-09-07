@@ -86,6 +86,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           <.link
             :for={option <- @options}
             patch={option.href}
+            phx-click={JS.hide(to: "#browse-mode-drawer")}
             rel="nofollow"
             class={drawer_option_class(option.selected?)}
           >
@@ -122,6 +123,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           <.link
             :for={option <- @options}
             patch={option.href}
+            phx-click={JS.hide(to: "#browse-sort-drawer")}
             rel="nofollow"
             class={drawer_option_class(option.selected?)}
           >
@@ -144,6 +146,8 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
       role="dialog"
       aria-modal="true"
       aria-labelledby="browse-filter-title"
+      phx-window-keydown={JS.hide(to: "#browse-filter-panel")}
+      phx-key="Escape"
     >
       <form
         id="browse-mobile-filter-form"
@@ -161,7 +165,18 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
         />
 
         <header class="border-border-divider flex h-[60px] shrink-0 items-center justify-between border-b px-5">
-          <h2 id="browse-filter-title" class="text-lg font-semibold">Filters</h2>
+          <div class="flex items-center gap-3">
+            <button
+              id="browse-filter-close"
+              type="button"
+              phx-click={JS.hide(to: "#browse-filter-panel")}
+              class="text-foreground-primary rounded-md px-2 py-1.5 text-sm hover:bg-white/8"
+              aria-label="Close filters without applying changes"
+            >
+              Close
+            </button>
+            <h2 id="browse-filter-title" class="text-lg font-semibold">Filters</h2>
+          </div>
           <div class="flex items-center gap-4">
             <.link
               :if={@payload.filters_active?}
@@ -171,7 +186,12 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
             >
               Clear all
             </.link>
-            <button type="submit" class="text-foreground-primary text-sm font-semibold">
+            <button
+              id="browse-filter-done"
+              type="submit"
+              phx-click={JS.hide(to: "#browse-filter-panel")}
+              class="text-foreground-primary text-sm font-semibold"
+            >
               Done
             </button>
           </div>

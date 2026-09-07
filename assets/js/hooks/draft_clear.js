@@ -13,6 +13,9 @@ const DraftClear = {
     this._onClick = () => {
       const key = this.el.dataset.draftKey
       if (!key) return
+      // Stop the matching editor's pending save before clearing storage, so
+      // its timer or teardown cannot write the deleted draft back.
+      window.dispatchEvent(new CustomEvent("kaguya:markdown-draft-clear", {detail: {key}}))
       try {
         window.localStorage.removeItem(key)
       } catch (_error) {

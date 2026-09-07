@@ -103,13 +103,13 @@ const AnchoredPopover = {
       if (this.el.matches(":popover-open")) placePanel(this.el, this.anchor, this.opts)
     }
 
-    this._onToggle = (event) => {
-      const open = event.newState === "open"
+    this._syncState = () => {
+      const open = this.el.matches(":popover-open")
       if (this.anchor) {
         this.anchor.setAttribute("aria-expanded", open ? "true" : "false")
         this.anchor.dataset.state = open ? "open" : "closed"
       }
-      if (open) {
+      if (open && this.anchor) {
         if (this.opts.matchWidth && this.anchor) {
           this.el.style.width = `${this.anchor.offsetWidth}px`
         }
@@ -126,18 +126,22 @@ const AnchoredPopover = {
         window.removeEventListener("resize", this._reposition)
       }
     }
+    this._onToggle = () => this._syncState()
 
     this._onClick = (event) => {
       if (event.target.closest("[data-menu-dismiss]")) this.el.hidePopover()
     }
 
-    // The hook owns data-state on the trigger (the server template does NOT
-    // render it) — otherwise a server patch while the menu is open would
-    // revert data-state=open back to closed via morphdom.
-    if (this.anchor) this.anchor.dataset.state = "closed"
-
     this.el.addEventListener("toggle", this._onToggle)
     this.el.addEventListener("click", this._onClick)
+    this._syncState()
+  },
+
+  updated() {
+    // LiveView patches the menu content and can restore its initial hidden
+    // style without changing the browser's open state (or firing toggle).
+    this.anchor = document.getElementById(this.el.dataset.anchor)
+    this._syncState()
   },
 
   destroyed() {

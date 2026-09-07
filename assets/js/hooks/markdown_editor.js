@@ -13,6 +13,12 @@ const MarkdownEditor = {
     // close, or a dropped connection never loses a long-form review. The
     // comment composer omits the attribute and behaves exactly as before.
     this.draftKey = this.el.dataset.draftKey || null
+    this._onDraftClear = event => {
+      if (!this.draftKey || event.detail?.key !== this.draftKey) return
+      clearTimeout(this._draftTimer)
+      this._draftTimer = null
+    }
+    window.addEventListener("kaguya:markdown-draft-clear", this._onDraftClear)
     this._onInput = () => {
       this._sync()
       this._scheduleDraftSave()
@@ -106,6 +112,7 @@ const MarkdownEditor = {
     this.el.removeEventListener("click", this._onClick)
     this.el.removeEventListener("focusin", this._onFocusIn)
     this.el.removeEventListener("kaguya:reply-input-cancel", this._onCancel)
+    window.removeEventListener("kaguya:markdown-draft-clear", this._onDraftClear)
   },
 
   _bindTextarea() {
@@ -184,7 +191,10 @@ const MarkdownEditor = {
   _scheduleDraftSave() {
     if (!this.draftKey) return
     clearTimeout(this._draftTimer)
-    this._draftTimer = setTimeout(() => this._saveDraft(), 400)
+    this._draftTimer = setTimeout(() => {
+      this._draftTimer = null
+      this._saveDraft()
+    }, 400)
   },
 
   _saveDraft() {
