@@ -123,7 +123,9 @@ defmodule KaguyaWeb.Policies.Content do
 
       A developer makes the work. A publisher releases it. One company can do both, and a translated edition can have a different publisher from the original.
 
-      Creating a producer page doesn't link it to a VN automatically. Add that relationship from the VN editor, using the credit for the work you're editing.
+      Creating a producer page doesn't link it to a VN automatically. Open the VN editor, go to Releases and producers, and add them to the relevant release as Developer, Publisher, or both. If there are no releases yet, add the first one there.
+
+      When creating a VN, you can select its developer in the same form. Its initial release is saved with it. For an ongoing VN, update the existing release as new versions arrive; you don't need a separate entry for every version. Use another release for a distinct edition, such as a translation or platform release.
 
       ## Official links
 

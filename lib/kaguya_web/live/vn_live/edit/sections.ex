@@ -3,7 +3,156 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
 
   use KaguyaWeb, :html
 
+  import KaguyaWeb.UI.Input, only: [input: 1]
+
   alias KaguyaWeb.VNLive.Edit.Form
+
+  def releases_section(assigns) do
+    assigns = assign(assigns, :roles, Kaguya.Producers.Credits.roles())
+
+    ~H"""
+    <section id="vn-edit-releases" class="scroll-mt-24 lg:scroll-mt-28">
+      <h2 class="border-border-divider text-foreground-primary mb-4 border-b pb-2 text-lg font-medium">
+        Releases and producers
+      </h2>
+
+      <p class="text-foreground-secondary mb-4 text-sm">
+        Credit the developer and publisher for each edition. For an ongoing VN, update its existing release;
+        a new version doesn't need a separate entry. Add another release for a distinct edition, such as a translation or platform release.
+      </p>
+
+      <p :if={@creating} class="text-foreground-secondary mb-4 text-sm">
+        Your initial release is saved with this VN. Its title defaults to the VN title.
+      </p>
+
+      <p
+        :if={@form["releases"] == []}
+        id="vn-releases-empty"
+        class="text-foreground-secondary mb-3 text-sm"
+      >
+        No releases yet. Add the first release to credit its producers.
+      </p>
+
+      <div
+        :for={release <- @form["releases"]}
+        id={"vn-release-#{release["key"]}"}
+        class="border-border-divider mb-4 space-y-3 rounded-lg border p-4"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-foreground-primary font-medium">
+            {if release["id"], do: release["title"], else: "New release"}
+          </h3>
+
+          <button
+            :if={!release["id"] and !@creating}
+            id={"discard-release-#{release["key"]}"}
+            type="button"
+            phx-click="discard_release"
+            phx-value-release={release["key"]}
+            class="text-foreground-secondary text-sm underline"
+          >Discard</button>
+        </div>
+
+        <.link
+          :if={release["revision_id"]}
+          href={~p"/vn/#{@slug}/release/#{release["id"]}/history/#{release["revision_id"]}"}
+          target="_blank"
+          class="text-foreground-link text-sm underline"
+        >Release history (opens in a new tab)</.link>
+        <p :if={release["locked"]} class="text-foreground-secondary text-sm">
+          This release is locked for editing.
+        </p>
+
+        <fieldset disabled={release["locked"]} class="space-y-3">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="text-foreground-secondary flex flex-col gap-1 text-sm"><span>Release title</span><.input
+              id={"release-title-#{release["key"]}"}
+              type="text"
+              name={"vn[releases][#{release["key"]}][title]"}
+              value={release["title"]}
+              placeholder="Same as VN title"
+              maxlength="1000"
+            /></label>
+            <label class="text-foreground-secondary flex flex-col gap-1 text-sm"><span>Release date (optional)</span><.input
+              id={"release-date-#{release["key"]}"}
+              type="date"
+              name={"vn[releases][#{release["key"]}][release_date]"}
+              value={release["release_date"]}
+            /></label>
+          </div>
+
+          <div
+            :for={credit <- release["producers"]}
+            id={"release-credit-#{credit["key"]}"}
+            class="flex flex-wrap items-center gap-3"
+          >
+            <span class="text-foreground-primary flex-1">{credit["name"]}</span>
+            <label class="text-foreground-secondary flex flex-col gap-1 text-sm"><span>Role</span><select
+              id={"credit-role-#{credit["key"]}"}
+              name={"vn[releases][#{release["key"]}][producers][#{credit["key"]}][role]"}
+              class="bg-surface-elevated border-border-divider rounded-lg border px-3 py-2 text-sm"
+            ><option :for={{label, value} <- @roles} value={value} selected={value == credit["role"]}>
+              {label}
+            </option></select></label>
+            <button
+              id={"remove-credit-#{credit["key"]}"}
+              type="button"
+              phx-click="remove_producer"
+              phx-value-release={release["key"]}
+              phx-value-credit={credit["key"]}
+              class="text-foreground-secondary text-sm underline"
+            >Remove</button>
+          </div>
+
+          <label class="text-foreground-secondary flex flex-col gap-1 text-sm"><span>Add a producer</span><.input
+            id={"producer-search-#{release["key"]}"}
+            type="text"
+            name="producer_query"
+            value={if @active_key == release["key"], do: @query, else: ""}
+            placeholder="Search by name"
+            phx-change="search_producers"
+            phx-value-release={release["key"]}
+            phx-debounce="250"
+            data-unsaved-ignore
+          /></label>
+          <div :if={@active_key == release["key"]} id={"producer-results-#{release["key"]}"}>
+            <button
+              :for={producer <- @results}
+              id={"add-producer-#{release["key"]}-#{producer.id}"}
+              type="button"
+              phx-click="add_producer"
+              phx-value-release={release["key"]}
+              phx-value-id={producer.id}
+              class="hover:bg-surface-elevated text-foreground-primary block w-full rounded-lg px-3 py-2 text-left text-sm"
+            >{producer.name}</button>
+            <p
+              :if={String.length(@query) >= 2 and @results == []}
+              class="text-foreground-secondary text-sm"
+            >
+              No matching producers.
+            </p>
+          </div>
+        </fieldset>
+      </div>
+
+      <button
+        :if={!@creating}
+        id="add-vn-release"
+        type="button"
+        phx-click="add_release"
+        class="border-border-divider text-foreground-primary rounded-lg border px-3 py-2 text-sm"
+      >Add release</button>
+      <p class="text-foreground-secondary mt-3 text-sm">
+        Missing a producer? <.link
+          id="vn-create-producer"
+          href={~p"/contribute/producer"}
+          target="_blank"
+          class="text-foreground-link underline"
+        >Create one in a new tab</.link>, then search again.
+      </p>
+    </section>
+    """
+  end
 
   def title_section(assigns) do
     ~H"""

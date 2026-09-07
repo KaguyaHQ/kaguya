@@ -9,7 +9,8 @@ defmodule KaguyaWeb.VNLive.Edit do
   alias Kaguya.VisualNovels
 
   alias KaguyaWeb.Components.Shared.NotFoundPage
-  alias KaguyaWeb.VNLive.Edit.{Form, Uploads, Sections}
+  alias KaguyaWeb.VNLive.Edit.{Form, Uploads, Sections, ReleaseForm}
+  alias Kaguya.VisualNovels.Contributions
 
   @accepted_image_exts ~w(.jpg .jpeg .png .webp)
   @max_vn_image_size 10_000_000
@@ -31,6 +32,9 @@ defmodule KaguyaWeb.VNLive.Edit do
        form: Form.empty_form(),
        dirty_fields: [],
        dirty_count: 0,
+       producer_query: "",
+       producer_results: [],
+       producer_release_key: nil,
        relation_query: "",
        relation_results: [],
        create_step: :form,
@@ -143,7 +147,11 @@ defmodule KaguyaWeb.VNLive.Edit do
             revisions = Revisions.list_revisions(:visual_novel, vn.id, limit: 10)
             {:ok, covers} = Covers.list_covers_for_vn(vn.id, current_user.id)
             {:ok, screenshots} = Screenshots.list_screenshots_for_vn(vn.id, current_user.id)
-            original_form = Form.from_visual_novel(vn, covers, screenshots)
+
+            original_form =
+              Form.from_visual_novel(vn, covers, screenshots)
+              |> Map.put("releases", ReleaseForm.load(vn.id, current_user))
+
             latest_revision = Revisions.latest_revision_number(:visual_novel, vn.id)
 
             cond do
@@ -234,7 +242,7 @@ defmodule KaguyaWeb.VNLive.Edit do
       |> String.trim()
 
     if mode != nil and title != "" do
-      form = form_for_mode(mode, title)
+      form = form_for_mode(mode, title) |> Map.put("releases", [ReleaseForm.new()])
 
       {:noreply,
        socket
@@ -248,6 +256,61 @@ defmodule KaguyaWeb.VNLive.Edit do
   @impl true
   def handle_event("back_to_fork", _params, socket) do
     {:noreply, assign(socket, :create_step, :fork)}
+  end
+
+  @impl true
+  def handle_event("search_producers", params, socket) do
+    query = normalize_text(Map.get(params, "producer_query", ""))
+    key = Map.get(params, "release")
+
+    {:noreply,
+     assign(socket,
+       producer_query: query,
+       producer_release_key: key,
+       producer_results: Kaguya.Producers.Credits.search(query)
+     )}
+  end
+
+  @impl true
+  def handle_event("add_producer", %{"id" => id, "release" => key}, socket) do
+    producer = Enum.find(socket.assigns.producer_results, &(&1.id == id))
+
+    if producer && socket.assigns.producer_release_key == key do
+      socket = update_release_form(socket, key, &ReleaseForm.add_producer(&1, producer))
+      {:noreply, assign(socket, producer_query: "", producer_results: [])}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_producer", %{"release" => key, "credit" => credit}, socket) do
+    {:noreply,
+     update_release_form(socket, key, fn r ->
+       Map.update!(r, "producers", &Enum.reject(&1, fn p -> p["key"] == credit end))
+     end)}
+  end
+
+  @impl true
+  def handle_event("add_release", _, socket) do
+    if socket.assigns.state in [:editing, :creating] do
+      form = Map.update!(socket.assigns.form, "releases", &(&1 ++ [ReleaseForm.new()]))
+      {:noreply, assign_form(socket, form)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("discard_release", %{"release" => key}, socket) do
+    form =
+      Map.update!(
+        socket.assigns.form,
+        "releases",
+        &Enum.reject(&1, fn r -> r["key"] == key and is_nil(r["id"]) end)
+      )
+
+    {:noreply, assign_form(socket, form)}
   end
 
   @impl true
@@ -340,12 +403,27 @@ defmodule KaguyaWeb.VNLive.Edit do
     end
   end
 
+  defp update_release_form(socket, key, fun) do
+    if socket.assigns.state in [:editing, :creating] do
+      form =
+        Map.update!(socket.assigns.form, "releases", fn releases ->
+          Enum.map(releases, fn r ->
+            if r["key"] == key and not r["locked"], do: fun.(r), else: r
+          end)
+        end)
+
+      assign_form(socket, form)
+    else
+      socket
+    end
+  end
+
   defp save_new(socket, form) do
     with {:ok, current_user} <- require_creator(socket),
          {:ok, _titles, summary} <- Form.validate(form) do
       attrs = Form.to_create_attrs(form)
 
-      case Revisions.create_entity(:visual_novel, attrs, summary, current_user) do
+      case Contributions.create(attrs, ReleaseForm.edits(form["releases"]), summary, current_user) do
         {:ok, %{entity: vn}} ->
           {:noreply,
            socket
@@ -367,14 +445,14 @@ defmodule KaguyaWeb.VNLive.Edit do
          {:ok, _titles, summary} <- Form.validate(form),
          {:ok, uploaded_form} <- Uploads.finalize_pending_uploads(socket, form),
          changes <- Form.build_changes(socket.assigns.original_form, uploaded_form),
-         :ok <- ensure_changes_present(changes) do
-      case Revisions.submit_edit(
-             :visual_novel,
+         :ok <- ensure_changes_present(changes, ReleaseForm.edits(uploaded_form["releases"])) do
+      case Contributions.update(
              socket.assigns.vn.id,
              changes,
+             ReleaseForm.edits(uploaded_form["releases"]),
              summary,
              socket.assigns.current_user,
-             base_revision: socket.assigns.base_revision
+             socket.assigns.base_revision
            ) do
         {:ok, _change} ->
           {:noreply,
@@ -387,13 +465,9 @@ defmodule KaguyaWeb.VNLive.Edit do
           {:noreply,
            socket
            |> assign_form(uploaded_form)
-           |> assign(
-             :base_revision,
-             Revisions.latest_revision_number(:visual_novel, socket.assigns.vn.id)
-           )
            |> put_flash(
              :error,
-             "This page was updated by someone else. Review your edits and submit again."
+             "This VN or one of its releases was updated by someone else. Copy your edits, then reload to review the latest version."
            )}
 
         {:error, reason} ->
@@ -674,6 +748,15 @@ defmodule KaguyaWeb.VNLive.Edit do
               title_category_options={@title_category_options}
             />
 
+            <Sections.releases_section
+              form={@form}
+              query={@producer_query}
+              results={@producer_results}
+              active_key={@producer_release_key}
+              slug={@slug}
+              creating={@state == :creating}
+            />
+
             <Sections.relations_section
               form={@form}
               relation_query={@relation_query}
@@ -815,10 +898,10 @@ defmodule KaguyaWeb.VNLive.Edit do
   defp current_vn_id(%{assigns: %{vn: %{id: id}}}), do: id
   defp current_vn_id(_socket), do: nil
 
-  defp ensure_changes_present(%{} = changes) when map_size(changes) == 0,
+  defp ensure_changes_present(%{} = changes, []) when map_size(changes) == 0,
     do: {:error, "No changes detected."}
 
-  defp ensure_changes_present(_changes), do: :ok
+  defp ensure_changes_present(_changes, _releases), do: :ok
 
   defp edit_state(socket, state, vn, revisions, latest_revision, original_form) do
     page_title =
@@ -974,6 +1057,7 @@ defmodule KaguyaWeb.VNLive.Edit do
     [
       {"Titles", "vn-edit-title"},
       {"General", "vn-edit-general"},
+      {"Releases and producers", "vn-edit-releases"},
       {"Relations", "vn-edit-relations"}
     ]
   end
@@ -982,6 +1066,7 @@ defmodule KaguyaWeb.VNLive.Edit do
     [
       {"Titles", "vn-edit-title"},
       {"General", "vn-edit-general"},
+      {"Releases and producers", "vn-edit-releases"},
       {"Relations", "vn-edit-relations"},
       {"Screenshots", "vn-edit-screenshots"},
       {"Covers", "vn-edit-covers"}

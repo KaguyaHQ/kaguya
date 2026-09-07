@@ -22,6 +22,7 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       "summary" => "",
       "titles" => [empty_title()],
       "relations" => [],
+      "releases" => [],
       "screenshots" => [],
       "covers" => [],
       "is_hidden" => false,
@@ -59,6 +60,7 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
           }
         end)
         |> ensure_titles_present(vn),
+      "releases" => [],
       "relations" =>
         vn.vn_relations
         |> Enum.sort_by(fn relation ->
@@ -119,6 +121,11 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
         normalize_text(Map.get(attrs, "primary_cover_id", current_form["primary_cover_id"])),
       "summary" => normalize_text(Map.get(attrs, "summary", current_form["summary"])),
       "titles" => normalize_titles(Map.get(attrs, "titles"), current_form["titles"]),
+      "releases" =>
+        KaguyaWeb.VNLive.Edit.ReleaseForm.normalize(
+          Map.get(attrs, "releases"),
+          current_form["releases"] || []
+        ),
       "relations" => normalize_relations(Map.get(attrs, "relations"), current_form["relations"]),
       "screenshots" =>
         normalize_screenshots(Map.get(attrs, "screenshots"), current_form["screenshots"]),
@@ -228,6 +235,11 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       end)
 
     scalar_labels
+    |> then(fn labels ->
+      if KaguyaWeb.VNLive.Edit.ReleaseForm.dirty?(form["releases"] || []),
+        do: ["releases and producers" | labels],
+        else: labels
+    end)
     |> maybe_add_changed_label(
       "relations",
       relation_changes(form["relations"]),

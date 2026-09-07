@@ -317,7 +317,7 @@ defmodule KaguyaWeb.VNLive.EditTest do
     assert html =~ "No changes detected."
   end
 
-  test "updates base revision and reports conflict on stale edits", %{conn: conn} do
+  test "keeps rejecting stale edits until the editor reloads", %{conn: conn} do
     user = insert_user!()
     vn = insert_vn!("Conflict VN", "conflict-vn")
     insert_title!(vn, "ja", "Conflict VN")
@@ -356,7 +356,9 @@ defmodule KaguyaWeb.VNLive.EditTest do
         }
       })
 
-    assert html =~ "This page was updated by someone else. Review your edits and submit again."
+    assert html =~
+             "This VN or one of its releases was updated by someone else. Copy your edits, then reload to review the latest version."
+
     assert expected_revision == Revisions.latest_revision_number(:visual_novel, vn.id)
 
     view
@@ -376,7 +378,7 @@ defmodule KaguyaWeb.VNLive.EditTest do
       }
     })
 
-    assert_redirected(view, "/vn/#{vn.slug}")
+    assert Repo.get!(VisualNovel, vn.id).description == "External change"
   end
 
   @tag :requires_image

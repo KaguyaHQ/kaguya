@@ -52,7 +52,7 @@ defmodule Kaguya.Sync.DumpSync.Releases do
           vndb: vndb,
           dry_run: dry_run,
           vn_mapping: vn_mapping,
-          producer_mapping: producer_mapping
+          producer_mapping: _producer_mapping
         } = ctx
       ) do
     Logger.info("Loading releases from VNDB dump...")
@@ -132,17 +132,12 @@ defmodule Kaguya.Sync.DumpSync.Releases do
       updated_rel_count = total_releases - new_rel_count
 
       # Derive VN-producer junctions from release producers
-      protected_vn_uuids = SyncProtection.user_edited_ids(:visual_novel)
-
       {producer_count, new_prod_count} =
         sync_vn_producers(
-          vndb,
           release_ids,
           release_vn_map,
           vn_mapping,
-          producer_mapping,
-          existing_vn_producers,
-          protected_vn_uuids
+          existing_vn_producers
         )
 
       Report.record(:releases, new_rel_count, updated_rel_count, Enum.uniq(new_rel_ids))
@@ -493,110 +488,31 @@ defmodule Kaguya.Sync.DumpSync.Releases do
 
   # ── VN-Producer Junctions from Release Data ─────────────────────────────────
 
-  defp sync_vn_producers(
-         vndb,
-         release_ids,
-         release_vn_map,
-         vn_mapping,
-         producer_mapping,
-         existing_vn_producers,
-         protected_vn_uuids
-       ) do
-    now = DumpSync.now()
-
-    # Load all release producers with release dates in chunks
-    producer_rows =
+  defp sync_vn_producers(release_ids, release_vn_map, vn_mapping, existing) do
+    vn_ids =
       release_ids
-      |> Enum.chunk_every(5000)
-      |> Enum.flat_map(fn chunk ->
-        placeholders = Enum.map_join(1..length(chunk), ", ", &"$#{&1}")
+      |> Enum.flat_map(&Map.get(release_vn_map, &1, []))
+      |> Enum.map(fn {vid, _} -> Map.get(vn_mapping, vid) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
 
-        DumpSync.query_vndb_raw!(
-          vndb,
-          """
-          SELECT rp.id, rp.pid, rp.developer, rp.publisher, r.released
-          FROM releases_producers rp
-          JOIN releases r ON r.id = rp.id
-          WHERE rp.id IN (#{placeholders})
-          """,
-          chunk
+    # Release rows have already passed SyncProtection. Deriving from the raw
+    # dump here would overwrite protected user credits and omit local releases.
+    Kaguya.Releases.Credits.recompute(vn_ids)
+
+    pairs =
+      vn_ids
+      |> Enum.chunk_every(500)
+      |> Enum.flat_map(fn ids ->
+        Kaguya.Repo.all(
+          from(p in VNProducer,
+            where: p.visual_novel_id in ^ids,
+            select: {p.visual_novel_id, p.producer_id}
+          )
         )
       end)
 
-    # Build VN-producer entries with role and release date
-    vn_producer_entries =
-      Enum.flat_map(producer_rows, fn [release_id, pid, is_dev, is_pub, released] ->
-        vn_vndb_ids = Map.get(release_vn_map, release_id, [])
-        producer_uuid = Map.get(producer_mapping, pid)
-
-        if producer_uuid do
-          Enum.flat_map(vn_vndb_ids, fn {vid, _rtype} ->
-            with vn_uuid when not is_nil(vn_uuid) <- Map.get(vn_mapping, vid),
-                 false <- MapSet.member?(protected_vn_uuids, vn_uuid) do
-              role =
-                cond do
-                  is_dev and is_pub -> "developer_publisher"
-                  is_dev -> "developer"
-                  is_pub -> "publisher"
-                  true -> "publisher"
-                end
-
-              release_date = if is_dev, do: DumpSync.parse_vndb_date(released), else: nil
-              [{vn_uuid, producer_uuid, role, release_date}]
-            else
-              _ -> []
-            end
-          end)
-        else
-          []
-        end
-      end)
-      # Deduplicate, preferring developer roles and tracking earliest dev release
-      |> Enum.group_by(fn {vn, prod, _role, _date} -> {vn, prod} end)
-      |> Enum.map(fn {{vn, prod}, entries} ->
-        roles = entries |> Enum.map(fn {_, _, role, _} -> role end) |> Enum.uniq()
-
-        role =
-          cond do
-            "developer_publisher" in roles -> "developer_publisher"
-            "developer" in roles and "publisher" in roles -> "developer_publisher"
-            "developer" in roles -> "developer"
-            true -> "publisher"
-          end
-
-        earliest =
-          entries
-          |> Enum.map(fn {_, _, _, date} -> date end)
-          |> Enum.reject(&is_nil/1)
-          |> Enum.min(Date, fn -> nil end)
-
-        {vn, prod, role, earliest}
-      end)
-
-    new_count =
-      Enum.count(vn_producer_entries, fn {vn, prod, _role, _date} ->
-        not MapSet.member?(existing_vn_producers, {vn, prod})
-      end)
-
-    insert_rows =
-      Enum.map(vn_producer_entries, fn {vn_uuid, prod_uuid, role, earliest} ->
-        %{
-          visual_novel_id: vn_uuid,
-          producer_id: prod_uuid,
-          role: role,
-          earliest_release_date: earliest,
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
-
-    total =
-      DumpSync.chunked_insert(VNProducer, insert_rows,
-        on_conflict: {:replace, [:role, :earliest_release_date, :updated_at]},
-        conflict_target: [:visual_novel_id, :producer_id]
-      )
-
-    {total, new_count}
+    {length(pairs), Enum.count(pairs, &(not MapSet.member?(existing, &1)))}
   end
 
   # ── Data Loading from VNDB Dump ─────────────────────────────────────────────

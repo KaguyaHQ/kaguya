@@ -8,7 +8,6 @@ defmodule Kaguya.Releases do
   import Ecto.Query
   alias Kaguya.Repo
   alias Kaguya.Releases.{Release, ReleaseExtlink}
-  alias Kaguya.Producers.VNProducer
   alias Kaguya.Sync.VndbStorefrontMapper
 
   # ============================================================================
@@ -153,92 +152,19 @@ defmodule Kaguya.Releases do
 
   # Only recompute vn_producers when producers field was actually changed
   defp maybe_recompute_vn_producers(vn_id, changes) do
-    if Map.has_key?(changes, :producers) or Map.has_key?(changes, "producers") do
+    if Enum.any?([:producers, :release_date, :hidden_at], &Map.has_key?(changes, &1)) do
       recompute_vn_producers(vn_id)
     else
       :ok
     end
   end
 
-  # Recomputes vn_producers for a VN from all its releases' producers JSONB.
-  # Handles both sync-imported format (vndb_id + name) and user format (producer_id).
-  # For sync-imported producers, resolves vndb_id → internal UUID via producers table.
   defp recompute_vn_producers(nil), do: :ok
 
   defp recompute_vn_producers(vn_id) do
-    # Serialize concurrent edits on the same VN so two release edits don't
-    # both delete_all + insert_all on vn_producers and leave a half-state.
-    # Reentrant within the caller's transaction; same lock-key family as
-    # Revisions.create_change/7 so visual_novel edits and release edits
-    # exclude each other on the same VN.
-    Repo.query!(
-      "SELECT pg_advisory_xact_lock(hashtext($1))",
-      ["visual_novel:#{vn_id}"]
-    )
-
-    releases =
-      from(r in Release,
-        where: r.visual_novel_id == ^vn_id,
-        select: {r.producers, r.release_date}
-      )
-      |> Repo.all()
-
-    # Batch-resolve all vndb_ids to internal UUIDs in one query
-    vndb_id_map = build_vndb_id_map(releases)
-
-    producer_map =
-      Enum.reduce(releases, %{}, fn {producers, release_date}, acc ->
-        Enum.reduce(producers || [], acc, fn producer, inner_acc ->
-          pid = resolve_producer_id(producer, vndb_id_map)
-          is_dev = get_flag(producer, :developer, "developer")
-          is_pub = get_flag(producer, :publisher, "publisher")
-
-          if pid do
-            existing =
-              Map.get(inner_acc, pid, %{developer: false, publisher: false, earliest_date: nil})
-
-            Map.put(inner_acc, pid, %{
-              developer: existing.developer || is_dev,
-              publisher: existing.publisher || is_pub,
-              earliest_date: earliest(existing.earliest_date, release_date)
-            })
-          else
-            inner_acc
-          end
-        end)
-      end)
-
-    from(vp in VNProducer, where: vp.visual_novel_id == ^vn_id) |> Repo.delete_all()
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    rows =
-      Enum.map(producer_map, fn {producer_id, info} ->
-        role =
-          case {info.developer, info.publisher} do
-            {true, true} -> "both"
-            {true, false} -> "developer"
-            {false, true} -> "publisher"
-            _ -> "developer"
-          end
-
-        %{
-          visual_novel_id: vn_id,
-          producer_id: producer_id,
-          role: role,
-          earliest_release_date: info.earliest_date,
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
-
-    if rows != [], do: Repo.insert_all(VNProducer, rows)
-
-    # Search index lives on the VN, so producer changes need a reindex —
-    # otherwise browse / search filtering by producer keeps showing the
-    # pre-change set until the next dump-sync or VN edit. Best-effort and
-    # async to S3-backed Meilisearch — never block the txn on it.
+    Kaguya.Releases.Credits.recompute([vn_id])
+    Kaguya.VisualNovels.VNPageCache.invalidate(vn_id)
     reindex_vn_search(vn_id)
-
     :ok
   end
 
@@ -261,44 +187,6 @@ defmodule Kaguya.Releases do
         "[Releases] Meilisearch reindex failed for VN #{vn_id} after vn_producers recompute: #{Exception.message(e)}"
       )
   end
-
-  # Resolves producer IDs from all releases in one batch query.
-  # User-created releases store producer_id (our UUID).
-  # Sync-imported releases store vndb_id (e.g. "p146") — resolved via producers table.
-  defp resolve_producer_id(producer, vndb_id_map) do
-    Map.get(producer, :producer_id) ||
-      Map.get(producer, "producer_id") ||
-      Map.get(vndb_id_map, Map.get(producer, "vndb_id"))
-  end
-
-  defp build_vndb_id_map(releases) do
-    vndb_ids =
-      releases
-      |> Enum.flat_map(fn {producers, _} ->
-        Enum.map(producers || [], &Map.get(&1, "vndb_id"))
-      end)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
-
-    if vndb_ids == [] do
-      %{}
-    else
-      from(p in Kaguya.Producers.Producer,
-        where: p.vndb_id in ^vndb_ids,
-        select: {p.vndb_id, p.id}
-      )
-      |> Repo.all()
-      |> Map.new()
-    end
-  end
-
-  defp get_flag(map, atom_key, string_key) do
-    Map.get(map, atom_key) || Map.get(map, string_key) || false
-  end
-
-  defp earliest(nil, date), do: date
-  defp earliest(date, nil), do: date
-  defp earliest(d1, d2), do: if(Date.compare(d1, d2) == :lt, do: d1, else: d2)
 
   defp pick_available_on_links(rows) do
     rows

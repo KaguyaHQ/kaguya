@@ -55,6 +55,8 @@ defmodule Kaguya.Revisions do
     with {:ok, context} <- fetch_context(entity_type) do
       result =
         Repo.transact(fn ->
+          lock_release_parent(entity_type, entity_id)
+
           with {:ok, original} <- fetch_entity(context, entity_id),
                changes <- sanitize_mod_fields(changes, user),
                :ok <- check_not_hidden(original, user),
@@ -250,6 +252,8 @@ defmodule Kaguya.Revisions do
 
       result =
         Repo.transact(fn ->
+          lock_release_parent(change.entity_type, change.entity_id)
+
           Repo.query!("SELECT pg_advisory_xact_lock(hashtext($1))", [
             advisory_lock_key(change.entity_type, change.entity_id)
           ])
@@ -1026,6 +1030,22 @@ defmodule Kaguya.Revisions do
   # ============================================================================
   # Private
   # ============================================================================
+
+  # Release writes also update their parent's derived credits. Always lock
+  # the VN before the release, matching the combined contribution transaction.
+  defp lock_release_parent(:release, id) do
+    case Repo.get(Kaguya.Releases.Release, id) do
+      %{visual_novel_id: vn_id} when not is_nil(vn_id) ->
+        Repo.query!("SELECT pg_advisory_xact_lock(hashtext($1))", [
+          advisory_lock_key(:visual_novel, vn_id)
+        ])
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp lock_release_parent(_, _), do: :ok
 
   defp fetch_entity(context, entity_id) do
     case context.get_for_edit(entity_id) do
