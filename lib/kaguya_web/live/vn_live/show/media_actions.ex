@@ -94,8 +94,20 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
           end
 
         case result do
-          {:ok, _} -> {:noreply, socket}
-          {:error, reason} -> {:noreply, put_flash(socket, :error, Data.format_error(reason))}
+          {:ok, _} when kind == :screenshot ->
+            featured = PageData.featured_screenshot(socket.assigns.public_vn.id)
+
+            {:noreply,
+             assign(socket,
+               public_vn: Map.put(socket.assigns.public_vn, :featured_screenshot, featured),
+               display_vn: Map.put(socket.assigns.display_vn, :featured_screenshot, featured)
+             )}
+
+          {:ok, _} ->
+            {:noreply, socket}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, Data.format_error(reason))}
         end
 
       _ ->

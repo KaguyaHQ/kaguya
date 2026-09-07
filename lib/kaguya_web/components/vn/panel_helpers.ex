@@ -84,6 +84,8 @@ defmodule KaguyaWeb.VN.PanelHelpers do
     required: true,
     doc: "Used in aria-label, e.g. \"cover\" or \"screenshot\"."
 
+  attr :id_prefix, :string, default: "media-like"
+
   def media_like_button(assigns) do
     assigns =
       assigns
@@ -98,7 +100,7 @@ defmodule KaguyaWeb.VN.PanelHelpers do
     <div class="pointer-events-none absolute top-1.5 right-1.5 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 lg:top-2 lg:right-2">
       <button
         :if={@is_logged_in}
-        id={"media-like-#{@value_key}-#{Map.get(@media, :id)}"}
+        id={"#{@id_prefix}-#{@value_key}-#{Map.get(@media, :id)}"}
         type="button"
         phx-hook="LikeButton"
         phx-click={@event}
@@ -131,7 +133,7 @@ defmodule KaguyaWeb.VN.PanelHelpers do
 
       <button
         :if={!@is_logged_in}
-        id={"media-like-#{@value_key}-#{Map.get(@media, :id)}"}
+        id={"#{@id_prefix}-#{@value_key}-#{Map.get(@media, :id)}"}
         type="button"
         phx-click={show_auth_prompt("vn-auth-prompt", "Sign in to like media")}
         aria-label={"Sign in to like #{@noun}"}

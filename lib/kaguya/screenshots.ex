@@ -9,7 +9,7 @@ defmodule Kaguya.Screenshots do
   alias Kaguya.VisualNovels.VisualNovel
   alias Kaguya.Screenshots.{Screenshot, ScreenshotLike}
   alias Kaguya.Activities
-  alias Kaguya.Cdn
+  alias Kaguya.VisualNovels.VNPageCache
 
   @doc """
   Like a screenshot. Idempotent — re-liking is a no-op.
@@ -44,7 +44,7 @@ defmodule Kaguya.Screenshots do
 
     with {:ok, {%Screenshot{} = screenshot, featured_changed}} <- result do
       record_liked_screenshot_activity(user_id, screenshot)
-      if featured_changed, do: purge_vn_cdn(screenshot.visual_novel_id)
+      if featured_changed, do: VNPageCache.invalidate(screenshot.visual_novel_id)
       {:ok, true}
     else
       {:ok, :already_liked} -> {:ok, true}
@@ -78,7 +78,7 @@ defmodule Kaguya.Screenshots do
 
     with {:ok, {:unliked, vn_id, featured_changed}} <- result do
       Activities.delete_activity(user_id, :liked_screenshot, "screenshot", screenshot_id)
-      if featured_changed, do: purge_vn_cdn(vn_id)
+      if featured_changed, do: VNPageCache.invalidate(vn_id)
       {:ok, true}
     else
       {:ok, :not_liked} -> {:ok, true}
@@ -303,10 +303,5 @@ defmodule Kaguya.Screenshots do
     else
       false
     end
-  end
-
-  defp purge_vn_cdn(vn_id) do
-    slug = Repo.one(from v in VisualNovel, where: v.id == ^vn_id, select: v.slug)
-    if slug, do: Cdn.purge_vn_cache(slug)
   end
 end

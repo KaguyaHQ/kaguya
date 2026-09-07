@@ -21,6 +21,7 @@ defmodule KaguyaWeb.VN.Panels.Screenshots do
   attr :show_nsfw, :boolean, default: false
   attr :show_brutal, :boolean, default: false
   attr :is_logged_in, :boolean, default: false
+  attr :id_prefix, :string, default: "media-like"
 
   def panel(assigns) do
     {visible, hidden_count} = partition(assigns.items, assigns.show_nsfw, assigns.show_brutal)
@@ -58,6 +59,7 @@ defmodule KaguyaWeb.VN.Panels.Screenshots do
             </button>
           </div>
           <.media_like_button
+            id_prefix={@id_prefix}
             media={screenshot}
             event="toggle_screenshot_like"
             value_key="screenshot-id"

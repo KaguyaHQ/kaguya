@@ -441,6 +441,15 @@ defmodule KaguyaWeb.VNLive.PageData do
       else: Screenshots.like_screenshot(screenshot_id, user_id)
   end
 
+  def featured_screenshot(vn_id) do
+    Repo.one(
+      from vn in VisualNovels.VisualNovel,
+        where: vn.id == ^vn_id,
+        select: vn.featured_screenshot_id
+    )
+    |> featured_screenshot_payload()
+  end
+
   def toggle_quote_like(quote_id, liked?, %{id: user_id}) do
     if liked?,
       do: Kaguya.Characters.Quotes.unlike_quote(quote_id, user_id),

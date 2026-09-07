@@ -347,8 +347,14 @@ defmodule KaguyaWeb.VNLive.Show do
   def handle_event("toggle_cover_like", params, socket),
     do: MediaActions.toggle_cover_like(socket, params)
 
-  def handle_event("toggle_screenshot_like", params, socket),
-    do: MediaActions.toggle_screenshot_like(socket, params)
+  def handle_event("toggle_screenshot_like", params, socket) do
+    {:noreply, socket} = MediaActions.toggle_screenshot_like(socket, params)
+
+    has_backdrop =
+      backdrop_image_url(socket.assigns.public_vn, socket.assigns.current_user) != nil
+
+    {:noreply, assign(socket, has_backdrop: has_backdrop, nav_transparent: has_backdrop)}
+  end
 
   def handle_event("open_media_lightbox", params, socket),
     do: MediaActions.open_media_lightbox(socket, params)

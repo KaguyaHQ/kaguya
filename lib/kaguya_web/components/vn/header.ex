@@ -601,6 +601,7 @@ defmodule KaguyaWeb.VN.Header do
           <Panels.Covers.panel items={items} is_logged_in={@is_logged_in} />
         <% {:ok, items} when @active_tab == :screenshots -> %>
           <Panels.Screenshots.panel
+            id_prefix={@id_prefix <> "-screenshot-like"}
             items={items}
             show_nsfw={Map.get(@current_user || %{}, :show_nsfw_screenshots, false)}
             show_brutal={Map.get(@current_user || %{}, :show_brutal_screenshots, false)}
