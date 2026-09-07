@@ -108,7 +108,7 @@ defmodule KaguyaWeb.VN.Panels.Screenshots do
           phx-value-url={image_src(screenshot, [:large, :medium, :small])}
           aria-label={"Open screenshot #{index + 1}"}
           class={[
-            "group overflow-hidden rounded-[3px] bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+            "group relative overflow-hidden rounded-[3px] bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
             index >= 6 && "hidden lg:block"
           ]}
         >
@@ -118,16 +118,20 @@ defmodule KaguyaWeb.VN.Panels.Screenshots do
             loading="lazy"
             class="aspect-video w-full object-cover transition duration-200 group-hover:scale-105 group-hover:brightness-110"
           />
+          <span
+            :if={index == 5 && @count > 6}
+            class="absolute right-1 bottom-1 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white lg:hidden"
+          >
+            <span class="sr-only">More screenshots: </span>+{@count - 6}
+          </span>
+          <span
+            :if={index == 11 && @count > 12}
+            class="absolute right-1 bottom-1 hidden rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white lg:block"
+          >
+            <span class="sr-only">More screenshots: </span>+{@count - 12}
+          </span>
         </button>
       </div>
-      <button
-        type="button"
-        phx-click="open_media_lightbox"
-        phx-value-kind="screenshots"
-        class="mt-2 text-[11px] text-[rgb(var(--foreground-tertiary))] transition hover:text-[rgb(var(--foreground-primary))]"
-      >
-        View all {@count} screenshots <span aria-hidden="true">→</span>
-      </button>
     </section>
     """
   end

@@ -1014,7 +1014,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
 
         <div
           data-media-stage
-          class="pointer-events-auto relative mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 items-center justify-center overflow-hidden px-1 py-2"
+          class="pointer-events-auto relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden px-1 py-2"
         >
           <figure class="relative flex max-h-full max-w-full items-center justify-center">
             <img
@@ -1029,29 +1029,28 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                 )
               ]}
             />
-
-            <button
-              :if={@media.count > 1}
-              type="button"
-              phx-click="previous_media"
-              data-modal-previous
-              class="absolute top-1/2 left-2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-black/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 sm:left-3 sm:size-11"
-              aria-label="Previous image"
-            >
-              <Lucide.chevron_left class="size-5" aria-hidden="true" />
-            </button>
-
-            <button
-              :if={@media.count > 1}
-              type="button"
-              phx-click="next_media"
-              data-modal-next
-              class="absolute top-1/2 right-2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-black/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 sm:right-3 sm:size-11"
-              aria-label="Next image"
-            >
-              <Lucide.chevron_right class="size-5" aria-hidden="true" />
-            </button>
           </figure>
+          <button
+            :if={@media.count > 1}
+            type="button"
+            phx-click="previous_media"
+            data-modal-previous
+            class="absolute top-1/2 left-0 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-black/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 sm:left-1"
+            aria-label="Previous image"
+          >
+            <Lucide.chevron_left class="size-5" aria-hidden="true" />
+          </button>
+
+          <button
+            :if={@media.count > 1}
+            type="button"
+            phx-click="next_media"
+            data-modal-next
+            class="absolute top-1/2 right-0 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-black/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70 sm:right-1"
+            aria-label="Next image"
+          >
+            <Lucide.chevron_right class="size-5" aria-hidden="true" />
+          </button>
         </div>
 
         <footer class="pointer-events-auto z-20 mx-auto flex w-full max-w-full flex-col gap-1 overflow-hidden rounded-2xl border border-white/10 bg-black/45 p-1.5 text-white shadow-2xl backdrop-blur-xl sm:w-fit">
