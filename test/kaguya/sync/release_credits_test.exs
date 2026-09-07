@@ -63,7 +63,9 @@ defmodule Kaguya.Sync.ReleaseCreditsTest do
                release.id,
                %{producers: [credit(corrected)]},
                "Correct the developer",
-               user, base_revision: 1)
+               user,
+               base_revision: 1
+             )
 
     # No VN revision protects this entry: this specifically exercises release protection.
     assert Revisions.latest_revision_number(:visual_novel, vn.id) == 0
