@@ -14,7 +14,6 @@ defmodule KaguyaWeb.SettingsLive.Index do
     "show_nsfw_images" => :show_nsfw_images,
     "show_nsfw_screenshots" => :show_nsfw_screenshots,
     "show_brutal_screenshots" => :show_brutal_screenshots,
-    "show_adjacent" => :show_adjacent,
     "show_nukige" => :show_nukige
   }
 
@@ -69,7 +68,7 @@ defmodule KaguyaWeb.SettingsLive.Index do
   def handle_event("toggle_preference", %{"field" => field}, socket) do
     user = socket.assigns.current_user
 
-    with pref when is_atom(pref) <- Map.get(@preference_fields, field),
+    with {:ok, pref} <- Map.fetch(@preference_fields, field),
          {:ok, updated} <- Users.update_user(user.id, %{pref => !Map.get(user, pref, false)}) do
       new_value = Map.get(updated, pref)
 
@@ -231,12 +230,6 @@ defmodule KaguyaWeb.SettingsLive.Index do
             Catalog
           </h4>
           <div class="divide-border-divider/30 divide-y">
-            <.preference_row
-              field="show_adjacent"
-              enabled={@current_user.show_adjacent}
-              title="Show VN hybrids"
-              description="Titles where gameplay is part of the work, not decoration"
-            />
             <.preference_row
               field="show_nukige"
               enabled={@current_user.show_nukige}
@@ -518,8 +511,6 @@ defmodule KaguyaWeb.SettingsLive.Index do
   defp preference_flash(:show_nsfw_screenshots, false), do: "NSFW screenshots are now hidden."
   defp preference_flash(:show_brutal_screenshots, true), do: "Brutal screenshots are now visible."
   defp preference_flash(:show_brutal_screenshots, false), do: "Brutal screenshots are now hidden."
-  defp preference_flash(:show_adjacent, true), do: "Hybrid titles are now visible."
-  defp preference_flash(:show_adjacent, false), do: "Hybrid titles are now hidden."
   defp preference_flash(:show_nukige, true), do: "Nukige titles are now visible."
   defp preference_flash(:show_nukige, false), do: "Nukige titles are now hidden."
 
@@ -541,7 +532,7 @@ defmodule KaguyaWeb.SettingsLive.Index do
   # Each cover/screenshot toggle writes a localStorage key
   # + html data-* attribute so the pre-paint script can suppress the blur
   # flash on the next hard reload, and other open tabs pick it up via the
-  # storage event. Nukige/adjacent are server-side-only — no client mirror.
+  # storage event. Nukige is server-side-only — no client mirror.
   defp maybe_push_client_pref(socket, :show_nsfw_images, value),
     do: push_event(socket, "kaguya:content-pref", %{nsfw_cover: !!value})
 

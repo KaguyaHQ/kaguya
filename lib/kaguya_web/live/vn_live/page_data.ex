@@ -868,14 +868,8 @@ defmodule KaguyaWeb.VNLive.PageData do
   defp require_can_edit(%{can_edit: false}), do: {:error, :permission_denied}
   defp require_can_edit(%{id: _}), do: :ok
 
-  defp recommendation_search_opts([:vn, :nukige, :adjacent]),
-    do: [include_nukige: true, include_adjacent: true]
-
   defp recommendation_search_opts(allowed) do
-    [
-      include_nukige: :nukige in allowed,
-      include_adjacent: :adjacent in allowed
-    ]
+    [include_nukige: :nukige in allowed]
   end
 
   defp readers_count(vn_id),

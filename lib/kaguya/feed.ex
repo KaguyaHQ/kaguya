@@ -31,10 +31,10 @@ defmodule Kaguya.Feed do
   hidden from non-owners.
 
   Options:
-    - `:allowed_categories` - list of title_category values to include (default: ["vn"])
+    - `:allowed_categories` - list of title_category values to include (default: [:vn, :adjacent])
   """
   def get_feed(viewer_id, cursor \\ nil, limit \\ 10, opts \\ []) do
-    allowed = Keyword.get(opts, :allowed_categories, [:vn])
+    allowed = Keyword.get(opts, :allowed_categories, [:vn, :adjacent])
 
     reviews_query =
       Review

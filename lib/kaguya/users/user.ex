@@ -35,6 +35,7 @@ defmodule Kaguya.Users.User do
     # join table; the changeset below never sees it.
     field :show_nsfw_images, :boolean, default: false
     field :show_nukige, :boolean, default: true
+    # Legacy preference retained for data compatibility; no longer filters titles.
     field :show_adjacent, :boolean, default: true
     field :show_nsfw_screenshots, :boolean, default: false
     field :show_brutal_screenshots, :boolean, default: false
@@ -78,7 +79,6 @@ defmodule Kaguya.Users.User do
       :vn_reviews_count,
       :show_nsfw_images,
       :show_nukige,
-      :show_adjacent,
       :show_nsfw_screenshots,
       :show_brutal_screenshots
     ])

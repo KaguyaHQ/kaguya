@@ -141,7 +141,7 @@ defmodule KaguyaWeb.BrowseLive.Data do
 
   def filters_active?(filters) do
     filters
-    |> Map.drop([:include_nukige, :include_adjacent])
+    |> Map.drop([:include_nukige])
     |> Enum.any?(fn
       {_key, nil} -> false
       {_key, []} -> false
@@ -195,8 +195,7 @@ defmodule KaguyaWeb.BrowseLive.Data do
 
   defp content_prefs(current_user) do
     %{
-      include_nukige: Map.get(current_user || %{}, :show_nukige, true),
-      include_adjacent: Map.get(current_user || %{}, :show_adjacent, true)
+      include_nukige: Map.get(current_user || %{}, :show_nukige, true)
     }
   end
 

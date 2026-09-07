@@ -28,6 +28,34 @@ defmodule KaguyaWeb.ProfileLive.LibraryTest do
   end
 
   describe "GET /@:username/library" do
+    test "another reader's library includes hybrids for a viewer with the retired preference off",
+         %{conn: conn} do
+      owner = UserFixtures.insert_user!()
+
+      viewer =
+        UserFixtures.insert_user!(show_nukige: false)
+        |> Ecto.Changeset.change(show_adjacent: false)
+        |> Repo.update!()
+
+      novels =
+        for category <- [:vn, :adjacent, :nukige], into: %{} do
+          vn =
+            insert_vn!("Public library #{category}")
+            |> Ecto.Changeset.change(title_category: category)
+            |> Repo.update!()
+
+          insert_status!(owner, vn, :read)
+          {category, vn}
+        end
+
+      conn = Plug.Test.init_test_session(conn, %{current_user_id: viewer.id})
+      {:ok, view, _html} = live(conn, "/@#{owner.username}/library")
+
+      assert has_element?(view, "#vns a[href='/vn/#{novels.vn.slug}']")
+      assert has_element?(view, "#vns a[href='/vn/#{novels.adjacent.slug}']")
+      refute has_element?(view, "#vns a[href='/vn/#{novels.nukige.slug}']")
+    end
+
     test "renders the toolbar and the user's VNs", %{conn: conn} do
       user = UserFixtures.insert_user!(username: "reader", display_name: "Reader")
       vn1 = insert_vn!("Steins;Gate")

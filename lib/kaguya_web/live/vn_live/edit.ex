@@ -846,10 +846,7 @@ defmodule KaguyaWeb.VNLive.Edit do
   defp relation_results(""), do: []
 
   defp relation_results(query) do
-    case VisualNovels.search_visual_novels(query, 1, 6,
-           include_nukige: true,
-           include_adjacent: true
-         ) do
+    case VisualNovels.search_visual_novels(query, 1, 6, include_nukige: true) do
       {:ok, %{items: items}} -> items
       %{} = result -> Map.get(result, :items, [])
       _ -> []

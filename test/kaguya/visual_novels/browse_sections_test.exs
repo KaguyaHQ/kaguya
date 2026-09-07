@@ -55,7 +55,7 @@ defmodule Kaguya.VisualNovels.BrowseSectionsTest do
       original_languages available_languages available_platforms engines
       vndb_rating_gte vndb_rating_lte average_rating_gte average_rating_lte
       ratings_count_gte ratings_count_lte released_after_year released_before_year
-      include_nukige include_adjacent has_ero available_on_stores free_on_stores is_avn
+      include_nukige has_ero available_on_stores free_on_stores is_avn
     )a
 
     test "every section's filter keys are cacheable" do

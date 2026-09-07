@@ -107,7 +107,7 @@ defmodule Kaguya.Activities do
         actions -> query |> where([a], a.action not in ^actions)
       end
 
-    allowed_categories = Keyword.get(opts, :allowed_categories, [:vn])
+    allowed_categories = Keyword.get(opts, :allowed_categories, [:vn, :adjacent])
     screenshot_prefs = Keyword.get(opts, :screenshot_prefs, %{})
 
     query
@@ -126,7 +126,7 @@ defmodule Kaguya.Activities do
   per `Kaguya.Activities.GroupedFeed`.
   """
   def list_global_activities(viewer_id \\ nil, cursor \\ nil, limit \\ 20, opts \\ []) do
-    allowed_categories = Keyword.get(opts, :allowed_categories, [:vn])
+    allowed_categories = Keyword.get(opts, :allowed_categories, [:vn, :adjacent])
     screenshot_prefs = Keyword.get(opts, :screenshot_prefs, %{})
     exclude_actions = Keyword.get(opts, :exclude_actions, [])
 
@@ -144,7 +144,7 @@ defmodule Kaguya.Activities do
   Lists home-feed activities from users the viewer follows, as grouped entries.
   """
   def list_following_activities(viewer_id, cursor \\ nil, limit \\ 20, opts \\ []) do
-    allowed_categories = Keyword.get(opts, :allowed_categories, [:vn])
+    allowed_categories = Keyword.get(opts, :allowed_categories, [:vn, :adjacent])
     screenshot_prefs = Keyword.get(opts, :screenshot_prefs, %{})
     exclude_actions = Keyword.get(opts, :exclude_actions, [])
 

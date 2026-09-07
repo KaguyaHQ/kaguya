@@ -214,11 +214,10 @@ defmodule Kaguya.VisualNovels do
 
   defp build_category_filter_opts(opts) do
     include_nukige = Keyword.get(opts, :include_nukige, false)
-    include_adjacent = Keyword.get(opts, :include_adjacent, false)
 
     allowed = ["vn"]
     allowed = if include_nukige, do: allowed ++ ["nukige"], else: allowed
-    allowed = if include_adjacent, do: allowed ++ ["adjacent"], else: allowed
+    allowed = allowed ++ ["adjacent"]
 
     if allowed == ["vn", "nukige", "adjacent"] do
       []

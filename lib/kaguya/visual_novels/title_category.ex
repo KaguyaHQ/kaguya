@@ -38,11 +38,10 @@ defmodule Kaguya.VisualNovels.TitleCategory do
     end
   end
 
-  @doc "Returns the list of allowed categories for a user's preferences."
+  @doc "Returns allowed categories, respecting the user's nukige preference."
   def allowed_categories(user) do
     cats = [:vn]
     cats = if Map.get(user, :show_nukige, false), do: cats ++ [:nukige], else: cats
-    cats = if Map.get(user, :show_adjacent, true), do: cats ++ [:adjacent], else: cats
-    cats
+    cats ++ [:adjacent]
   end
 end

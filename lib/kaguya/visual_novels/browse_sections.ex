@@ -68,16 +68,11 @@ defmodule Kaguya.VisualNovels.BrowseSections do
   # Kept in lockstep with the LiveView explore row size.
   @warm_page_size 36
 
-  # The content-pref combinations the frontend can ask for. The cache key
-  # hash includes `include_nukige`/`include_adjacent`, so each combo lives
-  # in its own Cachex slot and we warm all four to cover the full matrix.
-  # Without this, a logged-in user with nukige enabled would always hit a
-  # cold cache on first request because the default warm uses (off, off).
+  # Warm both nukige preference variants so the first request hits the cache
+  # regardless of the viewer's setting. Hybrids are included in both.
   @prefs_matrix [
-    %{include_nukige: false, include_adjacent: false},
-    %{include_nukige: true, include_adjacent: false},
-    %{include_nukige: false, include_adjacent: true},
-    %{include_nukige: true, include_adjacent: true}
+    %{include_nukige: false},
+    %{include_nukige: true}
   ]
 
   def all, do: @sections
@@ -91,7 +86,7 @@ defmodule Kaguya.VisualNovels.BrowseSections do
 
   @doc """
   Synchronously warm the page-1 cache entry for every configured section,
-  across all 4 content-pref combinations. Returns `{:ok, count}` with the
+  across both nukige preference variants. Returns `{:ok, count}` with the
   number of (section × prefs) pairs successfully primed.
 
   A single section's failure (e.g., a DB blip) is caught and logged so the

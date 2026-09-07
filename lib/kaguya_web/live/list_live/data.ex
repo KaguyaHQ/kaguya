@@ -172,8 +172,7 @@ defmodule KaguyaWeb.ListLive.Data do
     page_size = Keyword.get(opts, :page_size, 8)
 
     VisualNovels.search_visual_novels(query, page, page_size,
-      include_nukige: Map.get(viewer || %{}, :show_nukige, true),
-      include_adjacent: Map.get(viewer || %{}, :show_adjacent, true)
+      include_nukige: Map.get(viewer || %{}, :show_nukige, true)
     )
   end
 

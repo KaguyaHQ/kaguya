@@ -14,12 +14,12 @@ defmodule KaguyaWeb.SettingsLive.IndexTest do
     user = UserFixtures.insert_user!(email: "reader@example.com")
 
     for path <- ["/settings", "/account/settings", "/settings/integrations"] do
-      {:ok, _view, html} = live(conn_for(user), path)
+      {:ok, view, html} = live(conn_for(user), path)
 
       assert html =~ "Settings"
       assert html =~ "Sensitive content"
       assert html =~ "Show NSFW covers"
-      assert html =~ "Show VN hybrids"
+      refute has_element?(view, "#content-preferences [phx-value-field='show_adjacent']")
       assert html =~ "Import your library"
       assert html =~ "Export your data"
       assert html =~ "reader@example.com"
@@ -46,6 +46,20 @@ defmodule KaguyaWeb.SettingsLive.IndexTest do
              "Nukige titles are now hidden."
 
     refute Repo.get!(User, user.id).show_nukige
+  end
+
+  test "obsolete hybrid preference events do not change stored settings" do
+    user =
+      UserFixtures.insert_user!()
+      |> Ecto.Changeset.change(show_adjacent: false)
+      |> Repo.update!()
+
+    {:ok, view, _html} = live(conn_for(user), "/settings")
+
+    render_click(view, "toggle_preference", %{"field" => "show_adjacent"})
+
+    refute Repo.get!(User, user.id).show_adjacent
+    assert has_element?(view, "#content-preferences")
   end
 
   test "downloads the latest completed export instead of starting a new one" do

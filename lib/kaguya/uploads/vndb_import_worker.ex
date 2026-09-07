@@ -46,7 +46,7 @@ defmodule Kaguya.Uploads.VndbImportWorker do
           error_message: nil
         })
 
-        auto_enable_category_prefs(user_id)
+        auto_enable_nukige_preference(user_id)
         enqueue_recs_generation(user_id)
         :ok
 
@@ -95,32 +95,20 @@ defmodule Kaguya.Uploads.VndbImportWorker do
     )
   end
 
-  # After import, check if user's library contains nukige/adjacent VNs.
-  # If so, auto-enable the corresponding preferences so they can see their own VNs.
-  defp auto_enable_category_prefs(user_id) do
-    categories =
+  # Preserve nukige discovery for users who imported those titles.
+  defp auto_enable_nukige_preference(user_id) do
+    has_nukige? =
       from(rs in Kaguya.Shelves.ReadingStatus,
         join: vn in VisualNovel,
         on: vn.id == rs.visual_novel_id,
-        where: rs.user_id == ^user_id and vn.title_category != :vn,
-        select: vn.title_category,
-        distinct: true
+        where: rs.user_id == ^user_id and vn.title_category == :nukige
       )
-      |> Repo.all()
+      |> Repo.exists?()
 
-    updates =
-      %{}
-      |> then(fn u -> if :nukige in categories, do: Map.put(u, :show_nukige, true), else: u end)
-      |> then(fn u ->
-        if :adjacent in categories, do: Map.put(u, :show_adjacent, true), else: u
-      end)
+    if has_nukige? do
+      Users.update_user(user_id, %{show_nukige: true})
 
-    if map_size(updates) > 0 do
-      Users.update_user(user_id, updates)
-
-      Logger.info(
-        "[VndbImport] Auto-enabled category prefs for user #{user_id}: #{inspect(Map.keys(updates))}"
-      )
+      Logger.info("[VndbImport] Auto-enabled nukige preference for user #{user_id}")
     end
   end
 

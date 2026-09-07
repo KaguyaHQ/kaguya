@@ -160,8 +160,7 @@ defmodule KaguyaWeb.SearchLive.Index do
 
   defp search("visualNovels", query, page, current_user) do
     opts = [
-      include_nukige: Map.get(current_user || %{}, :show_nukige, true),
-      include_adjacent: Map.get(current_user || %{}, :show_adjacent, true)
+      include_nukige: Map.get(current_user || %{}, :show_nukige, true)
     ]
 
     VisualNovels.search_visual_novels(query, page, @page_size, opts)

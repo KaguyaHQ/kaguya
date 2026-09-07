@@ -141,6 +141,8 @@ defmodule KaguyaWeb.Policies.Content do
       body: """
       Visual novels have always included adult content. Kaguya aims to catalogue all of them, including ones with extreme/sensitive content like gore, ero, prejudice, abuse.
 
+      Gameplay hybrids are included in the same catalog as other visual novels.
+
       The one exception: works that exist solely to sexualize minors (loli/shota nukige).
 
       Kaguya is a social site for visual novel readers first, and the database exists to serve that purpose rather than to catalog everything for the sake of completeness.

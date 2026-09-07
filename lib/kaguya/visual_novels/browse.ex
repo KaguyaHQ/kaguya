@@ -32,7 +32,6 @@ defmodule Kaguya.VisualNovels.Browse do
     :released_after_year,
     :released_before_year,
     :include_nukige,
-    :include_adjacent,
     :has_ero,
     :available_on_stores,
     :free_on_stores,
@@ -634,7 +633,7 @@ defmodule Kaguya.VisualNovels.Browse do
   defp allowed_categories(filters) do
     [:vn]
     |> maybe_append(:nukige, Map.get(filters, :include_nukige, false))
-    |> maybe_append(:adjacent, Map.get(filters, :include_adjacent, false))
+    |> Kernel.++([:adjacent])
   end
 
   defp maybe_append(list, value, true), do: list ++ [value]
