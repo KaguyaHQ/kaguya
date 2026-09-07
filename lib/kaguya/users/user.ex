@@ -89,7 +89,7 @@ defmodule Kaguya.Users.User do
     |> validate_length(:username, min: 3, max: 30)
     |> validate_length(:display_name, min: 1, max: 36)
     |> validate_visible_display_name()
-    |> validate_length(:bio, max: 500)
+    |> validate_length(:bio, max: 1024)
     |> validate_format(:email, ~r/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/,
       message: "is not a valid email"
     )

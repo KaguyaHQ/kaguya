@@ -79,6 +79,26 @@ defmodule KaguyaWeb.AccountLive.EditProfileTest do
     assert Repo.get!(User, user.id).username == "validation_owner"
   end
 
+  test "accepts a 1024-character bio and rejects a longer bio without losing the draft" do
+    user = UserFixtures.insert_user!(username: "bio_limit_owner", bio: "Original bio")
+    {:ok, view, _html} = live(conn_for(user), "/account/edit/profile")
+
+    assert has_element?(view, "#profile-bio[maxlength='1024']")
+
+    bio = String.duplicate("a", 1024)
+    params = %{"username" => user.username, "display_name" => "Bio owner", "bio" => bio <> "b"}
+    render_submit(view, "save_profile", %{"profile" => params})
+
+    assert has_element?(view, "#profile-bio[aria-invalid='true']", bio <> "b")
+    assert has_element?(view, "#profile-bio-errors", "1024")
+    assert Repo.get!(User, user.id).bio == "Original bio"
+
+    assert {:error, {:live_redirect, %{to: "/@bio_limit_owner"}}} =
+             render_submit(view, "save_profile", %{"profile" => %{params | "bio" => bio}})
+
+    assert Repo.get!(User, user.id).bio == bio
+  end
+
   test "updates editable profile fields" do
     user = UserFixtures.insert_user!(username: "profile_editor", display_name: "Old")
 

@@ -541,20 +541,20 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
         >
           <textarea
             name="profile[bio]"
-            maxlength="250"
+            maxlength="1024"
             {attrs}
             placeholder="Write something about yourself…"
             class="border-border-divider custom-dropdown-scrollbar focus-visible:border-text-field-border-focus placeholder:text-foreground-primary/40 text-foreground-primary h-[120px] w-full resize-none rounded-[6px] border px-4 py-[15px] text-sm transition-colors placeholder:text-sm focus-visible:outline-hidden sm:h-[124px] sm:px-3 sm:py-[14px] lg:h-auto lg:min-h-[124px] lg:flex-1 dark:bg-white/2 sm:dark:bg-white/1"
           ><%= @form[:bio].value %></textarea>
           <span
-            :if={@bio_length >= 200}
+            :if={@bio_length >= 900}
             class={[
               "ml-auto block self-end text-right text-xs font-normal",
-              @bio_length > 250 && "text-red-400",
-              @bio_length <= 250 && "text-foreground-secondary"
+              @bio_length > 1024 && "text-red-400",
+              @bio_length <= 1024 && "text-foreground-secondary"
             ]}
           >
-            {@bio_length}/250
+            {@bio_length}/1024
           </span>
         </Field.field>
       </div>
