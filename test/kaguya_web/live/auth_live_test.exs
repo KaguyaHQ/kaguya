@@ -4,6 +4,23 @@ defmodule KaguyaWeb.AuthLiveTest do
   alias Kaguya.Test.UserFixtures
   alias Kaguya.Users
 
+  test "auth pages render one responsive form with a connected email label" do
+    for path <- ["/login", "/signup", "/login?reset_password=true&action=forgot_password"] do
+      {:ok, view, html} = live(build_conn(), path)
+      assert has_element?(view, "label[for='auth-email']", "Email")
+
+      assert has_element?(
+               view,
+               "input#auth-email[name='email'][type='email'][autocomplete='email']"
+             )
+
+      assert html
+             |> LazyHTML.from_fragment()
+             |> LazyHTML.query("input#auth-email")
+             |> Enum.count() == 1
+    end
+  end
+
   test "renders login page with parity shell" do
     {:ok, _view, html} = live(build_conn(), "/login")
 

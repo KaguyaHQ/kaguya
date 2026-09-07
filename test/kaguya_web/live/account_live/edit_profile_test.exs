@@ -21,7 +21,32 @@ defmodule KaguyaWeb.AccountLive.EditProfileTest do
         bio: "Old bio"
       )
 
-    {:ok, _view, html} = live(conn_for(user), "/account/edit/profile")
+    {:ok, view, html} = live(conn_for(user), "/account/edit/profile")
+
+    assert has_element?(
+             view,
+             "button#edit-profile-banner-trigger[type='button'][aria-label='Edit banner']"
+           )
+
+    assert has_element?(
+             view,
+             "button#edit-profile-avatar-trigger-desktop[type='button'][aria-label='Edit avatar']"
+           )
+
+    assert has_element?(
+             view,
+             "button#edit-profile-avatar-trigger-mobile[type='button'][aria-label='Edit avatar']"
+           )
+
+    assert has_element?(
+             view,
+             "input[name='profile[social_links][twitter]'][aria-label='X / Twitter handle']"
+           )
+
+    assert has_element?(
+             view,
+             "input[name='profile[social_links][website]'][aria-label='Website URL']"
+           )
 
     assert html =~ "Edit profile"
     assert html =~ "Profile Owner"
@@ -29,6 +54,29 @@ defmodule KaguyaWeb.AccountLive.EditProfileTest do
     assert html =~ ~s(id="basic-information")
     assert html =~ ~s(id="favorite-visual-novels")
     assert html =~ ~s(id="favorite-characters")
+  end
+
+  test "invalid profile fields retain submitted values and show connected errors" do
+    user = UserFixtures.insert_user!(username: "validation_owner", display_name: "Old")
+    {:ok, view, _html} = live(conn_for(user), "/account/edit/profile")
+
+    render_submit(view, "save_profile", %{
+      "profile" => %{
+        "display_name" => "Keep this draft",
+        "username" => "ab",
+        "bio" => "Draft bio"
+      }
+    })
+
+    assert has_element?(view, "#profile-display-name[value='Keep this draft']")
+
+    assert has_element?(
+             view,
+             "#usernameInput[value='ab'][aria-invalid='true'][aria-describedby='usernameInput-errors']"
+           )
+
+    assert has_element?(view, "#usernameInput-errors", "3")
+    assert Repo.get!(User, user.id).username == "validation_owner"
   end
 
   test "updates editable profile fields" do

@@ -16,6 +16,7 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   alias KaguyaWeb.Components.Shared.SocialIcons
   alias KaguyaWeb.Components.VN.Cards
   alias KaguyaWeb.ListLive.Data, as: ListData
+  alias KaguyaWeb.UI.{Field, Input}
 
   @top_favorites_limit 4
   @search_page_size 8
@@ -311,14 +312,7 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   defp profile_images(assigns) do
     ~H"""
     <div class="relative max-sm:hidden sm:max-lg:mt-10 lg:mt-6">
-      <div
-        class="group relative h-[196px] w-full cursor-pointer overflow-hidden rounded-[4px]"
-        phx-click={
-          Phoenix.LiveView.JS.dispatch("kaguya:open-image-cropper",
-            detail: %{id: "edit-profile-banner-cropper"}
-          )
-        }
-      >
+      <div class="group relative h-[196px] w-full cursor-pointer overflow-hidden rounded-[4px]">
         <%= if @user.banner_url do %>
           <img
             id="edit-profile-banner-preview-desktop"
@@ -343,8 +337,22 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
           <div class="h-[196px] w-full bg-[rgb(30,32,34)]" />
         <% end %>
 
-        <div class="pointer-events-none absolute inset-0 flex items-center justify-center gap-5 bg-black/50 px-4 text-sm font-medium text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <div class="flex flex-col items-center justify-center gap-2 px-[18px] py-3">
+        <button
+          id="edit-profile-banner-trigger"
+          type="button"
+          aria-label="Edit banner"
+          phx-click={
+            Phoenix.LiveView.JS.dispatch("kaguya:open-image-cropper",
+              detail: %{id: "edit-profile-banner-cropper"}
+            )
+          }
+          class="absolute inset-0 cursor-pointer rounded-[4px] focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
+        />
+        <div class="pointer-events-none absolute inset-0 flex items-center justify-center gap-5 bg-black/50 px-4 text-sm font-medium text-white opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100">
+          <div
+            class="flex flex-col items-center justify-center gap-2 px-[18px] py-3"
+            aria-hidden="true"
+          >
             <Lucide.pencil class="size-5" aria-hidden />
             <span>Edit Banner</span>
           </div>
@@ -363,8 +371,11 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
       </div>
 
       <div class="absolute top-[196px] left-6 z-10 -translate-y-1/2">
-        <div
-          class="group relative size-[100px] cursor-pointer overflow-hidden rounded-full shadow-[0_0_0_4px_rgb(var(--surface-base))]"
+        <button
+          id="edit-profile-avatar-trigger-desktop"
+          type="button"
+          aria-label="Edit avatar"
+          class="focus-visible:outline-foreground-primary group relative size-[100px] cursor-pointer overflow-hidden rounded-full shadow-[0_0_0_4px_rgb(var(--surface-base))] focus-visible:outline-2 focus-visible:outline-offset-4"
           phx-click={
             Phoenix.LiveView.JS.dispatch("kaguya:open-image-cropper",
               detail: %{id: "edit-profile-avatar-cropper"}
@@ -381,10 +392,10 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
             phx-update="ignore"
             data-cropper-preview="avatar"
           />
-          <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
             <Lucide.pencil class="size-5 text-white" aria-hidden />
           </div>
-        </div>
+        </button>
       </div>
 
       <div class="h-[54px]" />
@@ -442,8 +453,11 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
       </div>
 
       <div class="absolute top-[156px] left-4 z-10 -translate-y-1/2">
-        <div
-          class="relative size-[90px] cursor-pointer overflow-hidden rounded-full shadow-[0_0_0_4px_rgb(var(--surface-base))]"
+        <button
+          id="edit-profile-avatar-trigger-mobile"
+          type="button"
+          aria-label="Edit avatar"
+          class="focus-visible:outline-foreground-primary relative size-[90px] cursor-pointer overflow-hidden rounded-full shadow-[0_0_0_4px_rgb(var(--surface-base))] focus-visible:outline-2 focus-visible:outline-offset-4"
           phx-click={
             Phoenix.LiveView.JS.dispatch("kaguya:open-image-cropper",
               detail: %{id: "edit-profile-avatar-cropper"}
@@ -463,7 +477,7 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
           <div class="pointer-events-none absolute top-1/2 left-1/2 flex size-9 -translate-1/2 items-center justify-center rounded-full bg-black/40 backdrop-blur-xs">
             <Lucide.pencil class="size-[18px] text-white/70" aria-hidden />
           </div>
-        </div>
+        </button>
       </div>
 
       <div class="h-[49px]" />
@@ -484,33 +498,51 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
     >
       <div class="flex w-full flex-col justify-between gap-4 sm:gap-7 lg:flex-1">
         <div class="gap-[18px] sm:flex sm:justify-between">
-          <.input_field label="Display Name">
-            <input
-              name="profile[display_name]"
-              value={@form[:display_name].value}
+          <Field.field
+            :let={attrs}
+            id="profile-display-name"
+            label="Display name"
+            errors={field_errors(@form, :display_name)}
+            class="sm:w-full"
+          >
+            <Input.input
+              field={@form[:display_name]}
               placeholder="Arcueid"
               maxlength="36"
-              class="border-border-divider focus-visible:border-text-field-border-focus placeholder:text-foreground-primary/40 text-foreground-primary h-12 w-full rounded-[6px] border px-4 py-[15px] text-sm transition-colors placeholder:text-sm focus-visible:outline-hidden sm:h-[46px] sm:px-3 sm:py-[14px] dark:bg-white/2 sm:dark:bg-white/1"
+              control_size="roomy"
+              {attrs}
             />
-          </.input_field>
+          </Field.field>
 
-          <.input_field label="Username" class="max-sm:mt-4">
-            <input
-              id="usernameInput"
-              name="profile[username]"
-              value={@form[:username].value}
+          <Field.field
+            :let={attrs}
+            id="usernameInput"
+            label="Username"
+            errors={field_errors(@form, :username)}
+            class="max-sm:mt-4 sm:w-full"
+          >
+            <Input.input
+              field={@form[:username]}
               placeholder="arcueid"
               minlength="3"
               maxlength="30"
-              class="border-border-divider focus-visible:border-text-field-border-focus placeholder:text-foreground-primary/40 text-foreground-primary h-12 w-full rounded-[6px] border px-4 py-[15px] text-sm transition-colors placeholder:text-sm focus-visible:outline-hidden sm:h-[46px] sm:px-3 sm:py-[13px] dark:bg-white/2 sm:dark:bg-white/1"
+              control_size="roomy"
+              {attrs}
             />
-          </.input_field>
+          </Field.field>
         </div>
 
-        <.input_field label="About Me" class="lg:flex lg:flex-1 lg:flex-col">
+        <Field.field
+          :let={attrs}
+          id="profile-bio"
+          label="About me"
+          errors={field_errors(@form, :bio)}
+          class="lg:flex lg:flex-1 lg:flex-col [&>div]:lg:flex [&>div]:lg:flex-1 [&>div]:lg:flex-col"
+        >
           <textarea
             name="profile[bio]"
             maxlength="250"
+            {attrs}
             placeholder="Write something about yourself…"
             class="border-border-divider custom-dropdown-scrollbar focus-visible:border-text-field-border-focus placeholder:text-foreground-primary/40 text-foreground-primary h-[120px] w-full resize-none rounded-[6px] border px-4 py-[15px] text-sm transition-colors placeholder:text-sm focus-visible:outline-hidden sm:h-[124px] sm:px-3 sm:py-[14px] lg:h-auto lg:min-h-[124px] lg:flex-1 dark:bg-white/2 sm:dark:bg-white/1"
           ><%= @form[:bio].value %></textarea>
@@ -524,7 +556,7 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
           >
             {@bio_length}/250
           </span>
-        </.input_field>
+        </Field.field>
       </div>
     </div>
     """
@@ -557,21 +589,6 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
     """
   end
 
-  attr :label, :string, required: true
-  attr :class, :any, default: nil
-  slot :inner_block, required: true
-
-  defp input_field(assigns) do
-    ~H"""
-    <label class={["max-sm:space-y-3 sm:w-full", @class]}>
-      <span class="lg:text-foreground-secondary sm:text-foreground-primary text-foreground-secondary block text-xs font-medium tracking-[0.08em] uppercase sm:text-sm sm:tracking-normal sm:normal-case lg:text-xs lg:tracking-[0.08em] lg:uppercase">
-        {@label}
-      </span>
-      <span class="mt-3 block sm:mt-2">{render_slot(@inner_block)}</span>
-    </label>
-    """
-  end
-
   attr :name, :string, required: true
   attr :value, :any, default: nil
   attr :placeholder, :string, default: nil
@@ -584,12 +601,14 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
       <span class="text-foreground-primary/50 pointer-events-none absolute top-1/2 left-4 -translate-y-1/2">
         <SocialIcons.icon site={social_icon_site(@icon)} class="size-4" />
       </span>
-      <input
+      <Input.input
         name={@name}
+        aria-label={if @icon == :x, do: "X / Twitter handle", else: "Website URL"}
         value={@value}
         placeholder={@placeholder}
         type="text"
-        class="border-border-divider focus-visible:border-text-field-border-focus placeholder:text-foreground-primary/40 text-foreground-primary h-12 w-full rounded-[6px] border py-[15px] pr-4 pl-11 text-sm transition-colors placeholder:text-sm focus-visible:outline-hidden sm:h-[46px] sm:py-[13px] dark:bg-white/2 sm:dark:bg-white/1"
+        control_size="roomy"
+        class="pr-4 pl-11"
       />
     </label>
     """
@@ -858,7 +877,10 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
         end
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, put_flash(socket, :error, first_changeset_error(changeset))}
+        {:noreply,
+         socket
+         |> assign(:form, form_for_params(params, changeset.errors))
+         |> put_flash(:error, first_changeset_error(changeset))}
 
       {:error, reason} when is_binary(reason) ->
         {:noreply, assign(socket, :upload_error, reason)}
@@ -931,7 +953,7 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
     })
   end
 
-  defp form_for_params(params) do
+  defp form_for_params(params, errors \\ []) do
     social = Map.get(params, "social_links", %{})
 
     to_form(
@@ -942,8 +964,17 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
         "website" => Map.get(params, "website") || Map.get(social, "website") || "",
         "twitter" => Map.get(params, "twitter") || Map.get(social, "twitter") || ""
       },
-      as: :profile
+      as: :profile,
+      errors: errors
     )
+  end
+
+  defp field_errors(form, key) do
+    Enum.map(form[key].errors, fn {message, opts} ->
+      Enum.reduce(opts, message, fn {name, value}, text ->
+        String.replace(text, "%{#{name}}", to_string(value))
+      end)
+    end)
   end
 
   defp profile_attrs(params) do

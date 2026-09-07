@@ -19,6 +19,7 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
 
   alias Phoenix.LiveView.JS
   alias KaguyaWeb.UI.Table
+  alias KaguyaWeb.UI.Field
   alias KaguyaWeb.UI.FilterControl
   alias KaguyaWeb.SharedComponents.FilterChip
 
@@ -90,6 +91,68 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
           <label for="demo-disabled" class="text-sm">Disabled</label>
           <.input id="demo-disabled" type="text" placeholder="disabled" disabled />
         </div>
+      </section>
+
+      <section id="profile-input-comparison" class="scroll-mt-24 space-y-4">
+        <h2 class="text-foreground-primary text-style-heading3Medium">
+          Profile fields: visual comparison
+        </h2>
+        <p class="text-foreground-secondary text-sm">
+          Profile editing, sign-in, and sign-up now use shared roomy fields. The previous profile treatment is retained here for comparison.
+        </p>
+        <div class="grid gap-6 sm:grid-cols-2">
+          <div class="space-y-3">
+            <h3 class="text-sm font-medium">Previous profile field</h3>
+            <label
+              for="profile-input-current"
+              class="text-foreground-secondary block text-xs font-medium tracking-[0.08em] uppercase"
+            >Display name</label>
+            <input
+              id="profile-input-current"
+              value="Arcueid"
+              readonly
+              class="border-border-divider focus-visible:border-text-field-border-focus text-foreground-primary h-12 w-full rounded-[6px] border px-4 py-[15px] text-sm focus-visible:outline-hidden sm:h-[46px] sm:px-3 sm:py-[14px] dark:bg-white/2 sm:dark:bg-white/1"
+            />
+          </div>
+          <div class="space-y-3">
+            <h3 class="text-sm font-medium">Shared roomy field</h3>
+            <Field.field :let={attrs} id="profile-input-shared" label="Display name">
+              <.input value="Arcueid" control_size="roomy" readonly {attrs} />
+            </Field.field>
+          </div>
+        </div>
+      </section>
+
+      <section id="auth-input-comparison" class="scroll-mt-24 space-y-4">
+        <h2 class="text-foreground-primary text-style-heading3Medium">Sign-in and sign-up fields</h2>
+        <div class="grid gap-6 sm:grid-cols-2">
+          <div class="space-y-3">
+            <h3 class="text-sm font-medium">Auth page adapter</h3>
+            <KaguyaWeb.AuthComponents.auth_input
+              name="preview_email"
+              label="Email"
+              type="email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div class="space-y-3">
+            <h3 class="text-sm font-medium">Shared roomy field</h3>
+            <Field.field :let={attrs} id="auth-input-shared" label="Email">
+              <.input type="email" placeholder="you@example.com" control_size="roomy" {attrs} />
+            </Field.field>
+          </div>
+        </div>
+        <Field.field
+          :let={attrs}
+          id="field-validation-example"
+          label="Email"
+          hint="We’ll send your sign-in link here."
+          errors={["Enter a valid email address."]}
+          required
+          class="max-w-sm"
+        >
+          <.input type="email" value="invalid-email" control_size="roomy" {attrs} />
+        </Field.field>
       </section>
 
       <section class="space-y-4">

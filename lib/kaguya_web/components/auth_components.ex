@@ -2,6 +2,7 @@ defmodule KaguyaWeb.AuthComponents do
   @moduledoc false
 
   use KaguyaWeb, :html
+  alias KaguyaWeb.UI.{Field, Input}
 
   attr :title, :string, required: true
   attr :subtitle, :string, required: true
@@ -11,19 +12,20 @@ defmodule KaguyaWeb.AuthComponents do
   def auth_shell(assigns) do
     ~H"""
     <div class="bg-surface-base text-foreground-primary min-h-screen">
-      <div class="flex min-h-screen max-lg:hidden">
-        <section class="relative flex flex-1 justify-center px-[136px]">
-          <div class="absolute top-0 mt-6 w-full px-8">
+      <div class="flex min-h-screen">
+        <section class="relative flex flex-1 justify-center px-5 pb-14 sm:px-8 md:px-24 lg:px-[136px] lg:pb-0">
+          <div class="absolute top-0 mt-6 w-full px-8 max-lg:hidden">
             <nav class="relative flex items-center">
               <.logo small />
             </nav>
           </div>
-          <div class="w-full max-w-[386px] pt-[172px]">
+          <div class="mt-8 w-full sm:max-w-sm lg:mt-0 lg:max-w-[386px] lg:pt-[172px]">
+            <.logo class="mb-14 lg:hidden" />
             {render_slot(@inner_block)}
           </div>
         </section>
 
-        <aside class="relative w-[54.3%] overflow-hidden">
+        <aside class="relative w-[54.3%] overflow-hidden max-lg:hidden">
           <img
             src="https://images.kaguya.io/ui/auth/auth.webp"
             alt="featured cover"
@@ -38,15 +40,6 @@ defmodule KaguyaWeb.AuthComponents do
           </a>
           <div class="absolute inset-0 bg-black/25" />
         </aside>
-      </div>
-
-      <div class="mt-8 flex h-full items-center lg:hidden">
-        <div class="flex w-full px-5 pb-14 sm:flex-col sm:items-center md:px-24">
-          <div class="max-h-full w-full sm:max-w-sm">
-            <.logo class="mb-14" />
-            {render_slot(@inner_block)}
-          </div>
-        </div>
       </div>
     </div>
     """
@@ -125,12 +118,12 @@ defmodule KaguyaWeb.AuthComponents do
   attr :autofocus, :boolean, default: false
   attr :maxlength, :integer, default: nil
   attr :input_class, :any, default: nil
+  attr :errors, :list, default: []
 
   def auth_input(assigns) do
     ~H"""
-    <label class="block">
-      <span class="text-foreground-tertiary text-style-body2Regular mb-3 block">{@label}</span>
-      <input
+    <Field.field :let={attrs} id={"auth-" <> @name} label={@label} errors={@errors}>
+      <Input.input
         name={@name}
         type={@type}
         value={@value}
@@ -138,12 +131,11 @@ defmodule KaguyaWeb.AuthComponents do
         autocomplete={@autocomplete}
         autofocus={@autofocus}
         maxlength={@maxlength}
-        class={[
-          "bg-text-field-bg border-text-field-border focus-visible:border-text-field-border-focus placeholder:text-text-field-placeholder-text text-foreground-primary text-style-body2Regular h-12 w-full rounded-[6px] border px-3 focus-visible:outline-none",
-          @input_class
-        ]}
+        control_size="roomy"
+        class={@input_class}
+        {attrs}
       />
-    </label>
+    </Field.field>
     """
   end
 

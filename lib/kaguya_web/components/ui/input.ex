@@ -47,6 +47,11 @@ defmodule KaguyaWeb.UI.Input do
 
   attr :class, :any, default: nil
 
+  attr :control_size, :string,
+    values: ~w(compact roomy),
+    default: "compact",
+    doc: "Compact (36px) for toolbars; roomy (48px) for forms. Native size remains available."
+
   attr :rest, :global,
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
                 multiple pattern placeholder readonly required rows size step)
@@ -62,7 +67,11 @@ defmodule KaguyaWeb.UI.Input do
     ~H"""
     <input
       class={[
-        "bg-surface-elevated border-text-field-border focus-visible:border-text-field-border-focus placeholder:text-foreground-quaternary text-foreground-primary flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-none transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:border focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent dark:shadow-xs",
+        "border-text-field-border focus-visible:border-text-field-border-focus placeholder:text-text-field-placeholder-text text-foreground-primary flex w-full rounded-md border px-3 py-1 text-sm shadow-none transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:border focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+        if(@control_size == "roomy",
+          do: "bg-text-field-bg h-12",
+          else: "bg-surface-elevated h-9 dark:bg-transparent dark:shadow-xs"
+        ),
         "aria-invalid:border-semantic-error aria-invalid:focus-visible:border-semantic-error",
         @class
       ]}

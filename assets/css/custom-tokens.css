@@ -5,6 +5,9 @@
  */
 
 :root {
+  /* Shared field placeholder; overrides the older Figma value until synced. */
+  --text-field-placeholder-text: 122 122 122; /* #7A7A7A */
+
   --icons-star-muted: 160 160 174; /* #A0A0AE — silver/moonlight grey for unfilled stars */
   --status-wishlist: 155 127 230; /* #9B7FE6 — amethyst */
   --status-reading: 82 148 224; /* #5294E0 — sapphire */
