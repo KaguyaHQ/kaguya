@@ -70,6 +70,23 @@ defmodule KaguyaWeb.VNLive.ScreenshotBackdropTest do
     assert_cached_backdrop(vn, screenshot)
   end
 
+  test "main page previews respect content preferences and open the screenshot lightbox", %{
+    conn: conn,
+    vn: vn
+  } do
+    safe = screenshot(vn, 800)
+    hidden = screenshot(vn, 1600)
+    hidden |> Ecto.Changeset.change(is_nsfw: true) |> Repo.update!()
+    {:ok, view, _} = live(conn, ~p"/vn/#{vn.slug}")
+    render_async(view)
+    assert has_element?(view, "#desktop-screenshot-preview-#{safe.id}")
+    refute has_element?(view, "#desktop-screenshot-preview-#{hidden.id}")
+    view |> element("#desktop-screenshot-preview-#{safe.id}") |> render_click()
+    assert has_element?(view, "#media-lightbox")
+    url = VisualNovels.build_screenshot_urls(safe.id).large
+    assert has_element?(view, "#media-lightbox img[src='#{url}']")
+  end
+
   defp screenshot(vn, width) do
     %Screenshot{}
     |> Screenshot.changeset(%{

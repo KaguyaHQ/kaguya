@@ -74,6 +74,64 @@ defmodule KaguyaWeb.VN.Panels.Screenshots do
     """
   end
 
+  attr :id, :string, required: true
+  attr :state, :any, default: :not_loaded
+  attr :current_user, :map, default: nil
+
+  def preview(assigns) do
+    items =
+      case assigns.state do
+        {:ok, items} -> items
+        _ -> []
+      end
+
+    user = assigns.current_user || %{}
+
+    {visible, _} =
+      partition(
+        items,
+        Map.get(user, :show_nsfw_screenshots, false),
+        Map.get(user, :show_brutal_screenshots, false)
+      )
+
+    assigns = assign(assigns, items: Enum.take(visible, 12), count: length(visible))
+
+    ~H"""
+    <section :if={@items != []} id={@id} aria-label="Screenshots" class="mt-5">
+      <div class="grid grid-cols-3 gap-1 lg:grid-cols-6">
+        <button
+          :for={{screenshot, index} <- Enum.with_index(@items)}
+          id={"#{@id}-#{screenshot.id}"}
+          type="button"
+          phx-click="open_media_lightbox"
+          phx-value-kind="screenshots"
+          phx-value-url={image_src(screenshot, [:large, :medium, :small])}
+          aria-label={"Open screenshot #{index + 1}"}
+          class={[
+            "group overflow-hidden rounded-[3px] bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+            index >= 6 && "hidden lg:block"
+          ]}
+        >
+          <img
+            src={image_src(screenshot, [:small, :medium])}
+            alt=""
+            loading="lazy"
+            class="aspect-video w-full object-cover transition duration-200 group-hover:scale-105 group-hover:brightness-110"
+          />
+        </button>
+      </div>
+      <button
+        type="button"
+        phx-click="open_media_lightbox"
+        phx-value-kind="screenshots"
+        class="mt-2 text-[11px] text-[rgb(var(--foreground-tertiary))] transition hover:text-[rgb(var(--foreground-primary))]"
+      >
+        View all {@count} screenshots <span aria-hidden="true">→</span>
+      </button>
+    </section>
+    """
+  end
+
   def skeleton(assigns) do
     ~H"""
     <div class="grid grid-cols-3 gap-x-1.5 gap-y-3 lg:gap-x-2 lg:gap-y-5">

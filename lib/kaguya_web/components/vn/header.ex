@@ -78,6 +78,11 @@ defmodule KaguyaWeb.VN.Header do
         class="text-style-body1Regular mt-3 text-[rgb(var(--foreground-secondary))] [&_a]:text-[rgb(var(--text-link-default))] [&_a:hover]:text-[rgb(var(--text-link-hover))] [&_blockquote]:my-0 [&_li]:my-0 [&_ol]:my-0 [&_p]:my-2 [&_ul]:my-0"
       />
 
+      <Panels.Screenshots.preview
+        id="desktop-screenshot-preview"
+        state={@tabs[:screenshots]}
+        current_user={@current_user}
+      />
       <.vn_tabs active_tab={@active_tab} user_can_edit={@user_can_edit} />
       <.vn_tab_panel
         vn={@vn}
@@ -162,6 +167,12 @@ defmodule KaguyaWeb.VN.Header do
         description={@vn.description}
         limit={330}
         class="mt-6 text-[14px] leading-[22px] text-[rgb(var(--foreground-secondary))] [&_a]:text-[rgb(var(--text-link-default))] [&_blockquote]:my-0 [&_li]:my-0 [&_ol]:my-0 [&_p]:my-2 [&_ul]:my-0"
+      />
+
+      <Panels.Screenshots.preview
+        id="mobile-screenshot-preview"
+        state={@tabs[:screenshots]}
+        current_user={@current_user}
       />
 
       <.mobile_action_trigger

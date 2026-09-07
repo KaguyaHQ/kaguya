@@ -17,7 +17,8 @@ defmodule KaguyaWeb.VNLive.Show.MediaActions do
   end
 
   def open_media_lightbox(socket, params) do
-    active_tab = socket.assigns.active_tab
+    active_tab =
+      if params["kind"] == "screenshots", do: :screenshots, else: socket.assigns.active_tab
 
     entries =
       media_lightbox_entries(active_tab, socket.assigns.tabs, socket.assigns.current_user)

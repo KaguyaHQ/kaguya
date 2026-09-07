@@ -167,6 +167,7 @@ defmodule KaguyaWeb.VNLive.Show do
             loading: false
           )
           |> maybe_start_tab_async(initial_tab)
+          |> maybe_start_tab_async(:screenshots)
           |> maybe_start_discussions_async(vn, current_user)
           |> maybe_start_viewer_async(vn, current_user)
           |> maybe_start_friends_async(vn, current_user)
