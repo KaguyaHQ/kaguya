@@ -142,7 +142,11 @@ defmodule Kaguya.Sync.DumpSync do
         System.get_env("VNDB_DUMP_USERNAME") || Keyword.get(config, :username, "postgres"),
       password: System.get_env("VNDB_DUMP_PASSWORD") || Keyword.get(config, :password, ""),
       port: vndb_dump_port(config),
-      timeout: Keyword.get(config, :timeout, :infinity)
+      timeout: Keyword.get(config, :timeout, :infinity),
+      # Image selection tasks share this connection. Let a queued query wait
+      # for the other task's dump scan instead of failing after the OLTP default.
+      queue_target: Keyword.get(config, :queue_target, 60_000),
+      queue_interval: Keyword.get(config, :queue_interval, 60_000)
     )
   end
 
