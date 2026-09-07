@@ -17,8 +17,15 @@ defmodule KaguyaWeb.CharacterLive.Edit do
        character: nil,
        state: :loading,
        can_moderate: false,
+       base_revision: 0,
+       appearances: %{},
+       original_appearance_ids: [],
+       appearance_query: "",
+       appearance_results: %{},
        form: empty_form()
-     )}
+     )
+     |> stream(:appearances, [])
+     |> stream(:appearance_results, [])}
   end
 
   @impl true
@@ -91,14 +98,21 @@ defmodule KaguyaWeb.CharacterLive.Edit do
                  )}
 
               true ->
+                appearances =
+                  Characters.list_appearances_for_edit(page.character.id, current_user)
+
                 {:noreply,
-                 assign(socket,
+                 socket
+                 |> assign(
                    state: :editing,
                    character: page.character,
                    can_moderate: can_moderate,
                    page_title: "Edit #{page.character.name}",
+                   base_revision: Revisions.latest_revision_number(:character, page.character.id),
+                   original_appearance_ids: Enum.map(appearances, & &1.id),
                    form: form_from_character(page.character)
-                 )}
+                 )
+                 |> put_appearances(appearances)}
             end
 
           {:error, :not_found} ->
@@ -112,24 +126,82 @@ defmodule KaguyaWeb.CharacterLive.Edit do
   end
 
   @impl true
+  def handle_event(event, _params, %{assigns: %{state: state}} = socket)
+      when event in [
+             "validate",
+             "save",
+             "search_appearance_vns",
+             "add_appearance",
+             "remove_appearance"
+           ] and
+             state not in [:editing, :creating] do
+    {:noreply, put_flash(socket, :error, "You do not have permission to edit this character.")}
+  end
+
+  def handle_event("search_appearance_vns", params, socket) do
+    query = params |> Map.get("appearance_query", "") |> normalize_text() |> String.slice(0, 100)
+
+    results =
+      Characters.search_appearance_visual_novels(query, socket.assigns.current_user)
+      |> Enum.reject(&Map.has_key?(socket.assigns.appearances, &1.id))
+
+    {:noreply,
+     socket
+     |> assign(appearance_query: query, appearance_results: Map.new(results, &{&1.id, &1}))
+     |> stream(:appearance_results, results, reset: true)}
+  end
+
+  def handle_event("add_appearance", %{"id" => id}, socket) do
+    case Map.fetch(socket.assigns.appearance_results, id) do
+      {:ok, vn} ->
+        appearance = Map.merge(vn, %{role: "side", spoiler_level: "0"})
+
+        {:noreply,
+         socket
+         |> put_appearances(Map.put(socket.assigns.appearances, id, appearance) |> Map.values())
+         |> assign(appearance_query: "", appearance_results: %{})
+         |> stream(:appearance_results, [], reset: true)}
+
+      :error ->
+        {:noreply, put_flash(socket, :error, "Search for a visual novel before adding it.")}
+    end
+  end
+
+  def handle_event("remove_appearance", %{"id" => id}, socket) do
+    {:noreply,
+     put_appearances(socket, socket.assigns.appearances |> Map.delete(id) |> Map.values())}
+  end
+
   def handle_event("validate", %{"character" => attrs}, socket) do
-    {:noreply, assign(socket, :form, normalize_form(attrs, socket.assigns.form))}
+    {:noreply,
+     socket
+     |> assign(:form, normalize_form(attrs, socket.assigns.form))
+     |> update_appearance_fields(attrs)}
   end
 
   @impl true
   def handle_event("save", %{"character" => attrs}, socket) do
+    socket = update_appearance_fields(socket, attrs)
     form = normalize_form(attrs, socket.assigns.form)
     summary = form["summary"] |> ensure_summary(socket.assigns.live_action)
+
+    appearances =
+      Enum.map(socket.assigns.appearances, fn {id, row} ->
+        %{visual_novel_id: id, role: row.role, spoiler_level: row.spoiler_level}
+      end)
 
     case socket.assigns.live_action do
       :new ->
         attrs = %{
           name: form["name"],
-          description: form["description"]
+          description: form["description"],
+          appearances: appearances
         }
 
         case Revisions.create_entity(:character, attrs, summary, socket.assigns.current_user) do
           {:ok, %{entity: character}} ->
+            invalidate_appearance_pages(socket)
+
             {:noreply,
              socket
              |> assign(form: form)
@@ -145,7 +217,7 @@ defmodule KaguyaWeb.CharacterLive.Edit do
 
       :edit ->
         changes =
-          %{description: form["description"]}
+          %{description: form["description"], appearances: appearances}
           |> maybe_put_hidden_at(socket.assigns.character, form)
           |> maybe_put_is_locked(socket.assigns.character, form)
 
@@ -154,9 +226,12 @@ defmodule KaguyaWeb.CharacterLive.Edit do
                socket.assigns.character.id,
                changes,
                summary,
-               socket.assigns.current_user
+               socket.assigns.current_user,
+               base_revision: socket.assigns.base_revision
              ) do
           {:ok, _change} ->
+            invalidate_appearance_pages(socket)
+
             {:noreply,
              socket
              |> assign(form: form)
@@ -180,6 +255,8 @@ defmodule KaguyaWeb.CharacterLive.Edit do
   end
 
   def render(assigns) do
+    assigns = assign(assigns, :editor_form, to_form(assigns.form, as: :character))
+
     ~H"""
     <div class="mx-auto mt-6 max-w-[748px] px-4 pb-20 lg:mt-10 lg:px-0">
       <button
@@ -223,9 +300,10 @@ defmodule KaguyaWeb.CharacterLive.Edit do
         This character is locked and cannot be edited.
       </section>
 
-      <form
+      <.form
         :if={@state in [:editing, :creating]}
         id="character-edit"
+        for={@editor_form}
         class="bg-surface-base border-border-divider mt-6 rounded-[8px] border p-4"
         phx-change="validate"
         phx-submit="save"
@@ -267,6 +345,134 @@ defmodule KaguyaWeb.CharacterLive.Edit do
               class="bg-surface-elevated border-border-divider min-h-[180px] rounded-[6px] border px-3 py-2 text-[rgb(var(--foreground-primary))] outline-none"
             ><%= @form["description"] %></textarea>
           </label>
+
+          <section id="character-appearances" class="border-border-divider space-y-4 border-t pt-5">
+            <div>
+              <h2 class="text-foreground-primary text-base font-medium">Visual novel appearances</h2>
+              <p class="text-foreground-secondary mt-1 text-sm">
+                Link this character to the visual novels they appear in. Changes are saved with the character.
+              </p>
+            </div>
+
+            <div id="character-appearance-list" phx-update="stream" class="space-y-3">
+              <p
+                id="character-appearances-empty"
+                class="text-foreground-tertiary hidden text-sm only:block"
+              >
+                No visual novels linked yet.
+              </p>
+              <div
+                :for={{dom_id, appearance} <- @streams.appearances}
+                id={dom_id}
+                class="bg-surface-elevated border-border-divider rounded-lg border p-3"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <.link
+                    :if={appearance.slug}
+                    navigate={"/vn/#{appearance.slug}"}
+                    class="text-foreground-primary min-w-0 font-medium hover:underline"
+                  >
+                    {appearance.title}
+                  </.link>
+                  <span :if={!appearance.slug} class="text-foreground-secondary font-medium">{appearance.title}</span>
+                  <button
+                    id={"remove-appearance-#{appearance.id}"}
+                    type="button"
+                    phx-click="remove_appearance"
+                    phx-value-id={appearance.id}
+                    aria-label={"Remove #{appearance.title}"}
+                    class="hover:text-foreground-primary text-foreground-secondary shrink-0 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label class="text-foreground-secondary flex flex-col gap-1.5 text-sm">
+                    <span>Role</span>
+                    <select
+                      id={"appearance-role-#{appearance.id}"}
+                      name={"character[appearances][#{appearance.id}][role]"}
+                      class="bg-surface-base border-border-divider text-foreground-primary w-full rounded-md border px-3 py-2"
+                    >
+                      <option
+                        :for={
+                          {label, value} <- [
+                            {"Main", "main"},
+                            {"Primary", "primary"},
+                            {"Side", "side"},
+                            {"Appears", "appears"}
+                          ]
+                        }
+                        value={value}
+                        selected={appearance.role == value}
+                      >
+                        {label}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="text-foreground-secondary flex flex-col gap-1.5 text-sm">
+                    <span>Appearance spoiler level</span>
+                    <select
+                      id={"appearance-spoiler-#{appearance.id}"}
+                      name={"character[appearances][#{appearance.id}][spoiler_level]"}
+                      class="bg-surface-base border-border-divider text-foreground-primary w-full rounded-md border px-3 py-2"
+                    >
+                      <option
+                        :for={
+                          {label, value} <- [
+                            {"No spoilers", "0"},
+                            {"Minor spoilers", "1"},
+                            {"Major spoilers", "2"}
+                          ]
+                        }
+                        value={value}
+                        selected={appearance.spoiler_level == value}
+                      >
+                        {label}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <label for="character-vn-search" class="text-foreground-primary block text-sm font-medium">
+              Add a visual novel
+            </label>
+            <input
+              id="character-vn-search"
+              type="search"
+              name="appearance_query"
+              value={@appearance_query}
+              phx-change="search_appearance_vns"
+              phx-debounce="250"
+              maxlength="100"
+              placeholder="Search by title (at least 2 characters)"
+              autocomplete="off"
+              aria-controls="character-vn-results"
+              class="bg-surface-elevated border-border-divider text-foreground-primary w-full rounded-md border px-3 py-2 text-sm"
+            />
+            <p
+              :if={String.length(@appearance_query) >= 2 and map_size(@appearance_results) == 0}
+              id="character-vn-no-results"
+              class="text-foreground-tertiary text-sm"
+              role="status"
+            >
+              No matching visual novels to add.
+            </p>
+            <div id="character-vn-results" phx-update="stream" class="space-y-1">
+              <button
+                :for={{dom_id, vn} <- @streams.appearance_results}
+                id={dom_id}
+                type="button"
+                phx-click="add_appearance"
+                phx-value-id={vn.id}
+                class="border-border-divider hover:bg-surface-elevated text-foreground-primary flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm"
+              >
+                <span>{vn.title}</span><span class="text-foreground-secondary shrink-0">Add</span>
+              </button>
+            </div>
+          </section>
 
           <fieldset
             :if={@can_moderate and @live_action == :edit}
@@ -331,7 +537,7 @@ defmodule KaguyaWeb.CharacterLive.Edit do
             {submit_label(assigns)}
           </button>
         </div>
-      </form>
+      </.form>
     </div>
     """
   end
@@ -339,6 +545,39 @@ defmodule KaguyaWeb.CharacterLive.Edit do
   defp can_edit?(%{can_edit: false}), do: false
   defp can_edit?(%{id: _}), do: true
   defp can_edit?(_), do: false
+
+  defp put_appearances(socket, rows) do
+    rows = Enum.sort_by(rows, &{&1.title, &1.id})
+
+    socket
+    |> assign(:appearances, Map.new(rows, &{&1.id, &1}))
+    |> stream(:appearances, rows, reset: true)
+  end
+
+  defp update_appearance_fields(socket, attrs) do
+    params = Map.get(attrs, "appearances", %{})
+    params = if is_map(params), do: params, else: %{}
+
+    rows =
+      Enum.map(socket.assigns.appearances, fn {id, row} ->
+        fields = Map.get(params, id, %{})
+        fields = if is_map(fields), do: fields, else: %{}
+
+        %{
+          row
+          | role: Map.get(fields, "role", row.role),
+            spoiler_level: Map.get(fields, "spoiler_level", row.spoiler_level)
+        }
+      end)
+
+    put_appearances(socket, rows)
+  end
+
+  defp invalidate_appearance_pages(socket) do
+    Characters.invalidate_appearance_pages(
+      socket.assigns.original_appearance_ids ++ Map.keys(socket.assigns.appearances)
+    )
+  end
 
   defp normalize_text(nil), do: ""
   defp normalize_text(value), do: String.trim(to_string(value))
@@ -428,6 +667,10 @@ defmodule KaguyaWeb.CharacterLive.Edit do
   defp back_label(_assigns), do: "Back to character"
 
   defp format_revision_error({:error, reason}), do: format_revision_error(reason)
+
+  defp format_revision_error(:edit_conflict),
+    do: "This character changed while you were editing. Reload before saving again."
+
   defp format_revision_error(reason) when is_binary(reason), do: reason
   defp format_revision_error(%Ecto.Changeset{} = changeset), do: format_changeset_error(changeset)
   defp format_revision_error(_), do: "Unable to save character."

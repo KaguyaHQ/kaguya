@@ -248,6 +248,18 @@ defmodule Kaguya.Characters do
   # Edit / Revision Support
   # ============================================================================
 
+  def list_appearances_for_edit(character_id, viewer) do
+    Kaguya.Characters.Appearances.list_for_edit(character_id, can_view_hidden?(viewer))
+  end
+
+  def search_appearance_visual_novels(query, viewer) do
+    Kaguya.Characters.Appearances.search(query, can_view_hidden?(viewer))
+  end
+
+  def invalidate_appearance_pages(vn_ids) do
+    vn_ids |> Enum.uniq() |> Enum.each(&Kaguya.VisualNovels.VNPageCache.invalidate/1)
+  end
+
   def get_for_edit(id) do
     case Repo.get(Character, id) do
       nil -> nil
@@ -647,42 +659,42 @@ defmodule Kaguya.Characters do
       nil ->
         :ok
 
-      appearances when is_list(appearances) ->
-        vn_ids = Enum.map(appearances, & &1.visual_novel_id) |> Enum.uniq()
+      appearances ->
+        with {:ok, appearances} <-
+               Kaguya.Characters.Appearances.validate(character.id, appearances) do
+          vn_ids = Enum.map(appearances, & &1.visual_novel_id) |> Enum.uniq()
 
-        existing =
-          from(v in Kaguya.VisualNovels.VisualNovel, where: v.id in ^vn_ids, select: v.id)
-          |> Repo.all()
-          |> MapSet.new()
+          existing =
+            from(v in Kaguya.VisualNovels.VisualNovel, where: v.id in ^vn_ids, select: v.id)
+            |> Repo.all()
+            |> MapSet.new()
 
-        missing = Enum.reject(vn_ids, &MapSet.member?(existing, &1))
+          missing = Enum.reject(vn_ids, &MapSet.member?(existing, &1))
 
-        if missing != [] do
-          {:error, "Visual novel(s) not found: #{Enum.join(missing, ", ")}"}
-        else
-          from(vc in VNCharacter, where: vc.character_id == ^character.id) |> Repo.delete_all()
-          now = DateTime.utc_now() |> DateTime.truncate(:second)
+          if missing != [] do
+            {:error, "Visual novel(s) not found: #{Enum.join(missing, ", ")}"}
+          else
+            from(vc in VNCharacter, where: vc.character_id == ^character.id) |> Repo.delete_all()
+            now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-          rows =
-            Enum.map(appearances, fn a ->
-              %{
-                character_id: character.id,
-                visual_novel_id: a.visual_novel_id,
-                role: to_atom(a.role),
-                spoiler_level: Map.get(a, :spoiler_level, 0),
-                inserted_at: now,
-                updated_at: now
-              }
-            end)
+            rows =
+              Enum.map(appearances, fn a ->
+                %{
+                  character_id: character.id,
+                  visual_novel_id: a.visual_novel_id,
+                  role: a.role,
+                  spoiler_level: Map.get(a, :spoiler_level, 0),
+                  inserted_at: now,
+                  updated_at: now
+                }
+              end)
 
-          if rows != [], do: Repo.insert_all(VNCharacter, rows)
-          :ok
+            if rows != [], do: Repo.insert_all(VNCharacter, rows)
+            :ok
+          end
         end
     end
   end
-
-  defp to_atom(value) when is_atom(value), do: value
-  defp to_atom(value) when is_binary(value), do: String.to_existing_atom(value)
 
   defp to_string_or_nil_enum(value) when is_boolean(value), do: value
 
