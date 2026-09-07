@@ -91,17 +91,14 @@ function placePanel(panel, anchor, opts) {
 const AnchoredPopover = {
   mounted() {
     this.anchor = document.getElementById(this.el.dataset.anchor)
-    this.opts = {
-      placement: this.el.dataset.placement || "bottom",
-      align: this.el.dataset.align || "start",
-      sideOffset: parseInt(this.el.dataset.sideOffset || "8", 10),
-      alignOffset: parseInt(this.el.dataset.alignOffset || "0", 10),
-      matchWidth: this.el.dataset.matchWidth === "true",
-    }
+    this._readOptions()
 
     this._reposition = () => {
-      if (this.el.matches(":popover-open")) placePanel(this.el, this.anchor, this.opts)
+      if (!this.anchor || !this.el.matches(":popover-open")) return
+      if (this.opts.matchWidth) this.el.style.width = `${this.anchor.offsetWidth}px`
+      placePanel(this.el, this.anchor, this.opts)
     }
+    this.resizeObserver = new ResizeObserver(this._reposition)
 
     this._syncState = () => {
       const open = this.el.matches(":popover-open")
@@ -110,16 +107,16 @@ const AnchoredPopover = {
         this.anchor.dataset.state = open ? "open" : "closed"
       }
       if (open && this.anchor) {
-        if (this.opts.matchWidth && this.anchor) {
-          this.el.style.width = `${this.anchor.offsetWidth}px`
-        }
-        placePanel(this.el, this.anchor, this.opts)
+        this._reposition()
+        this.resizeObserver.observe(this.el)
+        this.resizeObserver.observe(this.anchor)
         // Reveal only after positioning — the panel renders visibility:hidden
         // so the pre-placement paint at the default (top-left) spot never shows.
         this.el.style.visibility = "visible"
         window.addEventListener("scroll", this._reposition, true)
         window.addEventListener("resize", this._reposition)
       } else {
+        this.resizeObserver.disconnect()
         if (this.opts.matchWidth) this.el.style.width = ""
         this.el.style.visibility = "hidden"
         window.removeEventListener("scroll", this._reposition, true)
@@ -129,7 +126,10 @@ const AnchoredPopover = {
     this._onToggle = () => this._syncState()
 
     this._onClick = (event) => {
-      if (event.target.closest("[data-menu-dismiss]")) this.el.hidePopover()
+      const item = event.target.closest("[data-menu-dismiss]")
+      if (item && !item.matches(":disabled, [aria-disabled=true]") && this.el.matches(":popover-open")) {
+        this.el.hidePopover()
+      }
     }
 
     this.el.addEventListener("toggle", this._onToggle)
@@ -140,11 +140,25 @@ const AnchoredPopover = {
   updated() {
     // LiveView patches the menu content and can restore its initial hidden
     // style without changing the browser's open state (or firing toggle).
+    this.resizeObserver.disconnect()
     this.anchor = document.getElementById(this.el.dataset.anchor)
+    this._readOptions()
+    if (!this.opts.matchWidth) this.el.style.width = ""
     this._syncState()
   },
 
+  _readOptions() {
+    this.opts = {
+      placement: this.el.dataset.placement || "bottom",
+      align: this.el.dataset.align || "start",
+      sideOffset: parseInt(this.el.dataset.sideOffset || "8", 10),
+      alignOffset: parseInt(this.el.dataset.alignOffset || "0", 10),
+      matchWidth: this.el.dataset.matchWidth === "true",
+    }
+  },
+
   destroyed() {
+    this.resizeObserver.disconnect()
     this.el.removeEventListener("toggle", this._onToggle)
     this.el.removeEventListener("click", this._onClick)
     window.removeEventListener("scroll", this._reposition, true)

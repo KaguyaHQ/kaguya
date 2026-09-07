@@ -550,6 +550,8 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           <input
             type="number"
             name={@min_name}
+            step={@step}
+            aria-label={"Minimum #{@label}"}
             value={@min_input_value}
             placeholder={@min_placeholder}
             inputmode="decimal"
@@ -560,6 +562,8 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           <input
             type="number"
             name={@max_name}
+            step={@step}
+            aria-label={"Maximum #{@label}"}
             value={@max_input_value}
             placeholder={@max_placeholder}
             inputmode="decimal"

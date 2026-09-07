@@ -37,7 +37,8 @@ defmodule KaguyaWeb.UI.Input do
 
   attr :type, :string,
     default: "text",
-    values: ~w(date datetime-local email file hidden month number password tel text time url week)
+    values:
+      ~w(date datetime-local email file hidden month number password search tel text time url week)
 
   attr :"default-value", :any
 
@@ -62,6 +63,7 @@ defmodule KaguyaWeb.UI.Input do
     <input
       class={[
         "bg-surface-elevated border-text-field-border focus-visible:border-text-field-border-focus placeholder:text-foreground-quaternary text-foreground-primary flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-none transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:border focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent dark:shadow-xs",
+        "aria-invalid:border-semantic-error aria-invalid:focus-visible:border-semantic-error",
         @class
       ]}
       {@rest}

@@ -12,7 +12,6 @@ defmodule Kaguya.VisualNovels.Browse do
   alias Kaguya.VisualNovels.VisualNovel
 
   @tag_relevance_threshold 0.72
-  @max_pages 10
 
   @cacheable_filter_keys [
     :include_tags,
@@ -39,11 +38,11 @@ defmodule Kaguya.VisualNovels.Browse do
   ]
 
   @doc """
-  Lists visual novels for browse grids and explore rows.
+  Lists visual novels for the catalogue and discovery rows.
 
   Options:
 
-    * `:page` - 1-based page, capped by callers to product limits.
+    * `:page` - 1-based page, clamped to the last matching page.
     * `:page_size` - capped at 100.
     * `:sort_by` - one of the VN browse sort atoms.
     * `:filters` - atom-keyed browse filters.
@@ -67,7 +66,7 @@ defmodule Kaguya.VisualNovels.Browse do
 
   defp browse_cache_key(filters, sort_by, page, page_size) do
     filter_hash = filters |> normalize_filters() |> :erlang.phash2()
-    {:vn_browse, filter_hash, sort_by || :default, page, page_size}
+    {:vn_catalogue, filter_hash, sort_by || :default, page, page_size}
   end
 
   defp normalize_filters(filters) do
@@ -79,7 +78,6 @@ defmodule Kaguya.VisualNovels.Browse do
 
   defp run_browse_query(page, page_size, sort_by, filters) do
     include_tags = Map.get(filters, :include_tags, []) || []
-    offset = (page - 1) * page_size
 
     effective_sort_by =
       if is_nil(sort_by) and include_tags != [], do: :relevance_desc, else: sort_by
@@ -99,8 +97,10 @@ defmodule Kaguya.VisualNovels.Browse do
       |> apply_vn_filters_with_relevance(filters, effective_sort_by)
       |> apply_sort_with_relevance(effective_sort_by, include_tags)
 
-    max_count = @max_pages * page_size + 1
-    total = fast_count(filters, max_count)
+    total = fast_count(filters, nil)
+    total_pages = max(1, ceil(total / page_size))
+    page = min(page, total_pages)
+    offset = (page - 1) * page_size
 
     items =
       query
@@ -113,7 +113,7 @@ defmodule Kaguya.VisualNovels.Browse do
       pagination: %{
         page: page,
         page_size: page_size,
-        total_pages: min(@max_pages, max(1, ceil(total / page_size))),
+        total_pages: total_pages,
         total_count: total
       }
     }
@@ -184,6 +184,11 @@ defmodule Kaguya.VisualNovels.Browse do
         |> select([vn], vn.id)
         |> limited_count(max_count)
     end
+  end
+
+  defp limited_count(query, nil) do
+    from(sub in subquery(query), select: count())
+    |> Repo.one()
   end
 
   defp limited_count(query, max_count) do

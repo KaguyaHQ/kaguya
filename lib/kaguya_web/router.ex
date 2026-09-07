@@ -57,6 +57,7 @@ defmodule KaguyaWeb.Router do
       live "/site-stats", SiteStatsLive.Index, :index
       live "/dumps", DumpsLive.Index, :index
       live "/members", MembersLive.Index, :index
+      live "/discover", BrowseLive.Index, :discover
       live "/browse", BrowseLive.Index, :index
       live "/browse/characters", BrowseLive.Index, :characters
       live "/history", ChangesLive.Index, :index

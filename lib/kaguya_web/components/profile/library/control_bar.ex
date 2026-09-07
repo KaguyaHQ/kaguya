@@ -14,7 +14,10 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
 
   use KaguyaWeb, :html
 
-  import KaguyaWeb.UI.Menu, only: [menu: 1]
+  import KaguyaWeb.UI.Menu, only: [menu: 1, menu_item: 1]
+
+  alias KaguyaWeb.UI.FilterControl
+  alias KaguyaWeb.UI.Input
 
   @rating_options [
     {5.0, "5"},
@@ -108,29 +111,23 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
       id={@id}
       align="start"
       side_offset={4}
-      class="text-foreground-primary inline-flex h-[34px] cursor-pointer list-none items-center gap-1.5 rounded-full border border-white/7 bg-white/4 px-3.5 text-[13px] transition-colors duration-150 hover:border-white/12 hover:bg-white/7 max-lg:h-fit max-lg:gap-2 max-lg:px-[14px] max-lg:py-1.5 max-lg:leading-[21px]"
+      class={FilterControl.trigger_class(not is_nil(@active), :quiet)}
     >
-      <:trigger>
+      <:trigger aria-label="Sort library">
         <Lucide.arrow_down_narrow_wide :if={@ascending?} class="size-4" aria-hidden />
         <Lucide.arrow_down_wide_narrow :if={!@ascending?} class="size-4" aria-hidden />
-        <span :if={@label}>{@label}</span>
+        <span class="max-lg:max-w-[100px] max-lg:truncate">{@label || "Sort"}</span>
       </:trigger>
-      <div class="bg-surface-elevated flex w-auto min-w-[180px] flex-col rounded-[12px] border-none p-1 shadow-lg">
-        <button
+      <div class={[FilterControl.panel_class(), "min-w-[180px]"]}>
+        <.menu_item
           :for={{atom, label, kebab} <- @options}
-          type="button"
-          phx-click="set_sort"
-          phx-value-value={kebab}
-          value={kebab}
-          class={[
-            "w-full cursor-pointer rounded-lg px-3 py-2.5 text-left text-[13px]/4 font-normal whitespace-nowrap transition-colors sm:py-2 sm:text-xs",
-            atom == @active &&
-              "bg-button-background-neutral-inverse-default font-semibold text-[rgb(var(--button-text-on-neutral-inverse))]",
-            atom != @active && "text-foreground-primary hover:bg-white/4"
-          ]}
+          event="set_sort"
+          value={%{value: kebab}}
+          class={FilterControl.option_class(atom == @active)}
+          aria-pressed={to_string(atom == @active)}
         >
           {label}
-        </button>
+        </.menu_item>
       </div>
     </.menu>
     """
@@ -159,40 +156,32 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
       id="library-rating-popover"
       align="start"
       side_offset={4}
-      class="text-foreground-primary inline-flex h-[34px] cursor-pointer list-none items-center gap-1.5 rounded-full border border-white/7 bg-white/4 px-3.5 text-[13px] transition-colors duration-150 hover:border-white/12 hover:bg-white/7 max-lg:h-fit max-lg:gap-2 max-lg:px-[14px] max-lg:py-1.5 max-lg:leading-[21px]"
+      class={FilterControl.trigger_class(not is_nil(@active), :quiet)}
     >
-      <:trigger>
+      <:trigger aria-label="Filter by rating">
         <.rating_stars :if={@active} value={@active} active />
         <Lucide.star
           :if={is_nil(@active)}
           class="text-foreground-secondary size-4"
           aria-hidden
         />
+        <span>Rating</span>
       </:trigger>
-      <div class="bg-surface-elevated flex w-auto min-w-[160px] flex-col rounded-[12px] border-none p-1 shadow-lg">
-        <button
-          type="button"
-          phx-click="clear_rating"
-          class={[
-            "flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-3 text-sm",
-            is_nil(@active) && "text-foreground-primary font-medium",
-            not is_nil(@active) && "text-foreground-secondary hover:bg-white/4"
-          ]}
+      <div class={[FilterControl.panel_class(), "min-w-[160px]"]}>
+        <.menu_item
+          event="clear_rating"
+          class={FilterControl.option_class(is_nil(@active))}
+          aria-pressed={to_string(is_nil(@active))}
         >
           <span>All ratings</span>
           <span :if={@total > 0} class="text-foreground-tertiary text-xs tabular-nums">{@total}</span>
-        </button>
-        <button
+        </.menu_item>
+        <.menu_item
           :for={{value, label} <- @options}
-          type="button"
-          phx-click="set_rating"
-          phx-value-value={rating_value(value)}
-          value={rating_value(value)}
-          class={[
-            "flex h-9 w-full cursor-pointer items-center justify-between rounded-md px-3 text-sm",
-            @active == value && "bg-white/6",
-            @active != value && "hover:bg-white/4"
-          ]}
+          event="set_rating"
+          value={%{value: rating_value(value)}}
+          class={FilterControl.option_class(@active == value)}
+          aria-pressed={to_string(@active == value)}
         >
           <.rating_stars value={value} active={@active == value} label={label} />
           <% bucket = rating_bucket(value, @ratings_dist) %>
@@ -206,7 +195,7 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
           >
             {bucket}
           </span>
-        </button>
+        </.menu_item>
       </div>
     </.menu>
     """
@@ -223,38 +212,33 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
       id="library-tag-popover"
       align="start"
       side_offset={4}
-      class="text-foreground-primary inline-flex h-[34px] cursor-pointer list-none items-center gap-1.5 rounded-full border border-white/7 bg-white/4 px-3.5 text-[13px] transition-colors duration-150 hover:border-white/12 hover:bg-white/7 max-lg:h-fit max-lg:gap-2 max-lg:px-[14px] max-lg:py-1.5 max-lg:leading-[21px]"
+      class={FilterControl.trigger_class(not is_nil(@active), :quiet)}
     >
-      <:trigger>
+      <:trigger aria-label="Filter by tag">
         <Lucide.tag class={["size-4", @active && "fill-current"]} aria-hidden />
+        <span>Tags</span>
       </:trigger>
-      <div class="bg-surface-elevated flex w-[220px] flex-col rounded-[12px] border-none p-1 shadow-lg">
+      <div class={[FilterControl.panel_class(), "w-[220px]"]}>
         <div class="max-h-[280px] overflow-y-auto py-1">
-          <button
+          <.menu_item
             :if={@active}
-            type="button"
-            phx-click="clear_tag"
-            class="text-foreground-secondary flex h-8 w-full cursor-pointer items-center rounded-md px-3 text-sm hover:bg-white/4"
+            event="clear_tag"
+            class={FilterControl.option_class()}
           >
             Clear filter
-          </button>
-          <button
+          </.menu_item>
+          <.menu_item
             :for={tag <- @tags}
-            type="button"
-            phx-click="set_tag"
-            phx-value-value={tag.tag_slug}
-            value={tag.tag_slug}
-            class={[
-              "flex h-8 w-full cursor-pointer items-center justify-between rounded-md px-3 text-sm",
-              @active == tag.tag_slug && "text-foreground-primary bg-white/6 font-medium",
-              @active != tag.tag_slug && "text-foreground-secondary hover:bg-white/4"
-            ]}
+            event="set_tag"
+            value={%{value: tag.tag_slug}}
+            class={FilterControl.option_class(@active == tag.tag_slug)}
+            aria-pressed={to_string(@active == tag.tag_slug)}
           >
             <span class="truncate">{tag.tag_name}</span>
             <span class="text-foreground-tertiary ml-2 shrink-0 text-xs tabular-nums">
               {tag.count}
             </span>
-          </button>
+          </.menu_item>
           <p :if={@tags == []} class="text-foreground-tertiary px-3 py-4 text-center text-sm">
             No tags
           </p>
@@ -265,36 +249,45 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
   end
 
   attr :value, :string, required: true
+  attr :id, :string, default: "library-search-desktop"
+  attr :class, :any, default: nil
+  attr :autofocus, :boolean, default: false
 
   def search_input(assigns) do
+    assigns = assign(assigns, :form, to_form(%{"value" => assigns.value}))
+
     ~H"""
-    <form
+    <.form
+      for={@form}
+      id={@id}
       phx-change="search"
       phx-submit="search"
-      class="relative flex h-[34px] min-w-0 flex-1 items-center"
+      class={["relative flex h-9 min-w-0 flex-1 items-center", @class]}
     >
       <.search_icon
         class="text-foreground-primary/50 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
         aria-hidden
       />
-      <input
+      <Input.input
         type="search"
-        name="value"
+        field={@form[:value]}
+        id={@id <> "-input"}
+        aria-label="Search library"
+        autofocus={@autofocus}
         placeholder="Search library..."
-        value={@value}
         phx-debounce="250"
-        class="border-border-divider no-search-clear placeholder:text-foreground-primary/40 text-foreground-primary size-full rounded-full border bg-transparent px-8 text-[13px] leading-[18px] focus:ring-0 focus:outline-hidden"
+        class="px-8 [&::-webkit-search-cancel-button]:appearance-none"
       />
       <button
         :if={@value != ""}
         type="button"
         phx-click="clear_search"
-        class="hover:text-foreground-primary text-foreground-secondary absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+        class="hover:text-foreground-primary text-foreground-secondary absolute top-1/2 right-0.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-md transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
         aria-label="Clear search"
       >
         <Lucide.x class="size-3.5" aria-hidden />
       </button>
-    </form>
+    </.form>
     """
   end
 
@@ -310,6 +303,7 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
       <KaguyaWeb.SharedComponents.FilterChip.filter_chip
         :for={{key, label} <- @items}
         label={label}
+        aria-label={"Remove #{label} filter"}
         phx-click="remove_filter"
         phx-value-key={key}
         icon_x

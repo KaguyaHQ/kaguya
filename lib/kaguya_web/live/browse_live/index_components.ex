@@ -8,6 +8,8 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   alias KaguyaWeb.BrowseLive.FilterOptions
   alias KaguyaWeb.BrowseLive.MobileControls
   alias KaguyaWeb.BrowseLive.TagSnapshot
+  alias KaguyaWeb.UI.FilterControl
+  alias KaguyaWeb.UI.Table
   import KaguyaWeb.UI.Menu, only: [menu: 1]
 
   attr :payload, :map, required: true
@@ -15,12 +17,25 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
   def browse_page(assigns) do
     ~H"""
-    <main class="lg:bg-surface-base text-foreground-primary min-h-screen pt-6 pb-20 sm:pt-8 lg:pt-16 dark:lg:bg-transparent">
+    <main class="lg:bg-surface-base text-foreground-primary min-h-screen pt-6 pb-20 sm:pt-8 lg:pt-10 dark:lg:bg-transparent">
       <div class="mx-auto flex w-full flex-col gap-4 sm:gap-6 md:max-lg:max-w-[768px] md:max-lg:px-6 lg:max-w-[1150px] lg:gap-12 lg:px-0">
-        <%= if @payload.mode == :characters do %>
-          <.characters payload={@payload} params={@params} />
+        <%= if @payload.mode == :discover do %>
+          <header class="flex items-center justify-between px-4 sm:px-0">
+            <h1 class="text-3xl font-semibold tracking-tight">Discover</h1>
+
+            <.link
+              id="discover-browse-link"
+              navigate="/browse"
+              class="text-sm underline underline-offset-4"
+            >Browse all novels</.link>
+          </header>
+          <.explore_sections sections={@payload.sections} />
         <% else %>
-          <.vns payload={@payload} params={@params} />
+          <%= if @payload.mode == :characters do %>
+            <.characters payload={@payload} params={@params} />
+          <% else %>
+            <.vns payload={@payload} params={@params} />
+          <% end %>
         <% end %>
       </div>
     </main>
@@ -32,21 +47,29 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
   defp vns(assigns) do
     ~H"""
-    <div class="flex flex-col gap-4 sm:gap-6 lg:gap-8">
+    <div class="flex flex-col gap-5 sm:gap-6">
+      <header class="flex flex-col items-start justify-between gap-3 px-4 sm:flex-row sm:items-end sm:gap-4 sm:px-0">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight sm:text-[32px]">Visual novels</h1>
+        </div>
+
+        <.link
+          id="browse-discover-link"
+          navigate="/discover"
+          class="hover:bg-surface-elevated hover:text-foreground-primary text-foreground-secondary inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
+        >Discover collections <Lucide.arrow_up_right class="size-4" /></.link>
+      </header>
+
       <div class="hidden sm:block">
         <.desktop_vn_filter_controls payload={@payload} params={@params} />
       </div>
-
       <.mobile_vn_controls payload={@payload} params={@params} />
-
       <%= if @payload.filters_active? do %>
         <div class="empty:hidden sm:hidden">
           <.active_filter_pills filters={@payload.filters} params={@params} />
         </div>
-        <.vn_results result={@payload.result} params={@params} />
-      <% else %>
-        <.explore_sections sections={@payload.sections} />
       <% end %>
+      <.vn_results result={@payload.result} params={@params} sort={@payload.sort_param} />
     </div>
     """
   end
@@ -102,10 +125,9 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     ~H"""
     <div class="flex flex-wrap items-center gap-2">
       <.mode_chip id="browse-type-popover" mode={:vn} params={@params} />
-
       <.link_popover_chip label={@sort_label} icon={:sort} active={not is_nil(@payload.sort_param)}>
         <.menu_link
-          :for={{label, value} <- [{"Default", ""} | @payload.sort_options]}
+          :for={{label, value} <- @payload.sort_options}
           href={query_path("/browse", @params, %{"sort" => value, "page" => nil})}
           selected?={(@payload.sort_param || "") == value}
         >
@@ -155,7 +177,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           )
         }
       />
-
       <.range_popover_chip
         label="Rating"
         params={@params}
@@ -177,7 +198,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           )
         }
       />
-
       <.link_popover_chip
         label="Length"
         value={single_chip_value(@payload.filters[:length_category], &length_label/1)}
@@ -203,7 +223,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         count={@platform_count}
         initial_count={10}
       />
-
       <.range_popover_chip
         label="Popularity"
         params={@params}
@@ -226,7 +245,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           )
         }
       />
-
       <.link_popover_chip
         label="AVN"
         value={
@@ -250,7 +268,11 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
       <button
         type="button"
-        phx-click={JS.toggle(to: "#browse-more-filters", display: "contents")}
+        id="browse-more-trigger"
+        phx-click={
+          JS.toggle(to: "#browse-more-filters", display: "inline-flex")
+          |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "#browse-more-trigger")
+        }
         class={filter_chip_class(@more_count > 0)}
         aria-expanded={to_string(@more_open?)}
         aria-controls="browse-more-filters"
@@ -267,7 +289,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
       <span
         id="browse-more-filters"
-        class="contents"
+        class="inline-flex flex-wrap items-center gap-2"
         style={if @more_open?, do: nil, else: "display: none"}
       >
         <.multi_popover_chip
@@ -357,13 +379,14 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
 
   defp mode_chip(assigns) do
     ~H"""
-    <.menu id={@id} align="start" class={filter_chip_class(false) <> "cursor-pointer"}>
+    <.menu id={@id} align="start" class={filter_chip_class(false)}>
       <:trigger aria-label="Change browse type">
         <Lucide.gamepad_2 :if={@mode == :vn} class="text-foreground-secondary size-4" />
         <Lucide.user_round :if={@mode == :characters} class="text-foreground-secondary size-4" />
         <span>{if @mode == :characters, do: "Characters", else: "VNs"}</span>
         <Lucide.chevron_down class="text-foreground-tertiary size-3.5 transition-transform duration-150 data-[state=open]:rotate-180" />
       </:trigger>
+
       <div class={popover_content_class("w-[180px] p-1")}>
         <.link
           patch={mode_href(:vn, @params)}
@@ -373,6 +396,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         >
           <Lucide.gamepad_2 class="size-4" /> VNs
         </.link>
+
         <.link
           patch={mode_href(:characters, @params)}
           rel="nofollow"
@@ -403,8 +427,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     <.menu
       id={@popover_id}
       align="start"
-      class={filter_chip_class(@active) <>
-      "cursor-pointer" <> if(@active and @clear_href, do: "pr-8", else: "")}
+      class={[filter_chip_class(@active), (@active and @clear_href) && "pr-8"]}
     >
       <:trigger>
         <.chip_icon :if={@icon} icon={@icon} active={@active} />
@@ -415,11 +438,13 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         >
           {@count}
         </span>
+
         <Lucide.chevron_down
           :if={not @active or is_nil(@clear_href)}
           class="text-foreground-tertiary size-3.5"
         />
       </:trigger>
+
       <:trailing :if={@active and @clear_href}>
         <.link
           patch={@clear_href}
@@ -430,6 +455,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           <Lucide.x class="size-3.5" />
         </.link>
       </:trailing>
+
       <div class={popover_content_class("w-[220px] p-1")}>
         {render_slot(@inner_block)}
       </div>
@@ -451,8 +477,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     <.menu
       id={@id}
       align="start"
-      class={filter_chip_class(@active) <>
-      "cursor-pointer" <> if(@active and @clear_href, do: "pr-8", else: "")}
+      class={[filter_chip_class(@active), (@active and @clear_href) && "pr-8"]}
     >
       <:trigger>
         <.chip_label label={@label} value={@value} active={@active} />
@@ -464,6 +489,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         </span>
         <Lucide.chevron_down :if={not @active} class="text-foreground-tertiary size-3.5" />
       </:trigger>
+
       <:trailing :if={@active and @clear_href}>
         <.link
           patch={@clear_href}
@@ -474,13 +500,13 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           <Lucide.x class="size-3.5" />
         </.link>
       </:trailing>
+
       <div class={popover_content_class(popover_panel_size(@variant))}>
         <form
           id={"#{@id}-form"}
           phx-hook="BrowseAutoApplyFilter"
           action="/browse"
           method="get"
-          onsubmit={compact_get_form_submit()}
         >
           <div class="flex flex-col gap-3">
             {render_slot(@inner_block)}
@@ -590,6 +616,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         <summary class="hover:text-foreground-primary text-foreground-secondary cursor-pointer list-none rounded-lg px-3 py-2 text-[13px] transition hover:bg-white/4 [&::-webkit-details-marker]:hidden">
           Show all {length(@options)}
         </summary>
+
         <div class="mt-1 max-h-[280px] overflow-y-auto pr-1">
           <.menu_link
             :for={{label, value} <- @hidden_options}
@@ -646,7 +673,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     >
       <input type="hidden" name={@include_name} value={@include_value} data-tag-picker-include />
       <input type="hidden" name={@exclude_name} value={@exclude_value} data-tag-picker-exclude />
-
       <label class="relative mx-3.5 block">
         <.search_icon class="text-foreground-tertiary pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
         <input
@@ -808,16 +834,19 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
           value={@min_input_value}
           placeholder={@min_placeholder}
           inputmode="decimal"
+          step={@step}
+          aria-label={"Minimum #{@label}"}
           class={range_number_class(@density)}
           data-range-min-input
-        />
-        <span class="text-foreground-secondary shrink-0 text-xs">-</span>
+        /> <span class="text-foreground-secondary shrink-0 text-xs">-</span>
         <input
           type="number"
           name={@max_name}
           value={@max_input_value}
           placeholder={@max_placeholder}
           inputmode="decimal"
+          step={@step}
+          aria-label={"Maximum #{@label}"}
           class={range_number_class(@density)}
           data-range-max-input
         />
@@ -883,8 +912,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   # Active + value (single-select, range): "Label:" (lighter) + Value (base weight)
   defp chip_label(%{active: true, value: value} = assigns) when is_binary(value) do
     ~H"""
-    <span class="font-normal">{@label}:</span>
-    <span>{@value}</span>
+    <span class="font-normal">{@label}:</span> <span>{@value}</span>
     """
   end
 
@@ -945,7 +973,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         icon_x
         title="Remove filter"
       />
-
       <.link
         :if={length(@pills) > 1}
         patch={clear_filter_path(@params)}
@@ -971,14 +998,16 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
       >
         <header>
           <.link
-            patch={section.href}
+            navigate={section.href}
             rel="nofollow"
             class="group/heading text-foreground-primary inline-flex items-center gap-1.5 text-xl font-semibold tracking-tight transition-colors sm:text-2xl"
           >
             <h2>{section.title}</h2>
+
             <Lucide.chevron_right class="text-foreground-tertiary size-[18px] translate-x-0 opacity-0 transition-all duration-200 ease-out group-hover/heading:translate-x-0.5 group-hover/heading:opacity-100" />
           </.link>
         </header>
+
         <%= if section.items == [] do %>
           <p class="text-foreground-secondary py-6 text-sm">No matches yet — check back soon.</p>
         <% else %>
@@ -1037,18 +1066,160 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   attr :result, :map, required: true
   attr :params, :map, required: true
 
+  attr :sort, :string, required: true
+
   defp vn_results(assigns) do
     ~H"""
-    <div class="text-foreground-primary scroll-mt-32 max-sm:-mt-[3px] sm:rounded-[12px]">
+    <section
+      id="browse-results"
+      aria-label="Visual novel results"
+      class="border-border-divider text-foreground-primary scroll-mt-32 overflow-hidden border-y sm:rounded-xl sm:border"
+    >
+      <div class="text-foreground-secondary flex items-center justify-between gap-4 p-4 text-sm sm:px-5">
+        <span id="browse-result-count"><span class="text-foreground-primary font-medium">{catalogue_count(
+          @result.pagination.total_count
+        )}</span>
+        visual novels</span>
+        <span :if={@result.items != []} class="tabular-nums">
+          {(@result.pagination.page - 1) * @result.pagination.page_size + 1}–{(@result.pagination.page -
+                                                                                 1) *
+            @result.pagination.page_size + length(@result.items)}
+        </span>
+      </div>
+
       <%= if @result.items == [] do %>
-        <div class="text-foreground-secondary flex min-h-[536px] flex-col items-center justify-center px-5 font-normal">
-          <p>No VNs match your filters</p>
-          <p>Try adjusting them</p>
+        <div
+          id="browse-empty"
+          class="border-border-divider flex min-h-64 flex-col items-center justify-center gap-2 border-y px-5 text-center"
+        >
+          <h2 class="font-medium">No visual novels match your filters</h2>
+
+          <p class="text-foreground-secondary text-sm">Try a broader rating range or fewer tags.</p>
+
+          <.link
+            id="browse-clear-filters"
+            patch="/browse"
+            class="mt-3 text-sm underline underline-offset-4"
+          >Clear filters</.link>
         </div>
       <% else %>
-        <div class="grid grid-cols-3 gap-1.5 px-4 pb-5 sm:grid-cols-4 sm:gap-4 sm:pb-10 sm:max-lg:px-0 md:grid-cols-5 md:gap-x-3 md:gap-y-4 lg:gap-x-3 lg:gap-y-6 lg:px-0 xl:grid-cols-6">
-          <.vn_card :for={vn <- @result.items} vn={vn} />
-        </div>
+        <Table.table
+          id="browse-catalogue"
+          caption="Visual novels with release date, length, rating, and rating count"
+        >
+          <:header>
+            <Table.column_header class="w-9 pl-3 sm:w-14 sm:pl-5">
+              #
+            </Table.column_header>
+
+            <Table.column_header class="pr-3">Title</Table.column_header>
+
+            <Table.column_header
+              class="hidden w-36 md:table-cell"
+              sort={column_sort(@sort, "newest", "oldest")}
+            >
+              <.catalogue_sort
+                label="Released"
+                value="newest"
+                reverse="oldest"
+                sort={@sort}
+                params={@params}
+              />
+            </Table.column_header>
+
+            <Table.column_header class="hidden w-32 lg:table-cell">
+              Length
+            </Table.column_header>
+
+            <Table.column_header
+              class="w-24 pr-4 text-right sm:w-28"
+              sort={column_sort(@sort, "top-rated", "lowest-rated")}
+            >
+              <.catalogue_sort
+                label="Rating / 5"
+                align="end"
+                value="top-rated"
+                reverse="lowest-rated"
+                sort={@sort}
+                params={@params}
+              />
+            </Table.column_header>
+
+            <Table.column_header
+              class="hidden w-28 pr-5 text-right sm:table-cell"
+              sort={column_sort(@sort, "most-popular", "least-popular")}
+            >
+              <.catalogue_sort
+                label="Votes"
+                align="end"
+                value="most-popular"
+                reverse="least-popular"
+                sort={@sort}
+                params={@params}
+              />
+            </Table.column_header>
+          </:header>
+          <tr
+            :for={{vn, index} <- Enum.with_index(@result.items)}
+            id={"browse-vn-#{vn.id}"}
+            class="group/row"
+          >
+            <td class="text-foreground-tertiary py-2 pl-3 align-middle text-xs tabular-nums sm:pl-5">
+              {(@result.pagination.page - 1) * @result.pagination.page_size + index + 1}
+            </td>
+
+            <th scope="row" class="py-2 pr-3 text-left font-normal">
+              <.link
+                id={"browse-vn-link-#{vn.id}"}
+                navigate={"/vn/#{vn.slug}"}
+                class="group flex items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 sm:gap-4"
+              >
+                <div class="h-12 w-[34px] shrink-0 overflow-hidden rounded-md shadow-sm ring-1 ring-black/10 dark:ring-white/10">
+                  <.cover_img
+                    src={vn_cover(vn, :small)}
+                    alt=""
+                    class="size-full object-cover"
+                    blur_nsfw={adult_cover?(vn)}
+                    nsfw_blur_size="40"
+                  />
+                </div>
+
+                <div class="min-w-0">
+                  <span class="decoration-foreground-tertiary line-clamp-2 text-[15px] leading-snug font-medium underline-offset-4 group-hover:underline sm:text-base">{vn.title}</span>
+                  <span class="text-foreground-secondary mt-1 block text-xs md:hidden">{if vn.release_date,
+                    do: vn.release_date.year,
+                    else: "TBA"}</span>
+                </div>
+              </.link>
+            </th>
+
+            <td class="text-foreground-secondary hidden py-2 text-sm tabular-nums md:table-cell">
+              {if vn.release_date, do: Calendar.strftime(vn.release_date, "%Y-%m-%d"), else: "TBA"}
+            </td>
+
+            <td class="text-foreground-secondary hidden py-2 text-sm lg:table-cell">
+              {catalogue_length(vn)}
+            </td>
+
+            <td class="py-2 pr-4 text-right tabular-nums">
+              <span
+                title={
+                  if show_rating?(vn),
+                    do: "Average rating out of 5",
+                    else: "At least 5 ratings needed"
+                }
+                class="text-[15px] font-medium sm:text-base"
+              >{if show_rating?(vn), do: format_rating(vn.average_rating), else: "—"}</span>
+              <span class="text-foreground-tertiary mt-1 block text-xs sm:hidden">{short_count(
+                vn.ratings_count || 0
+              )} votes</span>
+            </td>
+
+            <td class="text-foreground-secondary hidden py-2 pr-5 text-right text-sm tabular-nums sm:table-cell">
+              {catalogue_count(vn.ratings_count || 0)}
+            </td>
+          </tr>
+        </Table.table>
       <% end %>
 
       <.pagination
@@ -1057,37 +1228,52 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         params={@params}
         base_path="/browse"
       />
-    </div>
+    </section>
     """
   end
 
-  attr :vn, :map, required: true
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :reverse, :string, required: true
+  attr :sort, :string, required: true
+  attr :params, :map, required: true
+  attr :align, :string, default: "start"
 
-  defp vn_card(assigns) do
+  defp catalogue_sort(assigns) do
     ~H"""
-    <.link navigate={"/vn/#{@vn.slug}"} class="flex flex-col gap-1 rounded-[2px] sm:rounded-[4px]">
-      <div class="aspect-1/1.5 overflow-hidden rounded-[2px] sm:rounded-[4px]">
-        <.cover_img
-          src={vn_cover(@vn, :large)}
-          alt={@vn.title}
-          class="size-full object-cover object-center"
-          blur_nsfw={adult_cover?(@vn)}
-          nsfw_blur_size="172"
-        />
-      </div>
-      <div class="flex min-h-4 items-center gap-1.5 px-0.5">
-        <div :if={show_rating?(@vn)} class="flex items-baseline gap-1 font-medium">
-          <span class="text-foreground-secondary text-[11px] sm:text-[12px]">
-            {format_rating(@vn.average_rating)}
-          </span>
-          <span class="text-foreground-tertiary text-[10px] sm:text-[11px]">
-            {short_count(@vn.ratings_count || 0)}
-          </span>
-        </div>
-      </div>
-    </.link>
+    <Table.sort_link
+      id={"browse-sort-#{@value}"}
+      label={@label}
+      align={@align}
+      sort={column_sort(@sort, @value, @reverse)}
+      next_direction={if @sort == @value, do: "ascending", else: "descending"}
+      patch={
+        query_path("/browse", @params, %{
+          "sort" => if(@sort == @value, do: @reverse, else: @value),
+          "page" => nil
+        })
+      }
+    />
     """
   end
+
+  defp column_sort(sort, descending, _ascending) when sort == descending, do: "descending"
+  defp column_sort(sort, _descending, ascending) when sort == ascending, do: "ascending"
+  defp column_sort(_, _, _), do: "none"
+
+  defp catalogue_count(count) do
+    count
+    |> Integer.to_string()
+    |> String.replace(~r/\B(?=(\d{3})+(?!\d))/, ",")
+  end
+
+  defp catalogue_length(%{length_minutes: minutes}) when is_integer(minutes) and minutes > 0,
+    do: "#{Float.round(minutes / 60, 1)} h"
+
+  defp catalogue_length(%{length_category: category}) when is_binary(category),
+    do: length_label(category)
+
+  defp catalogue_length(_), do: "—"
 
   attr :character, :map, required: true
 
@@ -1104,10 +1290,12 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
         />
         <div class="pointer-events-none absolute inset-0 rounded-[12px] ring-1 ring-black/8 transition ring-inset group-hover:ring-black/[0.14]" />
       </div>
+
       <div class="flex flex-col gap-0.5 px-0.5">
         <span class="text-foreground-primary line-clamp-1 text-sm font-semibold transition-colors group-hover:text-white">
           {@character.name}
         </span>
+
         <span
           :if={(@character.favorites_count || 0) > 0}
           class="text-foreground-tertiary flex items-center gap-1 text-xs"
@@ -1222,22 +1410,9 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   end
 
   defp filter_chip_class(active?) do
-    base =
-      "inline-flex h-[34px] items-center gap-1.5 rounded-full border border-white/[7%] bg-white/[4%] px-3.5 text-[13px] font-medium text-foreground-primary outline-none transition-colors duration-150 hover:border-white/[12%] hover:bg-white/[7%] focus:outline-none focus-visible:outline-none focus-within:border-white/[14%] focus-within:bg-white/[7%]"
-
-    if active? do
-      # Brand here is crimson (rgb 155 1 61), and red borders read as
-      # destructive/error next to the page's actual semantic-error chips.
-      # A filled neutral pill is the cleaner "this chip is selected" signal:
-      # bg does the work, not color.
-      # `!` overrides the base `bg-white/[4%]` (Tailwind v4 emits utilities
-      # alphabetically; without !important the base wins on same-specificity
-      # ties — prod sidesteps this via tailwind-merge, we string-concat).
-      base <>
-        " !bg-white/[10%] hover:!bg-white/[14%]"
-    else
-      base
-    end
+    active?
+    |> FilterControl.trigger_class()
+    |> String.replace("rounded-full", "rounded-md")
   end
 
   defp pill_class(:exclude),
@@ -1504,10 +1679,6 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     end)
   end
 
-  defp compact_get_form_submit do
-    "this.querySelectorAll('input, select').forEach((field) => { field.disabled = field.value === '' })"
-  end
-
   defp bool_value(true), do: "true"
   defp bool_value(false), do: "false"
   defp bool_value(_), do: ""
@@ -1713,7 +1884,7 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
   defp show_rating?(vn), do: (vn.ratings_count || 0) >= 5 and not is_nil(vn.average_rating)
 
   defp format_rating(rating) when is_number(rating),
-    do: :erlang.float_to_binary(rating / 1, decimals: 1)
+    do: :erlang.float_to_binary(rating / 1, decimals: 2)
 
   defp format_rating(_), do: nil
 

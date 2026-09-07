@@ -17,6 +17,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
 
   alias KaguyaWeb.Components.Profile.Library.ControlBar
   alias KaguyaWeb.ProfileLive.LibraryData
+  alias KaguyaWeb.UI.FilterControl
 
   attr :shelf, :any, required: true
   attr :filters, :map, required: true
@@ -47,7 +48,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
 
     ~H"""
     <%!-- Mobile shelf trigger (status label + count) --%>
-    <div class="mb-4 flex items-center justify-between px-4 lg:hidden">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 px-4 lg:hidden">
       <.menu
         id="library-mobile-shelf-selector"
         align="start"
@@ -60,12 +61,12 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           </span>
           <Lucide.chevron_down class="size-4 shrink-0" aria-hidden />
         </:trigger>
-        <div class="bg-surface-base border-border-divider flex w-56 flex-col rounded-[8px] border p-1 shadow-lg">
+        <div class={[FilterControl.panel_class(), "w-56"]}>
           <.menu_item
             :for={shelf_def <- @shelves}
             event="select_shelf"
             value={%{value: shelf_def.value}}
-            class={shelf_menu_item_class(@active == shelf_def.value)}
+            class={FilterControl.option_class(@active == shelf_def.value)}
             aria-current={if @active == shelf_def.value, do: "true"}
           >
             <span class="flex-1">{shelf_def.label}</span>
@@ -78,9 +79,12 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
         <ControlBar.sort_popover id="library-sort-popover-mobile" shelf={@shelf} filters={@filters} />
         <button
           type="button"
+          id="library-mobile-search-toggle"
           phx-click="toggle_mobile_search"
+          aria-expanded={to_string(@mobile_search_open)}
+          aria-controls="library-mobile-search"
           aria-label="Search library"
-          class="flex h-fit items-center gap-2 rounded-full border border-white/7 bg-white/4 px-[14px] py-1.5 text-[13px] leading-[21px] text-[rgb(var(--foreground-primary))] transition-colors duration-150 hover:bg-white/7"
+          class={FilterControl.trigger_class(@mobile_search_open)}
         >
           <.search_icon class="size-4" aria-hidden />
         </button>
@@ -97,36 +101,16 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
     </div>
 
     <%!-- Mobile search field --%>
-    <div :if={@mobile_search_open} class="overflow-hidden lg:hidden">
-      <div class="px-4 pb-3">
-        <form phx-change="search" phx-submit="search" class="relative">
-          <.search_icon
-            class="text-foreground-primary/50 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-            aria-hidden
-          />
-          <input
-            type="search"
-            name="value"
-            placeholder="Search library..."
-            value={@filters.search || ""}
-            phx-debounce="250"
-            class="border-border-divider no-search-clear placeholder:text-foreground-primary/40 text-foreground-primary h-10 w-full rounded-lg border bg-transparent pr-10 pl-9 text-sm focus:ring-0 focus:outline-hidden"
-            autofocus
-          />
-          <button
-            :if={(@filters.search || "") != ""}
-            type="button"
-            phx-click="clear_search"
-            class="hover:text-foreground-primary text-foreground-secondary absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-            aria-label="Clear search"
-          >
-            <Lucide.x class="size-3.5" aria-hidden />
-          </button>
-        </form>
-      </div>
+    <div id="library-mobile-search" class={["px-4 pb-3 lg:hidden", !@mobile_search_open && "hidden"]}>
+      <ControlBar.search_input
+        :if={@mobile_search_open}
+        id="library-search-mobile"
+        value={@filters.search || ""}
+        autofocus
+      />
     </div>
 
-    <%!-- Desktop shelf pill tabs --%>
+    <%!-- Desktop shelf navigation --%>
     <div class="mb-5 hidden items-center gap-2 overflow-hidden lg:flex">
       <div class="flex max-w-[920px] flex-wrap items-center gap-2">
         <button
@@ -135,7 +119,9 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           phx-click="select_shelf"
           phx-value-value={shelf_def.value}
           value={shelf_def.value}
-          class={shelf_tab_classes(@active == shelf_def.value)}
+          id={"library-shelf-#{shelf_def.value}"}
+          aria-pressed={to_string(@active == shelf_def.value)}
+          class={shelf_trigger_class(@active == shelf_def.value)}
           data-shelf={shelf_def.value}
         >
           <%= if @active == shelf_def.value do %>
@@ -167,17 +153,17 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
       id="library-labels-dropdown"
       align="end"
       side_offset={8}
-      class="text-foreground-secondary ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 py-2 pr-0 pl-[10px] text-sm/5 whitespace-nowrap transition-colors"
+      class={[shelf_trigger_class(not is_nil(@selected)), "ml-auto"]}
     >
       <:trigger>
         {@label}
         <Lucide.chevron_down class="size-4" aria-hidden />
       </:trigger>
-      <div class="bg-surface-elevated border-border-divider flex w-[216px] flex-col rounded-[12px] border p-0 py-1 shadow-lg">
+      <div class={[FilterControl.panel_class(), "w-[216px]"]}>
         <.menu_item
           :if={@selected}
           event="clear_shelf"
-          class="border-border-divider text-foreground-secondary flex h-[41px] items-center justify-between border-b px-[19px] text-sm hover:bg-white/4"
+          class={FilterControl.option_class()}
         >
           Clear
         </.menu_item>
@@ -185,8 +171,8 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           :for={shelf <- @shelves}
           event="select_shelf"
           value={%{value: shelf.slug}}
-          class={"flex h-[41px] w-full items-center justify-between px-[19px] text-sm hover:bg-white/4" <>
-      if(shelf.slug == @active, do: "bg-white/6 font-medium", else: "")}
+          class={FilterControl.option_class(shelf.slug == @active)}
+          aria-pressed={to_string(shelf.slug == @active)}
         >
           <span class="truncate">{shelf.name}</span>
           <span class="text-foreground-secondary text-xs">{shelf.vns_count}</span>
@@ -219,21 +205,13 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
       |> assign(:rating_options, ControlBar.rating_options())
 
     ~H"""
-    <details class="group relative lg:hidden">
-      <summary
-        class="flex h-fit cursor-pointer list-none items-center gap-2 rounded-full border border-white/7 bg-white/4 px-[14px] py-1.5 text-[13px] leading-[21px] text-[rgb(var(--foreground-primary))] transition-colors duration-150 hover:bg-white/7"
-        aria-label="More library filters"
-      >
+    <.menu id="library-mobile-more-menu" align="end" class={FilterControl.trigger_class()}>
+      <:trigger aria-label="More library filters">
         <Lucide.ellipsis class="size-4" aria-hidden />
-      </summary>
-
-      <div
-        class="bg-surface-elevated border-border-divider absolute right-0 z-40 mt-2 flex w-[240px] flex-col rounded-[12px] border p-1 shadow-lg"
-        role="menu"
-        aria-label="More library filters"
-      >
+      </:trigger>
+      <div class={[FilterControl.panel_class(), "max-h-[70dvh] w-[260px] overflow-y-auto"]}>
         <details class="group/rating">
-          <summary class="text-foreground-primary flex h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-sm hover:bg-white/4">
+          <summary class={[FilterControl.option_class(), "list-none"]}>
             <span class="flex items-center gap-2.5">
               <Lucide.star
                 class={["size-4", @filters.rating && "fill-current"]}
@@ -243,32 +221,27 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
             <span :if={@filters.rating} class="bg-foreground-secondary size-1.5 rounded-full" />
           </summary>
           <div class="px-1 pb-1">
-            <button
-              type="button"
-              phx-click="clear_rating"
-              class="text-foreground-secondary flex h-8 w-full items-center rounded-md px-3 text-sm hover:bg-white/4"
+            <.menu_item
+              event="clear_rating"
+              class={FilterControl.option_class(is_nil(@filters.rating))}
+              aria-pressed={to_string(is_nil(@filters.rating))}
             >
               All ratings
-            </button>
-            <button
+            </.menu_item>
+            <.menu_item
               :for={{value, label} <- @rating_options}
-              type="button"
-              phx-click="set_rating"
-              phx-value-value={ControlBar.rating_value(value)}
-              value={ControlBar.rating_value(value)}
-              class={[
-                "flex h-8 w-full items-center rounded-md px-3 text-sm",
-                @filters.rating == value && "text-foreground-primary bg-white/6 font-medium",
-                @filters.rating != value && "text-foreground-secondary hover:bg-white/4"
-              ]}
+              event="set_rating"
+              value={%{value: ControlBar.rating_value(value)}}
+              class={FilterControl.option_class(@filters.rating == value)}
+              aria-pressed={to_string(@filters.rating == value)}
             >
               <ControlBar.rating_stars value={value} active={@filters.rating == value} label={label} />
-            </button>
+            </.menu_item>
           </div>
         </details>
 
         <details class="group/tags">
-          <summary class="text-foreground-primary flex h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-sm hover:bg-white/4">
+          <summary class={[FilterControl.option_class(), "list-none"]}>
             <span class="flex items-center gap-2.5">
               <Lucide.tag
                 class={["size-4", @filters.tag_slug && "fill-current"]}
@@ -278,32 +251,25 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
             <span :if={@filters.tag_slug} class="bg-foreground-secondary size-1.5 rounded-full" />
           </summary>
           <div class="max-h-[220px] overflow-y-auto px-1 pb-1">
-            <button
+            <.menu_item
               :if={@filters.tag_slug}
-              type="button"
-              phx-click="clear_tag"
-              class="text-foreground-secondary flex h-8 w-full items-center rounded-md px-3 text-sm hover:bg-white/4"
+              event="clear_tag"
+              class={FilterControl.option_class()}
             >
               Clear filter
-            </button>
-            <button
+            </.menu_item>
+            <.menu_item
               :for={tag <- @tags}
-              type="button"
-              phx-click="set_tag"
-              phx-value-value={tag.tag_slug}
-              value={tag.tag_slug}
-              class={[
-                "flex h-8 w-full items-center justify-between rounded-md px-3 text-sm",
-                @filters.tag_slug == tag.tag_slug &&
-                  "text-foreground-primary bg-white/6 font-medium",
-                @filters.tag_slug != tag.tag_slug && "text-foreground-secondary hover:bg-white/4"
-              ]}
+              event="set_tag"
+              value={%{value: tag.tag_slug}}
+              class={FilterControl.option_class(@filters.tag_slug == tag.tag_slug)}
+              aria-pressed={to_string(@filters.tag_slug == tag.tag_slug)}
             >
               <span class="truncate">{tag.tag_name}</span>
               <span class="text-foreground-tertiary ml-2 shrink-0 text-xs tabular-nums">
                 {tag.count}
               </span>
-            </button>
+            </.menu_item>
             <p :if={@tags == []} class="text-foreground-tertiary p-3 text-sm">
               No tags
             </p>
@@ -311,7 +277,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
         </details>
 
         <details class="group/labels">
-          <summary class="text-foreground-primary flex h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-sm hover:bg-white/4">
+          <summary class={[FilterControl.option_class(), "list-none"]}>
             <span class="flex items-center gap-2.5">
               <Lucide.tag
                 class={["size-4", @has_active_label && "fill-current"]}
@@ -321,31 +287,25 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
             <span :if={@has_active_label} class="bg-foreground-secondary size-1.5 rounded-full" />
           </summary>
           <div class="max-h-[220px] overflow-y-auto px-1 pb-1">
-            <button
+            <.menu_item
               :if={@has_active_label}
-              type="button"
-              phx-click="clear_shelf"
-              class="text-foreground-secondary flex h-8 w-full items-center rounded-md px-3 text-sm hover:bg-white/4"
+              event="clear_shelf"
+              class={FilterControl.option_class()}
             >
               Clear
-            </button>
-            <button
+            </.menu_item>
+            <.menu_item
               :for={shelf <- @custom_shelves}
-              type="button"
-              phx-click="select_shelf"
-              phx-value-value={shelf.slug}
-              value={shelf.slug}
-              class={[
-                "flex h-8 w-full items-center justify-between rounded-md px-3 text-sm",
-                shelf.slug == @active && "text-foreground-primary bg-white/6 font-medium",
-                shelf.slug != @active && "text-foreground-secondary hover:bg-white/4"
-              ]}
+              event="select_shelf"
+              value={%{value: shelf.slug}}
+              class={FilterControl.option_class(shelf.slug == @active)}
+              aria-pressed={to_string(shelf.slug == @active)}
             >
               <span class="truncate">{shelf.name}</span>
               <span class="text-foreground-tertiary ml-2 shrink-0 text-xs tabular-nums">
                 {shelf.vns_count}
               </span>
-            </button>
+            </.menu_item>
             <p :if={@custom_shelves == []} class="text-foreground-tertiary p-3 text-sm">
               No labels
             </p>
@@ -359,7 +319,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           type="button"
           data-show-dates-toggle
           aria-pressed={to_string(@show_dates)}
-          class="text-foreground-primary flex h-10 items-center justify-between rounded-lg px-3 text-sm hover:bg-white/4"
+          class={FilterControl.option_class()}
         >
           <span class="flex items-center gap-2.5">
             <Lucide.calendar class="text-foreground-secondary size-4" aria-hidden /> Show dates
@@ -381,7 +341,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           type="button"
           data-fade-toggle
           aria-pressed={to_string(@fade_read)}
-          class="text-foreground-primary flex h-10 items-center justify-between rounded-lg px-3 text-sm hover:bg-white/4"
+          class={FilterControl.option_class()}
         >
           <span class="flex items-center gap-2.5">
             <Lucide.eye class="text-foreground-secondary size-4" aria-hidden /> Fade read
@@ -398,28 +358,22 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           </span>
         </button>
       </div>
-    </details>
+    </.menu>
     """
+  end
+
+  defp shelf_trigger_class(selected?) do
+    [
+      "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border px-[10px] py-2 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground-secondary",
+      if(selected?,
+        do:
+          "border-[rgb(var(--tab-background-active))] bg-[rgb(var(--tab-background-active))] text-[rgb(var(--tab-text-active))] text-style-body2Medium",
+        else:
+          "border-[rgb(var(--tab-border-default))] bg-[rgb(var(--tab-background-default))] text-[rgb(var(--tab-text-default))] hover:border-[rgb(var(--tab-border-hover))] text-style-body2Regular"
+      )
+    ]
   end
 
   defp count_for(counts, %{value: "ALL"}), do: Map.get(counts, :all, 0)
   defp count_for(counts, %{status: status}), do: Map.get(counts, status, 0)
-
-  defp shelf_menu_item_class(true) do
-    "flex h-[48px] items-center gap-3 px-5 text-left text-sm font-medium bg-white/[4%]"
-  end
-
-  defp shelf_menu_item_class(false) do
-    "flex h-[48px] items-center gap-3 px-5 text-left text-sm font-normal"
-  end
-
-  defp shelf_tab_classes(true) do
-    "flex shrink-0 items-center justify-center border whitespace-nowrap transition-colors px-[10px] py-2 " <>
-      "bg-[rgb(var(--tab-background-active))] border-[rgb(var(--tab-background-active))] text-[rgb(var(--tab-text-active))] text-style-body2Medium font-medium"
-  end
-
-  defp shelf_tab_classes(false) do
-    "flex shrink-0 items-center justify-center border whitespace-nowrap transition-colors px-[10px] py-2 " <>
-      "bg-[rgb(var(--tab-background-default))] border-[rgb(var(--tab-border-default))] text-[rgb(var(--tab-text-default))] hover:border-[rgb(var(--tab-border-hover))] text-style-body2Regular"
-  end
 end

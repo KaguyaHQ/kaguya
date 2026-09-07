@@ -36,15 +36,19 @@ defmodule KaguyaWeb.BrowseLive.Index do
     """
   end
 
+  defp mode(:discover, _params), do: :discover
   defp mode(:characters, _params), do: :characters
   defp mode(_action, %{"type" => "characters"}), do: :characters
   defp mode(_action, _params), do: :vn
 
   defp page_title(:characters), do: "Browse Characters • Kaguya"
+  defp page_title(:discover), do: "Discover • Kaguya"
   defp page_title(:vn), do: "Browse • Kaguya"
 
   defp meta_description(:characters),
     do: "Discover characters from visual novels — sort by popularity, name, or recency."
+
+  defp meta_description(:discover), do: "Find your next visual novel through curated collections."
 
   defp meta_description(:vn),
     do: "Filter and sort visual novels by rating, length, release date, tags, language, and more."

@@ -28,6 +28,79 @@ defmodule KaguyaWeb.ProfileLive.LibraryTest do
   end
 
   describe "GET /@:username/library" do
+    test "shared filter actions preserve selection and patch the library URL", %{conn: conn} do
+      owner = UserFixtures.insert_user!()
+      vn = insert_vn!("Selected library controls")
+      insert_status!(owner, vn, :read)
+      Repo.insert!(%Rating{user_id: owner.id, visual_novel_id: vn.id, rating: 5.0})
+      path = "/@#{owner.username}/library"
+      {:ok, view, _html} = live(conn, path)
+
+      assert has_element?(view, "#library-shelf-ALL[aria-pressed='true']")
+
+      view |> element("#library-shelf-READ") |> render_click()
+      assert_patch(view, path <> "/read")
+      assert has_element?(view, "#library-shelf-READ[aria-pressed='true']")
+      assert has_element?(view, "#library-shelf-ALL[aria-pressed='false']")
+
+      view
+      |> element("#library-sort-popover-desktop-panel button[data-menu-dismiss]", "Highest rated")
+      |> render_click()
+
+      assert_patch(view, path <> "/read?sort=my-highest-rated")
+
+      assert has_element?(
+               view,
+               "#library-sort-popover-desktop-panel button[aria-pressed='true']",
+               "Highest rated"
+             )
+
+      assert has_element?(view, "#library-item-#{vn.id}")
+
+      assert has_element?(
+               view,
+               "#library-rating-popover-trigger[aria-controls='library-rating-popover-panel']"
+             )
+
+      assert has_element?(
+               view,
+               "#library-rating-popover-panel button[data-menu-dismiss]",
+               "All ratings"
+             )
+
+      assert has_element?(
+               view,
+               "#library-mobile-more-menu-trigger[aria-controls='library-mobile-more-menu-panel']"
+             )
+    end
+
+    test "mobile search uses the shared form and exposes its expanded state", %{conn: conn} do
+      owner = UserFixtures.insert_user!()
+      matching = insert_vn!("Tsukihime shared search")
+      other = insert_vn!("Clannad shared search")
+      insert_status!(owner, matching, :read)
+      insert_status!(owner, other, :read)
+      {:ok, view, _html} = live(conn, "/@#{owner.username}/library")
+
+      assert has_element?(view, "#library-search-desktop input[aria-label='Search library']")
+      assert has_element?(view, "#library-mobile-search-toggle[aria-expanded='false']")
+
+      view |> element("#library-mobile-search-toggle") |> render_click()
+
+      assert has_element?(
+               view,
+               "#library-mobile-search-toggle[aria-expanded='true'][aria-controls='library-mobile-search']"
+             )
+
+      view |> element("#library-search-mobile") |> render_change(%{value: "Tsukihime"})
+      assert has_element?(view, "#library-item-#{matching.id}")
+      refute has_element?(view, "#library-item-#{other.id}")
+
+      view |> element("#library-mobile-search-toggle") |> render_click()
+      assert has_element?(view, "#library-mobile-search-toggle[aria-expanded='false']")
+      refute has_element?(view, "#library-search-mobile")
+    end
+
     test "show dates updates already rendered cards in both directions", %{conn: conn} do
       owner = UserFixtures.insert_user!()
       vn = insert_vn!("Reading dates")

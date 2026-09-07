@@ -18,9 +18,22 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
   import KaguyaWeb.UI.Input
 
   alias Phoenix.LiveView.JS
+  alias KaguyaWeb.UI.Table
+  alias KaguyaWeb.UI.FilterControl
+  alias KaguyaWeb.SharedComponents.FilterChip
 
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, last_event: nil, dialog_open?: false, alert_open?: false)}
+    {:ok,
+     assign(socket,
+       last_event: nil,
+       dialog_open?: false,
+       alert_open?: false,
+       filter_selected?: false
+     )}
+  end
+
+  def handle_event("toggle_demo_filter", _params, socket) do
+    {:noreply, assign(socket, :filter_selected?, !socket.assigns.filter_selected?)}
   end
 
   def handle_event("primitive_event", %{"label" => label}, socket) do
@@ -57,11 +70,55 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
       <section class="space-y-4">
         <h2 class="text-foreground-primary text-style-heading3Medium">Input</h2>
         <div class="flex max-w-md flex-col gap-3">
-          <.input type="text" placeholder="Your name" />
-          <.input type="email" placeholder="you@example.com" />
-          <.input type="password" placeholder="••••••••" />
-          <.input type="text" value="readonly value" readonly />
-          <.input type="text" placeholder="disabled" disabled />
+          <label for="demo-name" class="text-sm">Name</label>
+          <.input id="demo-name" type="text" placeholder="Your name" />
+          <label for="demo-email" class="text-sm">Email — validation error</label>
+          <.input
+            id="demo-email"
+            type="email"
+            value="not-an-email"
+            aria-invalid="true"
+            aria-describedby="demo-email-error"
+          />
+          <p id="demo-email-error" class="text-semantic-error text-sm">
+            Enter a valid email address.
+          </p>
+          <label for="demo-password" class="text-sm">Password</label>
+          <.input id="demo-password" type="password" placeholder="••••••••" />
+          <label for="demo-readonly" class="text-sm">Read only</label>
+          <.input id="demo-readonly" type="text" value="readonly value" readonly />
+          <label for="demo-disabled" class="text-sm">Disabled</label>
+          <.input id="demo-disabled" type="text" placeholder="disabled" disabled />
+        </div>
+      </section>
+
+      <section class="space-y-4">
+        <h2 class="text-foreground-primary text-style-heading3Medium">Filters</h2>
+        <p class="text-foreground-secondary text-sm">
+          FilterControl owns filter styling; Menu owns disclosure behavior. FilterChip represents
+          an applied filter. Use Tab to inspect focus, Enter to open, and Escape to dismiss.
+        </p>
+        <div class="flex flex-wrap items-center gap-3">
+          <.menu id="demo-filter" class={FilterControl.trigger_class(@filter_selected?)}>
+            <:trigger>Tags <Lucide.chevron_down class="size-4" aria-hidden /></:trigger>
+            <div class={[FilterControl.panel_class(), "w-56"]}>
+              <.menu_item
+                event="toggle_demo_filter"
+                aria-pressed={to_string(@filter_selected?)}
+                class={FilterControl.option_class(@filter_selected?)}
+              >
+                Romance <Lucide.check :if={@filter_selected?} class="ml-auto size-4" aria-hidden />
+              </.menu_item>
+            </div>
+          </.menu>
+          <button type="button" disabled class={FilterControl.trigger_class(false)}>Unavailable filter</button>
+          <FilterChip.filter_chip
+            :if={@filter_selected?}
+            label="Romance"
+            icon_x
+            phx-click="toggle_demo_filter"
+            aria-label="Remove Romance filter"
+          />
         </div>
       </section>
 
@@ -92,13 +149,9 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
       <section class="space-y-4">
         <h2 class="text-foreground-primary text-style-heading3Medium">Dialog</h2>
         <div class="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            phx-click="open_demo_dialog"
-            class="bg-button-background-brand-default text-button-text-on-brand rounded-md px-4 py-2"
-          >
+          <.button phx-click="open_demo_dialog">
             Open dialog
-          </button>
+          </.button>
           <.dialog
             :if={@dialog_open?}
             id="demo-dialog"
@@ -113,11 +166,7 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
             </.dialog_header>
             <div class="space-y-3 py-2">
               <label class="text-style-body2Medium block">
-                Name
-                <input
-                  type="text"
-                  class="bg-text-field-bg border-text-field-border focus:border-text-field-border-focus text-foreground-primary mt-1 block w-full rounded-md border px-3 py-2 focus:outline-none"
-                />
+                Name <.input id="demo-dialog-name" type="text" class="mt-1" />
               </label>
             </div>
             <.dialog_footer>
@@ -135,13 +184,9 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
 
       <section class="space-y-4">
         <h2 class="text-foreground-primary text-style-heading3Medium">AlertDialog</h2>
-        <button
-          type="button"
-          phx-click="open_demo_alert"
-          class="bg-button-background-destructive-default text-button-text-on-destructive rounded-md px-4 py-2"
-        >
+        <.button variant="destructive" phx-click="open_demo_alert">
           Delete account
-        </button>
+        </.button>
         <.dialog
           :if={@alert_open?}
           id="demo-alert-dialog"
@@ -165,6 +210,36 @@ defmodule KaguyaWeb.Dev.StyleGuideLive do
             </.dialog_action>
           </.dialog_footer>
         </.dialog>
+      </section>
+
+      <section class="space-y-4">
+        <h2 class="text-foreground-primary text-style-heading3Medium">Table</h2>
+        <p class="text-foreground-secondary text-sm">
+          Titles use row headers. Numeric columns align right and retain tabular digits.
+          Pages own their columns and sorting; the shared component owns presentation.
+        </p>
+        <div class="border-border-divider overflow-hidden rounded-xl border">
+          <Table.table id="demo-table" caption="Example catalogue ratings">
+            <:header>
+              <Table.column_header class="px-4">Title</Table.column_header>
+              <Table.column_header class="w-28 px-4 text-right" sort="descending">
+                Rating / 5 <span aria-hidden="true">↓</span>
+              </Table.column_header>
+              <Table.column_header class="w-24 px-4 text-right">Votes</Table.column_header>
+            </:header>
+            <tr :for={
+              {title, rating, votes} <- [
+                {"Example visual novel", "4.50", "128"},
+                {"A longer title that can wrap naturally", "4.25", "96"},
+                {"Unrated visual novel", "—", "2"}
+              ]
+            }>
+              <th scope="row" class="p-4 text-base font-medium">{title}</th>
+              <td class="p-4 text-right tabular-nums">{rating}</td>
+              <td class="text-foreground-secondary p-4 text-right tabular-nums">{votes}</td>
+            </tr>
+          </Table.table>
+        </div>
       </section>
 
       <section class="space-y-4">

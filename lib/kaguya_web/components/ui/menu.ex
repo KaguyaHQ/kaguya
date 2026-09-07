@@ -25,6 +25,9 @@ defmodule KaguyaWeb.UI.Menu do
         </div>
       </.menu>
 
+  This is a disclosure, not an ARIA menu: contents may be links, actions, or
+  forms. Native Tab navigation follows the panel controls in DOM order.
+
   The caller owns the panel cosmetics — wrap the items in your own styled
   container inside the default slot.
   """
@@ -73,10 +76,14 @@ defmodule KaguyaWeb.UI.Menu do
         type="button"
         id={@id <> "-trigger"}
         popovertarget={@id <> "-panel"}
-        aria-haspopup="true"
+        aria-controls={@id <> "-panel"}
         aria-expanded="false"
         aria-label={@trigger_slot[:"aria-label"]}
-        class={[@trigger_slot[:class], @class]}
+        class={[
+          "focus-visible:outline-foreground-primary/70 focus-visible:outline-2 focus-visible:outline-offset-2",
+          @trigger_slot[:class],
+          @class
+        ]}
       >
         {render_slot(@trigger)}
       </button>

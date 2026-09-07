@@ -82,9 +82,12 @@ defmodule KaguyaWeb.SharedComponents.FilterChip do
 
   def filter_chip(assigns) do
     assigns =
-      assigns
-      |> assign(:shape_class, shape_class(assigns.shape, assigns.size))
-      |> assign(:tone_class, tone_class(assigns.shape, assigns.tone))
+      assign(assigns, :chip_class, [
+        shape_class(assigns.shape, assigns.size),
+        tone_class(assigns.shape, assigns.tone),
+        "focus-visible:outline-foreground-primary/70 focus-visible:outline-2 focus-visible:outline-offset-2",
+        assigns.class
+      ])
 
     cond do
       assigns.navigate || assigns.patch ->
@@ -92,7 +95,7 @@ defmodule KaguyaWeb.SharedComponents.FilterChip do
         <.link
           navigate={@navigate}
           patch={@patch}
-          class={[@shape_class, @tone_class, @class]}
+          class={@chip_class}
           {@rest}
         >
           <.chip_body label={@label} icon_x={@icon_x}>{render_slot(@inner_block)}</.chip_body>
@@ -101,14 +104,22 @@ defmodule KaguyaWeb.SharedComponents.FilterChip do
 
       assigns.href ->
         ~H"""
-        <a href={@href} class={[@shape_class, @tone_class, @class]} {@rest}>
+        <a
+          href={@href}
+          class={@chip_class}
+          {@rest}
+        >
           <.chip_body label={@label} icon_x={@icon_x}>{render_slot(@inner_block)}</.chip_body>
         </a>
         """
 
       true ->
         ~H"""
-        <button type="button" class={[@shape_class, @tone_class, @class]} {@rest}>
+        <button
+          type="button"
+          class={@chip_class}
+          {@rest}
+        >
           <.chip_body label={@label} icon_x={@icon_x}>{render_slot(@inner_block)}</.chip_body>
         </button>
         """

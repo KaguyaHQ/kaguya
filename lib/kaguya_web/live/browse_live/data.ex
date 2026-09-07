@@ -6,7 +6,6 @@ defmodule KaguyaWeb.BrowseLive.Data do
   @vn_page_size 48
   @character_page_size 30
   @section_page_size 36
-  @max_vn_pages 10
   @max_character_pages 50
 
   @vn_sort_from_param %{
@@ -103,28 +102,22 @@ defmodule KaguyaWeb.BrowseLive.Data do
     }
   end
 
+  def load(:discover, _params, current_user) do
+    %{mode: :discover, current_user: current_user, sections: load_sections(current_user)}
+  end
+
   def load(:vn, params, current_user) do
-    page = params |> Map.get("page") |> parse_page(@max_vn_pages)
-    sort_param = normalize_vn_sort_param(Map.get(params, "sort"))
+    page = params |> Map.get("page") |> parse_page(nil)
+    sort_param = normalize_vn_sort_param(Map.get(params, "sort")) || "most-popular"
     filters = vn_filters(params, current_user)
-    active? = filters_active?(filters) or not is_nil(sort_param)
 
     result =
-      if active? do
-        VisualNovels.browse_visual_novels(
-          page: page,
-          page_size: @vn_page_size,
-          sort_by: sort_param && Map.fetch!(@vn_sort_from_param, sort_param),
-          filters: filters
-        )
-      end
-
-    sections =
-      if active? do
-        []
-      else
-        load_sections(current_user)
-      end
+      VisualNovels.browse_visual_novels(
+        page: page,
+        page_size: @vn_page_size,
+        sort_by: Map.fetch!(@vn_sort_from_param, sort_param),
+        filters: filters
+      )
 
     %{
       mode: :vn,
@@ -133,9 +126,9 @@ defmodule KaguyaWeb.BrowseLive.Data do
       sort_param: sort_param,
       sort_options: @vn_sort_options,
       filters: filters,
-      filters_active?: active?,
+      filters_active?: filters_active?(filters),
       result: result,
-      sections: sections
+      sections: []
     }
   end
 
@@ -205,7 +198,7 @@ defmodule KaguyaWeb.BrowseLive.Data do
     value
     |> parse_int()
     |> case do
-      n when is_integer(n) and n > 0 -> min(n, max_page)
+      n when is_integer(n) and n > 0 -> if(max_page, do: min(n, max_page), else: n)
       _ -> 1
     end
   end
