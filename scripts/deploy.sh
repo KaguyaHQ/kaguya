@@ -6,10 +6,11 @@ set -euo pipefail
 
 REPO="KaguyaHQ/kaguya"
 WORKFLOW="deploy.yml"
-HEAD_SHA="$(git rev-parse HEAD)"
+HEAD_SHA="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "==> Triggering deploy workflow..."
-gh workflow run "$WORKFLOW" --repo "$REPO"
+gh workflow run "$WORKFLOW" --repo "$REPO" --ref main
 
 echo "==> Waiting for workflow run..."
 RUN_ID=""
@@ -19,8 +20,9 @@ for _ in {1..20}; do
     gh run list \
       --repo "$REPO" \
       --workflow "$WORKFLOW" \
+      --event workflow_dispatch \
       --json databaseId,headSha,createdAt \
-      --jq "map(select(.headSha == \"$HEAD_SHA\")) | sort_by(.createdAt) | reverse | .[0].databaseId // \"\""
+      --jq "map(select(.headSha == \"$HEAD_SHA\" and .createdAt >= \"$STARTED_AT\")) | sort_by(.createdAt) | reverse | .[0].databaseId // \"\""
   )"
 
   if [[ -n "$RUN_ID" ]]; then

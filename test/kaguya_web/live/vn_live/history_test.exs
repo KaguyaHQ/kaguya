@@ -35,8 +35,9 @@ defmodule KaguyaWeb.VNLive.HistoryTest do
     assert html =~ "History VN"
     assert html =~ "Expanded synopsis"
     assert html =~ "VN History Editor"
-    assert html =~ "Apr 28, 2026 17:10"
-    refute html =~ "ago"
+    timestamp = "#vn-history-revision-#{revision.id} + time"
+    assert has_element?(view, timestamp, "Apr 28, 2026 17:10")
+    refute has_element?(view, timestamp, "ago")
     # Edit-history/diff pages are derivative with unbounded revision variants.
     assert html =~ ~s(<meta name="robots" content="noindex,follow")
 

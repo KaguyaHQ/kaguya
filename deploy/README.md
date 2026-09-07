@@ -62,15 +62,25 @@ export HETZNER_HOST=your.server.ip   # or hostname
 
 ## Deploy
 
-Deploys run through GitHub Actions (`.github/workflows/deploy.yml`): it builds
-the image, pushes it to GHCR, syncs the ops files, and restarts the container on
-the server. Set `HETZNER_HOST` and `HETZNER_SSH_KEY` as repository secrets so the
-workflow can reach your box.
+Every push to `main` starts a deployment through GitHub Actions
+(`.github/workflows/deploy.yml`). First, the reusable checks workflow compiles
+the application, checks formatting, and runs the Elixir and JavaScript tests
+on Linux with PostgreSQL 17. Failed checks block deployment. Pull requests run
+the same checks without deploying.
+
+After checks pass, the workflow builds the image, pushes it to GHCR, syncs the
+ops files, and restarts the container on the server. Runs queue behind an active
+deployment; newer pushes do not cancel migrations or restarts. Set `HETZNER_HOST`
+and `HETZNER_SSH_KEY` as repository secrets so the workflow can reach your box.
+
+Manual deployment remains available for `main` and runs the same checks:
 
 ```bash
 # Trigger a deploy from your machine (uses the gh CLI)
 ./scripts/deploy.sh
 ```
+
+From PowerShell, use `gh workflow run deploy.yml --repo KaguyaHQ/kaguya --ref main`.
 
 On deploy, the server-side `deploy.sh` runs Ecto migrations and restarts the app
 container with the new image. Ingress is not touched (your proxy is separate).

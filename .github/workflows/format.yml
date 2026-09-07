@@ -1,15 +1,40 @@
-name: Format check
+name: Checks
 
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MIX_ENV: test
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -23,15 +48,24 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-checks-otp27.3.4.17-elixir1.20.4-test-${{ hashFiles('mix.lock', 'mix.exs', 'config/*.exs') }}
           restore-keys: |
-            ${{ runner.os }}-mix-
+            ${{ runner.os }}-checks-otp27.3.4.17-elixir1.20.4-test-
 
       - name: Install deps
-        run: mix deps.get
+        run: mix deps.get --check-locked
+
+      - name: Compile
+        run: mix compile
 
       - name: Install Tailwind CLI
         run: mix tailwind.install
 
       - name: Check formatting
         run: mix format --check-formatted
+
+      - name: Run Elixir tests
+        run: mix test
+
+      - name: Run JavaScript tests
+        run: node --test test/js/*.test.mjs

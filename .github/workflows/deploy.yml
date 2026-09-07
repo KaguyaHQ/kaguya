@@ -1,20 +1,31 @@
 name: Deploy kaguya
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
-# Only one prod deploy at a time; a newer push cancels an in-flight one so two
-# deploys can't interleave on the server.
+# Serialize the whole run so an older build cannot deploy after a newer one.
+# Never interrupt migrations or a server restart for a newer push.
 concurrency:
   group: deploy-prod
-  cancel-in-progress: true
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: kaguyahq/kaguya
 
 jobs:
+  checks:
+    uses: ./.github/workflows/format.yml
+
   deploy:
+    needs: checks
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
