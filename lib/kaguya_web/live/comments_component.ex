@@ -38,7 +38,6 @@ defmodule KaguyaWeb.CommentsComponent do
       |> assign_new(:editing_id, fn -> nil end)
       |> assign_new(:collapsed_ids, fn -> MapSet.new() end)
       |> assign_new(:show_all_ids, fn -> MapSet.new() end)
-      |> assign_new(:top_composer_expanded, fn -> false end)
       |> assign_new(:pending_delete_id, fn -> nil end)
       |> assign_new(:pending_report_id, fn -> nil end)
       |> assign_new(:report_error, fn -> nil end)
@@ -67,7 +66,6 @@ defmodule KaguyaWeb.CommentsComponent do
         can_comment={!@focused_mode && !@locked && (@can_comment || is_nil(@current_user))}
         current_user={@current_user}
         target={@myself}
-        expanded={@top_composer_expanded}
         show_disabled_composer={!@focused_mode && !@locked}
       />
       <CommentUI.reply_input
@@ -78,11 +76,9 @@ defmodule KaguyaWeb.CommentsComponent do
         target={@myself}
         submit_event="create_comment"
         cancel_event="cancel_composer"
-        expand_event="expand_composer"
         current_user={@current_user}
         button_text="Comment"
         placeholder="Add a comment..."
-        expanded={@top_composer_expanded}
       />
 
       <CommentUI.delete_confirm_dialog comment_id={@pending_delete_id} target={@myself} />
@@ -188,12 +184,8 @@ defmodule KaguyaWeb.CommentsComponent do
   end
 
   @impl true
-  def handle_event("expand_composer", _params, socket) do
-    {:noreply, assign(socket, top_composer_expanded: true)}
-  end
-
   def handle_event("cancel_composer", _params, socket) do
-    {:noreply, assign(socket, top_composer_expanded: false, error_message: nil)}
+    {:noreply, assign(socket, error_message: nil)}
   end
 
   def handle_event("start_reply", %{"id" => id}, socket) do
@@ -259,7 +251,7 @@ defmodule KaguyaWeb.CommentsComponent do
       {:ok, _comment} ->
         {:noreply,
          socket
-         |> assign(active_reply_id: nil, top_composer_expanded: false, error_message: nil)
+         |> assign(active_reply_id: nil, error_message: nil)
          |> load_comments()
          |> clear_editor(editor_id)}
 

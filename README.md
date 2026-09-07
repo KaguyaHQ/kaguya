@@ -22,6 +22,21 @@ history, and serves the browser surfaces directly via LiveView.
 
 ## Setup
 
+Use Elixir 1.20.4 / OTP 27; exact runtime versions are pinned in `mise.toml`.
+If you use mise, run `mise trust` and `mise install` in this checkout before
+running Mix commands.
+
+Full development requires Linux or macOS. Native Windows development is
+currently unsupported: Vix (used by Image) and EXLA do not provide Windows
+binaries, so `mix setup` / `mix phx.server` cannot build the normal development
+dependencies. Installing `nmake` alone does not resolve this. On Windows, use
+a Linux environment such as WSL2 for full development.
+
+The test configuration supports native Windows with PostgreSQL available:
+`mix test` excludes Image/Vix, skips tests tagged `requires_image`, and uses
+`Nx.BinaryBackend` instead of EXLA. Passing those tests does not verify image
+processing or the normal development server build.
+
 Install dependencies and prepare the database:
 
 ```sh

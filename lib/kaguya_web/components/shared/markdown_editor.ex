@@ -32,10 +32,8 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
         target={@myself}
         submit_event="create_comment"
         cancel_event="cancel_composer"
-        expand_event="expand_composer"
         submit_label="Comment"
         placeholder="Add a comment..."
-        expanded={@expanded}
       />
   """
 
@@ -159,7 +157,6 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
 
   defp cancel_js(id, cancel_event, target) do
     JS.dispatch("kaguya:reply-input-cancel", to: "##{id}")
-    |> JS.hide(to: "##{id}-actions")
     |> JS.push(cancel_event, target: target)
   end
 end

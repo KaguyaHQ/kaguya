@@ -5,8 +5,12 @@ expectations for a pull request.
 
 ## Local setup
 
-You'll need Elixir/Erlang (see `.tool-versions` or `mix.exs` for versions),
+You'll need Elixir/Erlang (see `mise.toml` for pinned versions),
 PostgreSQL, and optionally Meilisearch for search.
+
+Full development requires Linux or macOS (or Linux under WSL2). Native Windows
+supports a limited test configuration, but cannot build the development server's
+Vix/EXLA dependencies. See [Setup](README.md#setup) for the platform limitations.
 
 ```sh
 git clone <your-fork>

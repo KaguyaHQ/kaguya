@@ -16,7 +16,6 @@ defmodule KaguyaWeb.Components.Comments do
   attr :can_comment, :boolean, default: false
   attr :current_user, :map, default: nil
   attr :target, :any, required: true
-  attr :expanded, :boolean, default: false
   attr :show_disabled_composer, :boolean, default: true
 
   def header_and_composer(assigns) do
@@ -34,11 +33,9 @@ defmodule KaguyaWeb.Components.Comments do
       target={@target}
       submit_event="create_comment"
       cancel_event="cancel_composer"
-      expand_event="expand_composer"
       current_user={@current_user}
       button_text="Comment"
       placeholder="Add a comment..."
-      expanded={@expanded}
     />
 
     <div :if={!@can_comment && @show_disabled_composer} class="flex items-start gap-[11px]">
@@ -52,13 +49,11 @@ defmodule KaguyaWeb.Components.Comments do
   attr :target, :any, required: true
   attr :submit_event, :string, required: true
   attr :cancel_event, :string, required: true
-  attr :expand_event, :string, default: nil
   attr :current_user, :map, default: nil
   attr :parent_comment_id, :string, default: nil
   attr :content, :string, default: ""
   attr :button_text, :string, default: "Reply"
   attr :placeholder, :string, default: "Add a reply..."
-  attr :expanded, :boolean, default: true
   attr :rows, :integer, default: 1
   attr :class, :any, default: nil
 
@@ -69,12 +64,10 @@ defmodule KaguyaWeb.Components.Comments do
       target={@target}
       submit_event={@submit_event}
       cancel_event={@cancel_event}
-      expand_event={@expand_event}
       value={@content}
       rows={@rows}
       placeholder={@placeholder}
       submit_label={@button_text}
-      show_actions={@expanded}
       class={["w-full", @parent_comment_id && "mt-3", @class]}
     >
       <:leading_inputs>

@@ -84,9 +84,6 @@ npm-debug.log
 # TLS certs/keys live only on the server — never commit
 deploy/certs/
 
-# mise
-mise.toml
-
 # Python artifacts
 __pycache__/
 *.pyc
