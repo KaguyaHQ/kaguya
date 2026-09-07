@@ -43,6 +43,10 @@ RUN mkdir config
 # to ensure any relevant config change will trigger the dependencies
 # to be re-compiled.
 COPY config/config.exs config/${MIX_ENV}.exs config/
+# Keep EXLA in this cached dependency step; a cache hit skips compilation.
+# A separate dependency-image pipeline is not justified by the timings so far.
+# Revisit only if normal app changes repeatedly miss this cache. See the
+# deployment decision in scripts/exla_benchmark.md.
 RUN mix deps.compile
 
 # Frontend dependency changes must not invalidate native EXLA compilation.

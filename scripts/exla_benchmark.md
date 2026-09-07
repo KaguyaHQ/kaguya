@@ -114,3 +114,25 @@ follow-up that applies the loader improvement and explicit compilation to the
 scoring entry point, with integration coverage for masking, fallback scoring,
 and explanations. Keep the full matrix while validating those changes; this
 benchmark supplies no quality evidence for pruning or replacing the model.
+
+## Decision: keep the current deployment architecture
+
+Keep the single Docker build with registry-backed caching and the separate
+runtime/dependency layer. Do not add a prebuilt dependency-image pipeline or
+move inference to a Python service solely to shorten deployments. Keep the full
+EASE matrix; the compiler and loader experiments remain benchmark-only until
+the complete recommendation flow has integration coverage.
+
+Dependency compilation was cached in both September 7 deployments inspected
+before this change. Reordering the Dockerfile invalidated that cache once:
+the first deployment of `6b3e4eb` passed CI and health checks but took 7m 22s
+overall, including a 5m 35s deploy job and 2m 32s compiling dependencies.
+That first run is not evidence of recurring EXLA compilation or a measured
+steady-state deployment speedup.
+
+The next useful measurement is a normal app-code deployment with the new cache
+populated. Check whether `mix deps.compile` is cached, then identify the actual
+remaining cost. Reconsider a separate dependency-image pipeline only if repeated
+measurements show cache misses or another concrete benefit worth its maintenance.
+A Python worker becomes worth considering if inference needs independent
+resources or Python materially simplifies recommendation development.
