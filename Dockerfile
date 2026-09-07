@@ -39,16 +39,15 @@ COPY mix.exs mix.lock ./
 RUN mix deps.get --only $MIX_ENV
 RUN mkdir config
 
-# Install the Phoenix React island packages before copying the full asset tree
-# so Docker can cache npm dependency resolution independently from CSS/JS edits.
-COPY assets/package*.json assets/
-RUN npm ci --prefix assets --no-audit --no-fund
-
 # copy compile-time config files before we compile dependencies
 # to ensure any relevant config change will trigger the dependencies
 # to be re-compiled.
 COPY config/config.exs config/${MIX_ENV}.exs config/
 RUN mix deps.compile
+
+# Frontend dependency changes must not invalidate native EXLA compilation.
+COPY assets/package*.json assets/
+RUN npm ci --prefix assets --no-audit --no-fund
 
 COPY priv priv
 
@@ -69,6 +68,19 @@ RUN mix sentry.package_source_code
 
 COPY rel rel
 RUN mix release
+
+# Keep the runtime and dependency files in a reusable final-image layer.
+# Sentry's packaged application sources change with app code, so Sentry stays
+# with kaguya in the application layer. Move files instead of copying them to
+# avoid shipping a second copy of the native libraries in the overlay.
+RUN mkdir -p /opt/release-deps/lib && \
+    for dependency in /app/_build/prod/rel/kaguya/lib/*; do \
+      case "${dependency##*/}" in \
+        kaguya-*|sentry-*) ;; \
+        *) mv "$dependency" /opt/release-deps/lib/ ;; \
+      esac; \
+    done && \
+    mv /app/_build/prod/rel/kaguya/erts-* /opt/release-deps/
 
 # start a new build stage so that the final image will only contain
 # the compiled release and other runtime necessities
@@ -91,7 +103,8 @@ RUN chown nobody /app
 # set runner ENV
 ENV MIX_ENV="prod"
 
-# Only copy the final release from the build stage
+# Application changes can reuse the large native dependency layer.
+COPY --from=builder --chown=nobody:root /opt/release-deps/ ./
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/kaguya ./
 
 RUN chmod +x /app/bin/server /app/bin/migrate
