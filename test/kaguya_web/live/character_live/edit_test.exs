@@ -250,6 +250,88 @@ defmodule KaguyaWeb.CharacterLive.EditTest do
     refute Repo.get!(Character, character.id).description == "Forged change"
   end
 
+  test "corrects names with stable URLs and reversible revision history", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, %{entity: character, change: original}} =
+      Revisions.create_entity(:character, %{name: "Misspelled Heroine"}, "Created", user)
+
+    {:ok, view, _} = live(conn, ~p"/character/#{character.slug}/edit")
+    assert has_element?(view, "#character-name[name='character[name]']:not([readonly])")
+
+    render_submit(element(view, "#character-edit"), %{
+      "character" => %{"name" => "Corrected Heroine", "summary" => "Correct spelling"}
+    })
+
+    assert_redirect(view, "/character/#{character.slug}")
+    assert %{name: "Corrected Heroine", slug: slug} = Repo.get!(Character, character.id)
+    assert slug == character.slug
+    assert Revisions.latest_revision_number(:character, character.id) == 2
+    assert {:ok, _} = Revisions.revert_to_revision(original.id, "Restore name", user)
+    assert Repo.get!(Character, character.id).name == character.name
+  end
+
+  test "invalid names retain edits without changing the character", %{conn: conn, user: user} do
+    {:ok, %{entity: character}} =
+      Revisions.create_entity(:character, %{name: "Valid Heroine"}, "Created", user)
+
+    {:ok, view, _} = live(conn, ~p"/character/#{character.slug}/edit")
+
+    for name <- ["", String.duplicate("x", 256)] do
+      render_submit(element(view, "#character-edit"), %{
+        "character" => %{"name" => name, "summary" => "Change name"}
+      })
+
+      assert has_element?(view, "#character-edit[data-dirty=true]")
+      assert Repo.get!(Character, character.id).name == character.name
+      assert Revisions.latest_revision_number(:character, character.id) == 1
+    end
+  end
+
+  test "stale name edits cannot overwrite a newer correction", %{conn: conn, user: user} do
+    {:ok, %{entity: character}} =
+      Revisions.create_entity(:character, %{name: "Original Name"}, "Created", user)
+
+    {:ok, view, _} = live(conn, ~p"/character/#{character.slug}/edit")
+
+    assert {:ok, _} =
+             Revisions.submit_edit(
+               :character,
+               character.id,
+               %{name: "New Correction"},
+               "Corrected",
+               user
+             )
+
+    render_submit(element(view, "#character-edit"), %{
+      "character" => %{"name" => "Stale Correction", "summary" => "Corrected"}
+    })
+
+    assert has_element?(view, "#character-name[value='Stale Correction']")
+    assert has_element?(view, "#character-edit[data-dirty=true]")
+    assert Repo.get!(Character, character.id).name == "New Correction"
+  end
+
+  test "navigation guard tracks scalar and appearance changes but ignores search", %{conn: conn} do
+    vn = vn!("Guard Appearance")
+    {:ok, view, _} = live(conn, ~p"/contribute/character")
+    assert has_element?(view, "#character-edit[phx-hook=UnsavedChanges][data-dirty=false]")
+
+    render_change(element(view, "#character-vn-search"), %{"appearance_query" => vn.title})
+    assert has_element?(view, "#character-edit[data-dirty=false]")
+    assert has_element?(view, "#character-vn-search[data-unsaved-ignore]")
+    render_click(element(view, "#appearance_results-#{vn.id}"))
+    assert has_element?(view, "#character-edit[data-dirty=true]")
+    render_click(element(view, "#remove-appearance-#{vn.id}"))
+    assert has_element?(view, "#character-edit[data-dirty=false]")
+
+    render_change(element(view, "#character-edit"), %{"character" => %{"name" => "Draft"}})
+    assert has_element?(view, "#character-edit[data-dirty=true]")
+    render_change(element(view, "#character-edit"), %{"character" => %{"name" => ""}})
+    assert has_element?(view, "#character-edit[data-dirty=false]")
+  end
+
   defp add_vn(view, vn) do
     render_change(element(view, "#character-vn-search"), %{"appearance_query" => vn.title})
     render_click(element(view, "#appearance_results-#{vn.id}"))

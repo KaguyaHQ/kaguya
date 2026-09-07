@@ -115,9 +115,9 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
     form =
       attrs
       |> sanitize_form()
-      |> put_summary(Map.get(socket.assigns.form, "summary", ""))
+      |> put_summary(Map.get(attrs, "summary", ""))
 
-    assign_dirty(socket, form)
+    {:noreply, assign_dirty(socket, form)}
   end
 
   @impl true
@@ -131,14 +131,14 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
         links ++ [%{"site" => "website", "value" => ""}]
       )
 
-    assign_dirty(socket, form)
+    {:noreply, assign_dirty(socket, form)}
   end
 
   @impl true
   def handle_event("remove_link", %{"index" => index}, socket) do
     links = Map.get(socket.assigns.form, "external_links", [])
     form = Map.put(socket.assigns.form, "external_links", drop_index(links, index))
-    assign_dirty(socket, form)
+    {:noreply, assign_dirty(socket, form)}
   end
 
   @impl true
@@ -278,6 +278,15 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
         {heading(assigns)}
       </h1>
 
+      <.link
+        id="producer-editor-help"
+        href={~p"/help/producers"}
+        target="_blank"
+        class="text-foreground-link text-sm underline underline-offset-2"
+      >
+        Help with producers and credits (opens in a new tab)
+      </.link>
+
       <p :if={@producer} class="mt-1 text-sm text-[rgb(var(--foreground-secondary))]">
         {@producer.name}
       </p>
@@ -309,6 +318,8 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
         class="bg-surface-base border-border-divider mt-6 space-y-4 rounded-[8px] border p-4"
         phx-change="validate"
         phx-submit="save"
+        phx-hook="UnsavedChanges"
+        data-dirty={to_string(@form != @original_form)}
       >
         <label class="flex flex-col gap-1.5 text-sm text-[rgb(var(--foreground-secondary))]">
           <span class="font-medium text-[rgb(var(--foreground-primary))]">Name</span>
@@ -370,6 +381,7 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
           <div class="flex items-center justify-between">
             <h2 class="text-sm font-medium text-[rgb(var(--foreground-primary))]">External links</h2>
             <button
+              id="producer-add-link"
               type="button"
               phx-click="add_link"
               class="rounded-[6px] border border-[rgb(var(--chip-border-default))] px-2.5 py-1 text-xs text-[rgb(var(--foreground-primary))] transition-colors hover:border-[rgb(var(--chip-border-hover))]"
@@ -411,6 +423,7 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
             />
 
             <button
+              id={"producer-remove-link-#{index}"}
               type="button"
               phx-click="remove_link"
               phx-value-index={index}
@@ -564,12 +577,11 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
   defp assign_dirty(socket, form) do
     dirty_fields = changed_fields(socket.assigns.original_form, form)
 
-    {:noreply,
-     assign(socket,
-       form: form,
-       dirty_fields: dirty_fields,
-       dirty_count: length(dirty_fields)
-     )}
+    assign(socket,
+      form: form,
+      dirty_fields: dirty_fields,
+      dirty_count: length(dirty_fields)
+    )
   end
 
   defp form_from_producer(producer) do

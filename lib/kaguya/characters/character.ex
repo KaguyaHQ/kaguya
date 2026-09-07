@@ -79,6 +79,7 @@ defmodule Kaguya.Characters.Character do
     ])
     |> Utils.put_unique_slug(:name)
     |> validate_required([:name, :slug])
+    |> validate_length(:name, max: 255)
     |> validate_length(:description, max: 5000)
     |> unique_constraint(:vndb_id)
     |> unique_constraint(:slug)

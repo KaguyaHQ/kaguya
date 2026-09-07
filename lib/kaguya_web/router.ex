@@ -123,6 +123,12 @@ defmodule KaguyaWeb.Router do
       live "/contribute/developer", DeveloperLive.Edit, :new
 
       live "/about", PoliciesLive.Show, :about
+      live "/help", PoliciesLive.Show, :help
+      live "/help/visual-novels", PoliciesLive.Show, :help_visual_novels
+      live "/help/characters", PoliciesLive.Show, :help_characters
+      live "/help/producers", PoliciesLive.Show, :help_producers
+      live "/help/editing", PoliciesLive.Show, :help_editing
+      live "/help/images", PoliciesLive.Show, :help_images
       live "/development", PoliciesLive.Show, :development
       live "/faq", PoliciesLive.Show, :faq
       live "/community-guidelines", PoliciesLive.Show, :community_guidelines

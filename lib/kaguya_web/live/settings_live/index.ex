@@ -5,6 +5,7 @@ defmodule KaguyaWeb.SettingsLive.Index do
 
   alias Kaguya.Exports.KaguyaCsv
   alias Kaguya.Users
+  alias Kaguya.Users.UserLibraryExport
 
   require Logger
 
@@ -19,14 +20,14 @@ defmodule KaguyaWeb.SettingsLive.Index do
 
   def mount(_params, _session, socket) do
     if socket.assigns.current_user do
-      latest_export = latest_export(socket.assigns.current_user.id)
+      exports = Users.list_user_library_exports(socket.assigns.current_user.id)
 
       {:ok,
        socket
        |> assign(:page_title, "Settings • Kaguya")
        |> assign(:meta_description, "Settings")
        |> assign(KaguyaWeb.SEO.noindex())
-       |> assign(:latest_export, latest_export)
+       |> assign_exports(exports)
        |> assign(:active_export_id, nil)
        |> assign(:danger_dialog, nil)
        |> maybe_schedule_export_poll()}
@@ -40,8 +41,8 @@ defmodule KaguyaWeb.SettingsLive.Index do
   end
 
   def handle_info(:poll_export, socket) do
-    latest_export = latest_export(socket.assigns.current_user.id)
-    socket = assign(socket, :latest_export, latest_export)
+    socket = refresh_exports(socket)
+    latest_export = socket.assigns.latest_export
 
     cond do
       export_busy?(latest_export) ->
@@ -89,7 +90,8 @@ defmodule KaguyaWeb.SettingsLive.Index do
 
   def handle_event("start_export", _params, socket) do
     user_id = socket.assigns.current_user.id
-    latest_export = latest_export(user_id)
+    socket = refresh_exports(socket)
+    latest_export = socket.assigns.latest_export
 
     cond do
       export_busy?(latest_export) ->
@@ -97,12 +99,6 @@ defmodule KaguyaWeb.SettingsLive.Index do
          socket
          |> assign(:latest_export, latest_export)
          |> maybe_schedule_export_poll()}
-
-      export_completed?(latest_export) ->
-        {:noreply,
-         socket
-         |> assign(:latest_export, latest_export)
-         |> push_export_download(latest_export)}
 
       true ->
         case KaguyaCsv.enqueue(user_id) do
@@ -117,13 +113,25 @@ defmodule KaguyaWeb.SettingsLive.Index do
           {:error, :export_in_progress} ->
             {:noreply,
              socket
-             |> assign(:latest_export, latest_export(user_id))
+             |> refresh_exports()
              |> maybe_schedule_export_poll()
              |> put_flash(:error, "A library export is already queued or running.")}
 
           {:error, reason} ->
             {:noreply, put_flash(socket, :error, "Could not start export: #{inspect(reason)}")}
         end
+    end
+  end
+
+  def handle_event("download_export", _params, socket) do
+    socket = refresh_exports(socket)
+
+    case socket.assigns.downloadable_export do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No backup is available. Generate a fresh export.")}
+
+      export ->
+        {:noreply, push_export_download(socket, export)}
     end
   end
 
@@ -259,31 +267,44 @@ defmodule KaguyaWeb.SettingsLive.Index do
               </span>
             </.link>
 
-            <button
-              type="button"
-              phx-click="start_export"
-              disabled={export_busy?(@latest_export)}
-              class="group -mx-3 flex w-[calc(100%+1.5rem)] items-center justify-between px-3 py-4 text-left transition-colors hover:bg-white/3 disabled:cursor-wait disabled:opacity-70"
-            >
-              <div>
-                <p class="text-foreground-primary text-style-body1Medium">Export your data</p>
-                <p class="text-foreground-secondary text-style-body2Regular mt-1">
-                  {export_description(@latest_export)}
-                </p>
+            <div id="library-export" class="py-4">
+              <p class="text-foreground-primary text-style-body1Medium">Export your data</p>
+              <p id="export-status" class="text-foreground-secondary text-style-body2Regular mt-1">
+                {export_description(@latest_export)}
+              </p>
+              <p
+                :if={@downloadable_export}
+                id="export-snapshot"
+                class="text-foreground-secondary text-style-body2Regular mt-1"
+              >
+                Backup from {Calendar.strftime(
+                  @downloadable_export.inserted_at,
+                  "%b %d, %Y at %H:%M UTC"
+                )}. Downloads are available for 3 days.
+              </p>
+              <div class="mt-3 flex flex-wrap gap-3">
+                <button
+                  :if={@downloadable_export}
+                  id="download-export"
+                  type="button"
+                  phx-click="download_export"
+                  class="bg-button-background-neutral-default text-foreground-primary rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  Download existing backup
+                </button>
+                <button
+                  id="generate-export"
+                  type="button"
+                  phx-click="start_export"
+                  disabled={export_busy?(@latest_export)}
+                  class="bg-button-background-neutral-default text-foreground-primary rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-wait disabled:opacity-70"
+                >
+                  {if export_busy?(@latest_export),
+                    do: "Preparing export…",
+                    else: "Generate fresh export"}
+                </button>
               </div>
-              <span class="group-hover:text-foreground-secondary text-foreground-tertiary transition-colors">
-                <Lucide.loader_2
-                  :if={export_busy?(@latest_export)}
-                  class="size-4 animate-spin"
-                  aria-hidden
-                />
-                <Lucide.download
-                  :if={!export_busy?(@latest_export)}
-                  class="size-4"
-                  aria-hidden
-                />
-              </span>
-            </button>
+            </div>
           </div>
         </section>
 
@@ -428,11 +449,22 @@ defmodule KaguyaWeb.SettingsLive.Index do
     """
   end
 
-  defp latest_export(user_id) do
-    user_id
-    |> Users.list_user_library_exports()
-    |> List.first()
+  defp refresh_exports(socket) do
+    assign_exports(socket, Users.list_user_library_exports(socket.assigns.current_user.id))
   end
+
+  defp assign_exports(socket, exports) do
+    assign(socket,
+      latest_export: List.first(exports),
+      downloadable_export: Enum.find(exports, &export_available?/1)
+    )
+  end
+
+  defp export_available?(%{status: :completed, object_key: key} = export) when is_binary(key) do
+    DateTime.after?(UserLibraryExport.expires_at(export), DateTime.utc_now())
+  end
+
+  defp export_available?(_), do: false
 
   defp export_busy?(%{status: status}) when status in [:queued, :processing], do: true
   defp export_busy?(_), do: false
@@ -472,6 +504,9 @@ defmodule KaguyaWeb.SettingsLive.Index do
 
   defp export_description(%{status: status} = export) do
     cond do
+      status == :completed and not export_available?(export) ->
+        "Backup expired. Generate a fresh export to download your current data."
+
       status in [:queued, :processing] ->
         "Preparing ZIP"
 

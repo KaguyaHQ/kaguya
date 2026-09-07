@@ -178,11 +178,11 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
   # localStorage bridge — pushed by the LibraryPrefs hook on mount/toggle.
   def handle_event("set_fade_read", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :fade_read, truthy(value))}
+    {:noreply, set_display_preference(socket, :fade_read, truthy(value))}
   end
 
   def handle_event("set_show_dates", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :show_dates, truthy(value))}
+    {:noreply, set_display_preference(socket, :show_dates, truthy(value))}
   end
 
   def handle_event("set_item_status", %{"vn-id" => vn_id, "status" => status}, socket) do
@@ -433,6 +433,18 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
   defp stream_each(socket, items) do
     Enum.reduce(items, socket, &stream_insert(&2, :library_items, &1))
+  end
+
+  defp set_display_preference(socket, key, value) do
+    if socket.assigns[key] == value do
+      socket
+    else
+      # Updating existing stream IDs preserves their order, including loaded
+      # mobile pages. Reuse the shadow index instead of querying the library.
+      socket
+      |> assign(key, value)
+      |> stream_each(Map.values(socket.assigns.items_state))
+    end
   end
 
   defp apply_item_update(socket, item) do

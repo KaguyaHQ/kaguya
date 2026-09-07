@@ -28,6 +28,41 @@ defmodule KaguyaWeb.ProfileLive.LibraryTest do
   end
 
   describe "GET /@:username/library" do
+    test "show dates updates already rendered cards in both directions", %{conn: conn} do
+      owner = UserFixtures.insert_user!()
+      vn = insert_vn!("Reading dates")
+      insert_status!(owner, vn, :read, %{date_finished: ~D[2020-01-01]})
+      conn = Plug.Test.init_test_session(conn, %{current_user_id: owner.id})
+      {:ok, view, _html} = live(conn, "/@#{owner.username}/library")
+      date = "#library-item-#{vn.id} span.lg\\:hidden"
+
+      refute has_element?(view, date, "2020")
+      render_hook(view, "set_show_dates", %{value: true})
+      assert has_element?(view, date, "2020")
+      render_hook(view, "set_show_dates", %{value: false})
+      refute has_element?(view, date, "2020")
+    end
+
+    test "fade read updates existing cards according to the viewer's status", %{conn: conn} do
+      owner = UserFixtures.insert_user!()
+      viewer = UserFixtures.insert_user!()
+      read = insert_vn!("Already read")
+      unread = insert_vn!("Still unread")
+      insert_status!(owner, read, :read)
+      insert_status!(owner, unread, :read)
+      insert_status!(viewer, read, :read)
+      conn = Plug.Test.init_test_session(conn, %{current_user_id: viewer.id})
+      {:ok, view, _html} = live(conn, "/@#{owner.username}/library")
+      faded = "#library-item-#{read.id} .opacity-20"
+
+      refute has_element?(view, faded)
+      render_hook(view, "set_fade_read", %{value: true})
+      assert has_element?(view, faded)
+      refute has_element?(view, "#library-item-#{unread.id} .opacity-20")
+      render_hook(view, "set_fade_read", %{value: false})
+      refute has_element?(view, faded)
+    end
+
     test "another reader's library includes hybrids for a viewer with the retired preference off",
          %{conn: conn} do
       owner = UserFixtures.insert_user!()

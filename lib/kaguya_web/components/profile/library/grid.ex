@@ -77,7 +77,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
               sizes="(max-width: 420px) 110px, 137px"
               link
               show_title_tooltip
-              class={"size-full rounded-[4px] object-cover object-center" <> if(faded, do: "opacity-20", else: "")}
+              class={["size-full rounded-[4px] object-cover object-center", faded && "opacity-20"]}
             />
             <div
               :if={@profile.viewer.is_mine}

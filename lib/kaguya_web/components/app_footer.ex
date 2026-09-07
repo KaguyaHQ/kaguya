@@ -34,6 +34,7 @@ defmodule KaguyaWeb.AppFooter do
   ]
 
   @contribute_links [
+    %{label: "Contributor help", href: "/help"},
     %{label: "Add visual novel", href: "/contribute/vn"},
     %{label: "Add character", href: "/contribute/character"},
     %{label: "Add producer", href: "/contribute/developer"},

@@ -2,7 +2,7 @@ defmodule KaguyaWeb.PoliciesLive.Show do
   @moduledoc """
   Static policy / about / FAQ pages.
 
-  One LiveView serves all 10 slugs — the content map lives in
+  One LiveView serves the policy and contributor help pages — the content map lives in
   `KaguyaWeb.Policies.Content` and is rendered through the shared
   `KaguyaWeb.PolicyComponents.policy_shell/1` shell.
   """
@@ -14,6 +14,12 @@ defmodule KaguyaWeb.PoliciesLive.Show do
   alias KaguyaWeb.Policies.{Content, Markdown}
 
   @action_to_slug %{
+    help: "help",
+    help_visual_novels: "help/visual-novels",
+    help_characters: "help/characters",
+    help_producers: "help/producers",
+    help_editing: "help/editing",
+    help_images: "help/images",
     about: "about",
     development: "development",
     faq: "faq",

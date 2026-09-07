@@ -7,6 +7,17 @@ defmodule KaguyaWeb.PolicyComponents do
 
   @policy_groups [
     %{
+      label: "Contributing",
+      pages: [
+        %{href: "/help", label: "Getting started"},
+        %{href: "/help/visual-novels", label: "Visual novels"},
+        %{href: "/help/characters", label: "Characters"},
+        %{href: "/help/producers", label: "Producers"},
+        %{href: "/help/editing", label: "Editing and sources"},
+        %{href: "/help/images", label: "Images and content"}
+      ]
+    },
+    %{
       label: "About",
       pages: [
         %{href: "/about", label: "About"},
@@ -47,7 +58,14 @@ defmodule KaguyaWeb.PolicyComponents do
     ~H"""
     <div class="mt-8 sm:mt-16">
       <div class="mx-auto mb-8 max-w-[75ch] px-5 sm:px-8 xl:hidden">
-        <.policy_sidebar groups={@groups} current_path={@current_path} />
+        <details id="help-page-navigation" class="border-border-divider rounded-lg border p-3">
+          <summary class="text-foreground-primary cursor-pointer text-sm font-medium">
+            Help and policies
+          </summary>
+          <div class="mt-4">
+            <.policy_sidebar groups={@groups} current_path={@current_path} />
+          </div>
+        </details>
       </div>
 
       <div class="xl:mx-auto xl:flex xl:max-w-6xl xl:items-start xl:gap-12 xl:px-8">
@@ -73,7 +91,10 @@ defmodule KaguyaWeb.PolicyComponents do
 
   defp policy_sidebar(assigns) do
     ~H"""
-    <nav class="flex flex-col gap-6">
+    <nav
+      aria-label="Help and policies"
+      class="grid grid-cols-2 gap-6 sm:grid-cols-3 xl:flex xl:flex-col"
+    >
       <div :for={group <- @groups}>
         <span class="text-foreground-quaternary mb-2 block text-xs font-medium tracking-wider uppercase">
           {group.label}

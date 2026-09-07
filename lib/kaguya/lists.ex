@@ -659,6 +659,16 @@ defmodule Kaguya.Lists do
     |> format_cursor_response()
   end
 
+  @doc "Returns a numbered page of trending lists for search, using the same discovery rules as the feed."
+  def paginate_trending_lists_for_viewer(viewer_id, page, page_size) do
+    query =
+      list_discovery_scope(viewer_id, nil)
+      |> order_by([l], desc: l.trending_score, desc: l.id)
+
+    {items, pagination} = Pagination.paginate(query, page, page_size)
+    {:ok, %{items: items, pagination: pagination}}
+  end
+
   @doc """
   Returns public lists for sitemap indexing (surface-aware: list + user must be public).
   """

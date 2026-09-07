@@ -920,7 +920,7 @@ defmodule Kaguya.Users do
     Repo.all(
       from e in UserLibraryExport,
         where: e.user_id == ^user_id,
-        order_by: [desc: e.inserted_at],
+        order_by: [desc: e.inserted_at, desc: e.id],
         limit: 20
     )
   end

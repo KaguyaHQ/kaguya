@@ -138,15 +138,6 @@ defmodule KaguyaWeb.SearchLive.Index do
           error: false
         )
 
-      {:ok, %{items: items, next_cursor: next_cursor, has_next: has_next}} ->
-        assign(socket,
-          items: preload_lists(items),
-          pagination: nil,
-          total_count: length(items),
-          total_pages: if(has_next || next_cursor, do: page + 1, else: page),
-          error: false
-        )
-
       {:error, _reason} ->
         assign(socket,
           items: [],
@@ -177,12 +168,11 @@ defmodule KaguyaWeb.SearchLive.Index do
   defp search("lists", "", page, current_user) do
     viewer_id = Map.get(current_user || %{}, :id)
 
-    Lists.list_trending_lists_for_viewer(viewer_id, nil, @page_size)
+    Lists.paginate_trending_lists_for_viewer(viewer_id, page, @page_size)
     |> case do
       {:ok, result} -> {:ok, %{result | items: preload_lists(result.items)}}
       other -> other
     end
-    |> maybe_limit_trending_page(page)
   end
 
   defp search("lists", query, page, current_user) do
@@ -193,10 +183,6 @@ defmodule KaguyaWeb.SearchLive.Index do
       other -> other
     end
   end
-
-  defp maybe_limit_trending_page({:ok, result}, 1), do: {:ok, result}
-  defp maybe_limit_trending_page({:ok, result}, _page), do: {:ok, %{result | items: []}}
-  defp maybe_limit_trending_page(other, _page), do: other
 
   defp preload_lists(items) do
     Repo.preload(items, [:user, :visual_novels])
@@ -345,7 +331,12 @@ defmodule KaguyaWeb.SearchLive.Index do
   defp list_results(assigns) do
     ~H"""
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <.link :for={list <- @items} navigate={list_href(list)} class="block">
+      <.link
+        :for={list <- @items}
+        id={"search-list-#{list.id}"}
+        navigate={list_href(list)}
+        class="block"
+      >
         <div class="overflow-hidden rounded-[4px]">
           <KaguyaWeb.SharedComponents.StackedCovers.stacked_covers
             items={Enum.take(list_visual_novels(list), 5)}
@@ -404,9 +395,10 @@ defmodule KaguyaWeb.SearchLive.Index do
 
   defp pagination_controls(assigns) do
     ~H"""
-    <nav class="my-6 flex w-full items-center justify-center gap-3 text-sm">
+    <nav id="search-pagination" class="my-6 flex w-full items-center justify-center gap-3 text-sm">
       <.link
         :if={@page > 1}
+        id="search-previous-page"
         patch={page_path(@type, @query, @page - 1)}
         class="bg-button-background-neutral-default text-foreground-primary rounded-[8px] px-4 py-2 font-medium"
       >
@@ -415,6 +407,7 @@ defmodule KaguyaWeb.SearchLive.Index do
       <span class="text-foreground-secondary">Page {@page} of {@total_pages}</span>
       <.link
         :if={@page < @total_pages}
+        id="search-next-page"
         patch={page_path(@type, @query, @page + 1)}
         class="bg-button-background-neutral-default text-foreground-primary rounded-[8px] px-4 py-2 font-medium"
       >

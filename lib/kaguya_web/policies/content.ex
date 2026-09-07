@@ -8,6 +8,187 @@ defmodule KaguyaWeb.Policies.Content do
   @base_url "https://kaguya.io"
 
   @pages %{
+    "help" => %{
+      title: "Contributing to Kaguya",
+      page_title: "Contributor help • Kaguya",
+      description:
+        "How to add visual novels, characters and producers, and improve existing entries.",
+      body: """
+      Found a VN that's missing? A character with the wrong name? You can help fix that. The catalog gets better when people who know these works add what they know.
+
+      You need to sign in to add or edit entries. You don't need to know every detail about a work before you start. Add what you can verify and leave the rest for someone who can.
+
+      ## What are you working on?
+
+      - [Visual novels](/help/visual-novels): checking for duplicates, titles, descriptions and release details.
+      - [Characters](/help/characters): names, VN appearances, roles and spoilers.
+      - [Producers](/help/producers): companies, groups and their official links.
+      - [Editing an entry](/help/editing): sources, summaries and revision history.
+      - [Images and content](/help/images): covers, screenshots, sensitive content and reports.
+
+      ## Before you add something
+
+      Search for it first. Try the original title, the English title and any common alternative names. A translation or a different spelling doesn't necessarily mean it's a separate work.
+
+      Gameplay hybrids belong in the catalog too. The [Content Policy](/content-policy) still applies. If an entry has been removed, ask about it before adding it again. A missing page isn't an invitation to get around a moderation decision.
+
+      If you're unsure where something belongs, ask in [Feedback](/discussions/feedback). Include the title and an official source so we can understand what you're referring to.
+      """
+    },
+    "help/visual-novels" => %{
+      title: "Adding visual novels",
+      page_title: "Adding visual novels • Kaguya",
+      description: "A guide to titles, descriptions and the visual novel editor.",
+      body: """
+      Start by [searching the catalog](/search). Try a few names before creating a page. It saves you the work of adding everything twice, and keeps people's ratings and reviews together.
+
+      Once you're sure it's missing, open [Add visual novel](/contribute/vn).
+
+      ## Titles
+
+      Add the title in its original language. Use the language field for the title you're entering, and the Romanized field for its Latin-script spelling where needed. Add an official translated title as another title, rather than replacing the original with it.
+
+      Keep the spelling used by the work or its publisher. If you're unsure of a reading or translation, leave it for someone who knows. A guessed title makes the work harder to find.
+
+      ## Description
+
+      Give someone who hasn't read it an idea of the premise. Keep major reveals out of the description. Your verdict on whether it's good belongs in a review.
+
+      Write a short description yourself, or use a source you're allowed to quote and credit it with a link. An official publisher page is a useful place to start. See [editing and sources](/help/editing).
+
+      ## Details and relationships
+
+      Use the release date, original language and development status you can verify. Don't invent a date or reading length to fill an empty field. An announcement isn't a finished release.
+
+      A translated release or a new platform version usually belongs with the existing work. A remake may be a separate entry. If you're unsure, ask before creating a second page.
+
+      When linking related VNs or producers, check the selected entry carefully. Similar names don't always mean the same work or company.
+
+      ## Save, then add images
+
+      Write a short summary of what you're adding, including a source where useful, and create the entry. Covers and screenshots are added from the edit page after the VN exists. See [the image guide](/help/images).
+
+      To add a character to its cast, open that character's editor and use Visual novel appearances. The [character guide](/help/characters) explains the roles and spoiler settings.
+      """
+    },
+    "help/characters" => %{
+      title: "Adding characters",
+      page_title: "Adding characters • Kaguya",
+      description: "How to add a character and link their visual novel appearances.",
+      body: """
+      Search for the character first. They may already have a page from another work in the same series. If they do, add the missing appearance to that page.
+
+      Otherwise, open [Add character](/contribute/character). Use the character's established name and keep the description useful to someone who hasn't read the VN yet. Avoid revealing a hidden identity or a major plot twist.
+
+      ## Link their visual novels
+
+      In Visual novel appearances, search for a VN and press Add next to the right result. You can link more than one VN. If the VN itself is missing, create that entry first.
+
+      Choose the role for each appearance:
+
+      - **Main:** a protagonist or central viewpoint character.
+      - **Primary:** a major member of the cast, such as a main heroine.
+      - **Side:** a supporting character.
+      - **Appears:** a brief appearance or cameo.
+
+      The same character can have a different role in each work. Choose based on that appearance, not how much you personally like them.
+
+      ## Appearance spoilers
+
+      Ask whether knowing this character appears in the VN would spoil something. Use No spoilers for an ordinary cast member, Minor spoilers for a smaller reveal, and Major spoilers when their presence gives away a significant twist.
+
+      This setting belongs to the appearance. It doesn't make an openly written spoiler in the character's description safe.
+
+      ## Saving changes
+
+      The links, roles and spoiler levels are saved when you save the character. Remove takes a VN out of the form; save the character to apply that removal. It doesn't delete the VN.
+
+      Add a summary explaining what changed. The character editor currently has no image uploader. If the image needs attention, include the character page in a [feedback post](/discussions/feedback).
+      """
+    },
+    "help/producers" => %{
+      title: "Adding producers",
+      page_title: "Adding producers • Kaguya",
+      description: "How to add a company or group behind a visual novel.",
+      body: """
+      A producer entry represents a company or group involved in making or publishing VNs. Search for its name and any older names before [adding a producer](/contribute/developer).
+
+      ## Name and details
+
+      Use the name the company or group uses publicly. Select the type and language when you know them. Leave uncertain information unset rather than guessing.
+
+      Keep the description factual: who they are, what they make, and any useful context about their history. Credit the source if you use someone else's description.
+
+      ## Developer or publisher?
+
+      A developer makes the work. A publisher releases it. One company can do both, and a translated edition can have a different publisher from the original.
+
+      Creating a producer page doesn't link it to a VN automatically. Add that relationship from the VN editor, using the credit for the work you're editing.
+
+      ## Official links
+
+      Add the group's official website and accounts. Check that each link belongs to this producer, especially when the name is shared by other companies.
+
+      Finish with a short summary of what you added or corrected. If two pages appear to represent the same group, [report the duplicate](/discussions/feedback) with both links rather than changing one into a different producer.
+      """
+    },
+    "help/editing" => %{
+      title: "Editing and sources",
+      page_title: "Editing and sources • Kaguya",
+      description: "Making useful edits, explaining changes and checking revision history.",
+      body: """
+      Small corrections count. Fixing a broken link or adding a missing title makes the next person's visit better. You don't need to rewrite an entire entry to contribute.
+
+      ## Check your source
+
+      Prefer the work itself, its credits, or an official developer or publisher page. If sources disagree, explain which one you used and why. Leave unknown information blank where the form allows it.
+
+      Descriptions should introduce the work or character. Keep personal ratings and recommendations in reviews. If you quote a description, credit its source and only use text you have permission to reuse. [Formatting help](/formatting-help) explains links and other supported formatting.
+
+      ## Write a useful summary
+
+      Tell the next editor what changed. "Added the official English title from the publisher page" is more useful than "fixed stuff". Include the source URL when it helps someone verify your edit.
+
+      ## History and conflicting edits
+
+      Entry history records revisions so you can see what changed. Check it before undoing another person's work; their summary may explain something you missed.
+
+      If the editor says someone changed the entry while you were working, keep a copy of your unsaved text, reload, and compare the latest version before submitting again.
+
+      If you disagree with an edit, explain the issue and bring a source. Repeatedly undoing each other won't resolve it. Ask in [Feedback](/discussions/feedback) when you need another pair of eyes.
+
+      ## Removed or locked entries
+
+      Don't recreate a removed entry under another name or without its VNDB ID. If you think a decision was wrong, contact the moderators through [Discord](https://discord.gg/stcK4A23jt) and include the details. The same applies when an entry is locked and you can't edit it.
+      """
+    },
+    "help/images" => %{
+      title: "Images and content",
+      page_title: "Images and content • Kaguya",
+      description:
+        "Adding covers and screenshots, marking sensitive images and reporting content.",
+      body: """
+      A good cover helps people recognize a VN. Screenshots help them see what reading it actually looks like. Use images from the work or its official materials that you're allowed to share.
+
+      ## Covers and screenshots
+
+      Create the VN first, then open its edit page to add images. The uploader accepts JPG, JPEG, PNG and WebP files up to 10 MB each.
+
+      Use a cover that clearly identifies the work. For screenshots, capture the game itself at a readable size. Avoid unrelated desktop windows, added watermarks and images that give away major story reveals.
+
+      ## Sensitive images
+
+      Set the available sensitive-content flags accurately. A tame cover doesn't make an explicit screenshot tame, and an adult VN doesn't mean every image is explicit. Judge each image on what it shows.
+
+      Blur preferences let readers control what they see. They don't make prohibited content acceptable to upload. The [Content Policy](/content-policy) applies to entries and their media.
+
+      ## Something shouldn't be here
+
+      Contact the moderators through [Discord](https://discord.gg/stcK4A23jt) or [email](mailto:support@kaguya.io). Include the entry URL and explain the concern in words. Don't repost or attach suspected prohibited material to make the report.
+
+      For an ordinary mistake, such as the wrong cover or a duplicate page, you can also use [Feedback](/discussions/feedback). Include the affected page so we can find it.
+      """
+    },
     "about" => %{
       title: "About",
       page_title: "About • Kaguya",

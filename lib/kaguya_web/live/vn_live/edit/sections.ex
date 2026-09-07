@@ -19,6 +19,11 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
         </button>
       </div>
 
+      <p class="text-foreground-secondary mb-4 text-sm">
+        Add original and translated titles separately. Romanized is the Latin-script spelling;
+        mark Official only when the title is used by the creator or publisher.
+      </p>
+
       <div class="space-y-4">
         <div
           :for={{title, index} <- Enum.with_index(@form["titles"])}

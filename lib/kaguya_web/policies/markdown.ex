@@ -9,8 +9,8 @@ defmodule KaguyaWeb.Policies.Markdown do
     * `---` horizontal rules.
     * Paragraphs with the production typography.
     * Inline `**bold**`, `*italic*`, `~~strikethrough~~`,
-      `` `code` `` and `[label](url)` links (links open in a new tab
-      with `noopener noreferrer nofollow`).
+      `` `code` `` and `[label](url)` links. Local pages use LiveView
+      navigation; external links open in a new tab.
 
   Content is project-owned, not user-supplied, so this is meant to be
   used only for trusted policy markdown. All text is HTML-escaped via
@@ -22,6 +22,7 @@ defmodule KaguyaWeb.Policies.Markdown do
   """
 
   import Phoenix.HTML, only: [html_escape: 1, safe_to_string: 1]
+  import Phoenix.Component, only: [sigil_H: 2]
 
   @link_class "text-foreground-link hover:text-text-link-hover underline-offset-2 hover:underline"
 
@@ -218,8 +219,25 @@ defmodule KaguyaWeb.Policies.Markdown do
     Regex.replace(~r/\[([^\]]+)\]\(([^)]+)\)/, text, fn _, label, href ->
       safe_href = sanitize_href(href)
 
-      ~s(<a href="#{safe_href}" class="#{@link_class}" target="_blank" rel="noopener noreferrer nofollow">#{label}</a>)
+      cond do
+        String.starts_with?(safe_href, "/") and not String.starts_with?(safe_href, "//") ->
+          local_link(%{href: safe_href, label: label, class: @link_class})
+          |> Phoenix.HTML.Safe.to_iodata()
+          |> IO.iodata_to_binary()
+
+        String.starts_with?(safe_href, "#") ->
+          ~s(<a href="#{safe_href}" class="#{@link_class}">#{label}</a>)
+
+        true ->
+          ~s(<a href="#{safe_href}" class="#{@link_class}" target="_blank" rel="noopener noreferrer nofollow">#{label}</a>)
+      end
     end)
+  end
+
+  defp local_link(assigns) do
+    ~H"""
+    <Phoenix.Component.link navigate={@href} class={@class}>{Phoenix.HTML.raw(@label)}</Phoenix.Component.link>
+    """
   end
 
   defp sanitize_href(href) do

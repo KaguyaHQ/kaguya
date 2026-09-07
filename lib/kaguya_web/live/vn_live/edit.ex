@@ -453,6 +453,15 @@ defmodule KaguyaWeb.VNLive.Edit do
         {display_title(assigns)}
       </h1>
 
+      <.link
+        id="vn-editor-help"
+        href={~p"/help/visual-novels"}
+        target="_blank"
+        class="text-foreground-link text-sm underline underline-offset-2"
+      >
+        Help with titles, details and images (opens in a new tab)
+      </.link>
+
       <p :if={@vn} class="text-sm text-[rgb(var(--foreground-secondary))]">
         /vn/{@vn.slug}
       </p>

@@ -63,6 +63,7 @@ const UnsavedChanges = {
   mounted() {
     this._serverDirty = false
     this._clientDirty = false
+    this._initialValues = this._formValues()
     this._guardUrl = window.location.href
     this._guardState = window.history.state
     guards.add(this)
@@ -107,7 +108,10 @@ const UnsavedChanges = {
         return
       }
 
-      if (window.confirm(CONFIRM_MESSAGE)) return
+      if (window.confirm(CONFIRM_MESSAGE)) {
+        this._disable()
+        return
+      }
 
       event.preventDefault()
       event.stopImmediatePropagation()
@@ -118,7 +122,7 @@ const UnsavedChanges = {
     // in the moment the user types.
     this._onInput = (event) => {
       if (this.el.contains(event.target)) {
-        this._clientDirty = true
+        this._clientDirty = this._formValues() !== this._initialValues
       }
     }
 
@@ -145,6 +149,26 @@ const UnsavedChanges = {
 
   _sync() {
     this._serverDirty = this.el.dataset.dirty === "true"
+    this._clientDirty = this._formValues() !== this._initialValues
+  },
+
+  _formValues() {
+    return JSON.stringify(
+      Array.from(this.el.querySelectorAll("input, textarea, select"))
+        .filter(field => !field.hasAttribute("data-unsaved-ignore") &&
+          !["submit", "button", "reset"].includes(field.type))
+        .map(field => {
+          let value = field.value
+          if (field.type === "checkbox" || field.type === "radio") {
+            value = field.checked
+          } else if (field.type === "file") {
+            value = Array.from(field.files || [], file => [file.name, file.size, file.lastModified])
+          } else if (field.multiple) {
+            value = Array.from(field.selectedOptions, option => option.value)
+          }
+          return [field.name || field.id, field.type, value]
+        })
+    )
   },
 
   _isDirty() {

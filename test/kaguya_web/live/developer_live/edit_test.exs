@@ -218,6 +218,31 @@ defmodule KaguyaWeb.DeveloperLive.EditTest do
     assert links == [{"twitter", "createdstudio"}]
   end
 
+  test "navigation guard tracks link buttons and resets when edits are undone", %{conn: conn} do
+    {:ok, view, _} = conn |> log_in(insert_user!()) |> live(~p"/contribute/developer")
+    assert has_element?(view, "#developer-edit-form[phx-hook=UnsavedChanges][data-dirty=false]")
+    render_click(element(view, "#producer-add-link"))
+    assert has_element?(view, "#developer-edit-form[data-dirty=true]")
+    render_click(element(view, "#producer-remove-link-0"))
+    assert has_element?(view, "#developer-edit-form[data-dirty=false]")
+
+    render_change(element(view, "#developer-edit-form"), %{"developer" => %{"name" => "Draft"}})
+    assert has_element?(view, "#developer-edit-form[data-dirty=true]")
+    render_change(element(view, "#developer-edit-form"), %{"developer" => %{"name" => ""}})
+    assert has_element?(view, "#developer-edit-form[data-dirty=false]")
+  end
+
+  test "rejected save preserves the form and navigation protection", %{conn: conn} do
+    {:ok, view, _} = conn |> log_in(insert_user!()) |> live(~p"/contribute/developer")
+
+    render_submit(element(view, "#developer-edit-form"), %{
+      "developer" => %{"name" => "", "description" => "Keep this draft"}
+    })
+
+    assert has_element?(view, "#developer-edit-form[data-dirty=true]")
+    assert has_element?(view, "#developer-edit-form textarea", "Keep this draft")
+  end
+
   defp insert_producer!(name) do
     %Producer{}
     |> Producer.changeset(%{name: name})

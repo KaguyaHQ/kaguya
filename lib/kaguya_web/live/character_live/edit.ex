@@ -19,6 +19,8 @@ defmodule KaguyaWeb.CharacterLive.Edit do
        can_moderate: false,
        base_revision: 0,
        appearances: %{},
+       original_appearances: %{},
+       original_form: empty_form(),
        original_appearance_ids: [],
        appearance_query: "",
        appearance_results: %{},
@@ -110,6 +112,8 @@ defmodule KaguyaWeb.CharacterLive.Edit do
                    page_title: "Edit #{page.character.name}",
                    base_revision: Revisions.latest_revision_number(:character, page.character.id),
                    original_appearance_ids: Enum.map(appearances, & &1.id),
+                   original_appearances: Map.new(appearances, &{&1.id, &1}),
+                   original_form: form_from_character(page.character),
                    form: form_from_character(page.character)
                  )
                  |> put_appearances(appearances)}
@@ -217,7 +221,7 @@ defmodule KaguyaWeb.CharacterLive.Edit do
 
       :edit ->
         changes =
-          %{description: form["description"], appearances: appearances}
+          %{name: form["name"], description: form["description"], appearances: appearances}
           |> maybe_put_hidden_at(socket.assigns.character, form)
           |> maybe_put_is_locked(socket.assigns.character, form)
 
@@ -279,6 +283,15 @@ defmodule KaguyaWeb.CharacterLive.Edit do
         {heading(assigns)}
       </h1>
 
+      <.link
+        id="character-editor-help"
+        href={~p"/help/characters"}
+        target="_blank"
+        class="text-foreground-link text-sm underline underline-offset-2"
+      >
+        Help with characters and appearances (opens in a new tab)
+      </.link>
+
       <section
         :if={@state == :auth_required}
         class="bg-surface-base border-border-divider mt-6 rounded-[8px] border p-4 text-sm text-[rgb(var(--foreground-secondary))]"
@@ -304,35 +317,22 @@ defmodule KaguyaWeb.CharacterLive.Edit do
         :if={@state in [:editing, :creating]}
         id="character-edit"
         for={@editor_form}
+        phx-hook="UnsavedChanges"
+        data-dirty={to_string(@form != @original_form or @appearances != @original_appearances)}
         class="bg-surface-base border-border-divider mt-6 rounded-[8px] border p-4"
         phx-change="validate"
         phx-submit="save"
       >
         <div class="space-y-4">
-          <label
-            :if={@live_action == :new}
-            class="flex flex-col gap-1.5 text-sm text-[rgb(var(--foreground-secondary))]"
-          >
+          <label class="flex flex-col gap-1.5 text-sm text-[rgb(var(--foreground-secondary))]">
             <span class="font-medium text-[rgb(var(--foreground-primary))]">Name</span>
             <input
+              id="character-name"
               type="text"
               name="character[name]"
               value={@form["name"]}
               maxlength="255"
               class="bg-surface-elevated border-border-divider rounded-[6px] border px-3 py-2 text-[rgb(var(--foreground-primary))] outline-none"
-            />
-          </label>
-
-          <label
-            :if={@live_action == :edit}
-            class="flex flex-col gap-1.5 text-sm text-[rgb(var(--foreground-secondary))]"
-          >
-            <span class="font-medium text-[rgb(var(--foreground-primary))]">Character</span>
-            <input
-              type="text"
-              value={@character.name}
-              class="bg-surface-elevated border-border-divider rounded-[6px] border px-3 py-2 text-[rgb(var(--foreground-primary))] outline-none"
-              readonly
             />
           </label>
 
@@ -353,6 +353,11 @@ defmodule KaguyaWeb.CharacterLive.Edit do
                 Link this character to the visual novels they appear in. Changes are saved with the character.
               </p>
             </div>
+
+            <p class="text-foreground-secondary text-sm">
+              Set the role for each VN. The spoiler level marks whether knowing they appear there
+              reveals part of the story.
+            </p>
 
             <div id="character-appearance-list" phx-update="stream" class="space-y-3">
               <p
@@ -443,6 +448,7 @@ defmodule KaguyaWeb.CharacterLive.Edit do
               id="character-vn-search"
               type="search"
               name="appearance_query"
+              data-unsaved-ignore
               value={@appearance_query}
               phx-change="search_appearance_vns"
               phx-debounce="250"
