@@ -795,7 +795,6 @@ defmodule KaguyaWeb.ProfileLive.Show do
   def handle_event("toggle_follow", params, socket) do
     case Events.toggle_follow(socket, params) do
       {:noreply, new_socket} -> {:noreply, refresh_overview(new_socket)}
-      other -> other
     end
   end
 

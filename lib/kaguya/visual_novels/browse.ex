@@ -537,7 +537,6 @@ defmodule Kaguya.VisualNovels.Browse do
     end
   end
 
-  defp filter_include_tags_with_relevance(query, nil, _sort_by), do: query
   defp filter_include_tags_with_relevance(query, [], _sort_by), do: query
 
   defp filter_include_tags_with_relevance(query, slugs, sort_by) when is_list(slugs) do

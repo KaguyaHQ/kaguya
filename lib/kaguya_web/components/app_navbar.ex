@@ -898,7 +898,6 @@ defmodule KaguyaWeb.AppNavbar do
   defp avatar_url_from(%{avatar_id: avatar_id}) when is_binary(avatar_id) do
     case Kaguya.Users.build_avatar_urls(avatar_id) do
       %{small: small} when is_binary(small) -> small
-      _ -> nil
     end
   end
 

@@ -36,8 +36,8 @@ defmodule Kaguya.Recommendations.Nx.Npy do
   def parse!(<<@magic, major::8, minor::8, rest::binary>>) do
     header_len_bytes = if major >= 2, do: 4, else: 2
 
-    <<header_len::little-integer-size(header_len_bytes)-unit(8), rest::binary>> = rest
-    <<header_str::binary-size(header_len), data::binary>> = rest
+    <<header_len::little-integer-size(^header_len_bytes)-unit(8), rest::binary>> = rest
+    <<header_str::binary-size(^header_len), data::binary>> = rest
 
     header = parse_header!(header_str)
 

@@ -259,9 +259,6 @@ defmodule KaguyaWeb.ProfileLive.Activity do
           |> normalize_card_associations(viewer_id)
 
         {loaded, next_cursor, has_next}
-
-      _ ->
-        {[], nil, false}
     end
   end
 
@@ -419,9 +416,6 @@ defmodule KaguyaWeb.ProfileLive.Activity do
           |> Enum.map(&Data.normalize_user/1)
 
         {users, profile.counts.following || 0}
-
-      _ ->
-        {[], profile.counts.following || 0}
     end
   end
 end

@@ -7,7 +7,6 @@ defmodule Kaguya.Auth do
 
   alias Kaguya.Repo
   alias Kaguya.Users.{User, UserIdentity, UserNotifier, UserToken}
-  require Logger
 
   @doc """
   Finds or creates the local app user that owns an email magic-link login.

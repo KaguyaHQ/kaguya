@@ -673,8 +673,6 @@ defmodule Kaguya.Sync.DumpSync do
     Enum.any?(results, fn {_name, result} -> match?({:error, _}, result) end)
   end
 
-  defp filter_steps(nil), do: @all_steps
-
   defp filter_steps(step_name) when is_binary(step_name) do
     if String.contains?(step_name, ",") do
       # Comma-separated: --step vns,tags,releases

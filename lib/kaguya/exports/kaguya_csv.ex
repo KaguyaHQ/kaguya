@@ -8,7 +8,6 @@ defmodule Kaguya.Exports.KaguyaCsv do
   """
 
   import Ecto.Query
-  require Logger
 
   alias Kaguya.Exports.Storage
   alias Kaguya.Repo

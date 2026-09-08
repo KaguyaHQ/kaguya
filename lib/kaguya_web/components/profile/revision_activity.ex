@@ -301,8 +301,6 @@ defmodule KaguyaWeb.Components.Profile.RevisionActivity do
   defp group_action_label(:edit), do: "edits"
   defp group_action_label(action), do: String.downcase(action_label(action))
 
-  defp time_label(nil), do: ""
-
   defp time_label(%DateTime{} = dt) do
     [pad2(dt.hour), pad2(dt.minute)] |> Enum.join(":")
   end

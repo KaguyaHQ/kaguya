@@ -395,11 +395,6 @@ defmodule KaguyaWeb.ModerationLive.Reports do
                 status_options: status_options(),
                 entity_type_options: entity_type_options(visible_types)
               )
-
-            _ ->
-              socket
-              |> assign(state: :forbidden, reports: [], pagination: empty_pagination())
-              |> put_flash(:error, format_error(:forbidden))
           end
         else
           assign(socket, state: :forbidden, reports: [], pagination: empty_pagination())

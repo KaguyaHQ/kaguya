@@ -311,8 +311,6 @@ defmodule Kaguya.Utils.SlugUtils do
     end
   end
 
-  defp slug_suffix(nil), do: nil
-
   defp slug_suffix(slug) do
     slug
     |> String.split("-")

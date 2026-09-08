@@ -327,8 +327,6 @@ defmodule KaguyaWeb.Home.FeedComponents do
     end
   end
 
-  defp image_srcset(_), do: nil
-
   defp srcset_entry(nil, _width), do: nil
   defp srcset_entry(url, width), do: "#{url} #{width}"
 

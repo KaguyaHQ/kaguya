@@ -118,7 +118,7 @@ defmodule KaguyaWeb.SharedComponents.CharacterImage do
 
   defp safely_build(character) do
     if function_exported?(VisualNovels, :build_character_image_urls, 1) do
-      VisualNovels.build_character_image_urls(character) || %{}
+      VisualNovels.build_character_image_urls(character)
     else
       %{}
     end
@@ -152,8 +152,6 @@ defmodule KaguyaWeb.SharedComponents.CharacterImage do
     ]
     |> Enum.any?(&(Map.get(character, &1) == true))
   end
-
-  defp adult_image?(_), do: false
 
   defp nsfw_blur_size(nil), do: "100"
 

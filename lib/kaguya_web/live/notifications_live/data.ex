@@ -124,8 +124,8 @@ defmodule KaguyaWeb.NotificationsLive.Data do
   defp normalize_only_unread(_), do: false
 
   defp embed_metadata(nil), do: %{}
+  defp embed_metadata(%_{} = metadata), do: Map.from_struct(metadata)
   defp embed_metadata(%{} = metadata), do: metadata
-  defp embed_metadata(metadata), do: Map.from_struct(metadata)
 
   defp actors_count(meta, actors) do
     case meta_value(meta, :actors_count) do
@@ -260,15 +260,13 @@ defmodule KaguyaWeb.NotificationsLive.Data do
   defp notification_link("like_comment", meta) do
     post_path(meta) ||
       review_path(meta) ||
-      list_path(meta) ||
-      "#"
+      list_path(meta)
   end
 
   defp notification_link("reply_comment", meta) do
     post_path(meta) ||
       review_path(meta) ||
-      list_path(meta) ||
-      "#"
+      list_path(meta)
   end
 
   defp notification_link("new_comment_vn_list", meta), do: list_path(meta)
@@ -348,12 +346,10 @@ defmodule KaguyaWeb.NotificationsLive.Data do
     end)
   end
 
-  defp meta_value(map, key) when is_map(map), do: Map.get(map, key)
   defp meta_value(_, _), do: nil
 
   defp maybe_to_string(value) when is_atom(value), do: Atom.to_string(value)
   defp maybe_to_string(value) when is_binary(value), do: value
-  defp maybe_to_string(_), do: nil
 
   defp to_existing_atom(value) when is_binary(value) do
     try do

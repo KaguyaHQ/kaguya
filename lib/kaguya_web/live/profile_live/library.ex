@@ -351,16 +351,12 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
       optimistic = apply_item_update(socket, %{item | shelves: new_shelves})
 
-      result =
+      {:ok, _} =
         if selected?,
           do: Shelves.remove_vns_from_shelves(socket.assigns.profile.id, [shelf_id], [vn_id]),
           else: Shelves.add_vns_to_shelves(socket.assigns.profile.id, [shelf_id], [vn_id])
 
-      case result do
-        {:ok, _} -> {:noreply, optimistic}
-        # Revert by reloading authoritative state.
-        _ -> {:noreply, reload_library(optimistic)}
-      end
+      {:noreply, optimistic}
     else
       _ -> {:noreply, socket}
     end
@@ -402,8 +398,6 @@ defmodule KaguyaWeb.ProfileLive.Library do
   defp pop_items(%{grid: %{items: items} = grid} = library) do
     {items, %{library | grid: %{grid | items: []}}}
   end
-
-  defp pop_items(library), do: {[], library}
 
   defp put_items(socket, items, opts) do
     reset? = Keyword.get(opts, :reset, false)

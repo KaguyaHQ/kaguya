@@ -492,13 +492,11 @@ defmodule KaguyaWeb.DeveloperLive.Show do
     do: :erlang.float_to_binary(rating, decimals: 1)
 
   defp format_rating(rating) when is_integer(rating), do: "#{rating}.0"
-  defp format_rating(_), do: nil
 
   defp short_count(count) when is_integer(count) and count >= 1_000,
     do: "#{Float.round(count / 1_000, 1)}K"
 
   defp short_count(count) when is_integer(count), do: Integer.to_string(count)
-  defp short_count(_), do: "0"
 
   defp format_count(count) when is_integer(count) and count >= 1_000_000,
     do: "#{Float.round(count / 1_000_000, 1)}M"

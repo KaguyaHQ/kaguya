@@ -346,7 +346,6 @@ defmodule KaguyaWeb.Import.VndbImportFlow do
     |> Kernel.||("Something went wrong. Please try again.")
   end
 
-  defp first_changeset_error(_), do: "Something went wrong. Please try again."
   defp failed_message(%VndbImport{status: "failed", error_message: message}), do: message
   defp failed_message(_), do: nil
 end

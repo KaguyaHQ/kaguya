@@ -543,8 +543,6 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
   defp full_star_count(rating) when is_float(rating),
     do: rating |> Float.floor() |> trunc() |> max(0) |> min(5)
 
-  defp full_star_count(_), do: 0
-
   defp fractional_rating?(rating) when is_float(rating) do
     rating > 0 and rating < 5 and rating != Float.floor(rating)
   end

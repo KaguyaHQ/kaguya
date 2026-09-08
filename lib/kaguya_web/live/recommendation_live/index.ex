@@ -246,12 +246,6 @@ defmodule KaguyaWeb.RecommendationLive.Index do
 
       {:error, :not_pregenerated} ->
         {:noreply, assign_error(socket, identifier, not_ready?: true)}
-
-      {:error, _reason} ->
-        {:noreply,
-         assign_error(socket, identifier,
-           error_message: "Something went wrong on our end. Please try again."
-         )}
     end
   end
 

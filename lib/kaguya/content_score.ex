@@ -166,7 +166,6 @@ defmodule Kaguya.ContentScore do
   # child PKs so VNs with no producers/tags/screenshots still produce a row
   # (counts of 0). vn.id is the primary key, so the non-aggregate columns
   # are functionally dependent and Postgres allows them under GROUP BY vn.id.
-  defp load_facts_for_vns([]), do: []
 
   defp load_facts_for_vns(vn_ids) do
     from(vn in VisualNovel,

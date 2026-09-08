@@ -339,7 +339,7 @@ defmodule KaguyaWeb.ListLive.Show do
     list = with_titles(payload.list)
     owner = payload.user
     base_path = "/@#{owner.username}/list/#{list.slug}"
-    total_count = list.vns_count || list_pagination.total_count || length(payload.visual_novels)
+    total_count = list.vns_count || list_pagination.total_count
 
     socket
     |> assign(:state, :loaded)

@@ -286,7 +286,6 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
     custom_shelves =
       case Shelves.list_shelves_for_user(user_id) do
         {:ok, list} -> list
-        _ -> []
       end
 
     {grid, applied_producer} =
@@ -386,7 +385,6 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
     case Producers.get_producer_by_slug(slug) do
       {:ok, producer} -> %{name: producer.name, slug: producer.slug}
       {:error, :not_found} -> %{name: slug, slug: slug}
-      _ -> %{name: slug, slug: slug}
     end
   rescue
     _ -> %{name: slug, slug: slug}

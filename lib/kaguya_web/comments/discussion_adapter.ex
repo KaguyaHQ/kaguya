@@ -148,7 +148,7 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
   def can_comment?(post_id, viewer) do
     with {:ok, user_id} <- require_user(viewer),
          :ok <- ensure_discussion_privilege(viewer),
-         {:ok, post} <- Discussions.get_post_for_viewer(post_id, user_id, viewer || %{}),
+         {:ok, post} <- Discussions.get_post_for_viewer(post_id, user_id, viewer),
          :ok <- ensure_not_locked(post),
          :ok <- ensure_not_deleted(post) do
       true
@@ -166,7 +166,7 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
   defp ensure_can_comment(post_id, viewer) do
     with {:ok, user_id} <- require_user(viewer),
          :ok <- ensure_discussion_privilege(viewer),
-         {:ok, post} <- Discussions.get_post_for_viewer(post_id, user_id, viewer || %{}),
+         {:ok, post} <- Discussions.get_post_for_viewer(post_id, user_id, viewer),
          :ok <- ensure_not_locked(post) do
       ensure_not_deleted(post)
     end

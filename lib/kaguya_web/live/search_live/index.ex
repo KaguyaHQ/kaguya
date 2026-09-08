@@ -171,7 +171,6 @@ defmodule KaguyaWeb.SearchLive.Index do
     Lists.paginate_trending_lists_for_viewer(viewer_id, page, @page_size)
     |> case do
       {:ok, result} -> {:ok, %{result | items: preload_lists(result.items)}}
-      other -> other
     end
   end
 
@@ -180,7 +179,6 @@ defmodule KaguyaWeb.SearchLive.Index do
 
     case Lists.search_lists(query, page, @page_size, viewer_id) do
       {:ok, %{items: items} = result} -> {:ok, %{result | items: preload_lists(items)}}
-      other -> other
     end
   end
 

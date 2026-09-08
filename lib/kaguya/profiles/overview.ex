@@ -157,9 +157,6 @@ defmodule Kaguya.Profiles.Overview do
         Enum.map(shelves, fn s ->
           %{id: s.id, name: s.name, slug: s.slug, vns_count: s.vns_count}
         end)
-
-      _ ->
-        []
     end
   end
 
@@ -287,7 +284,6 @@ defmodule Kaguya.Profiles.Overview do
   defp load_following_preview(user_id) do
     case Social.list_following_by_user_id(user_id, nil, 12) do
       {:ok, %{items: items}} -> Enum.map(items, &decorate_following_user/1)
-      _ -> []
     end
   end
 

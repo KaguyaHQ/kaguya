@@ -44,9 +44,6 @@ defmodule KaguyaWeb.NotificationsLive.Index do
 
         {:error, :not_found} ->
           {:noreply, socket |> assign(:load_error?, true)}
-
-        _ ->
-          {:noreply, socket |> assign(:load_error?, true)}
       end
     else
       {:noreply, redirect(socket, to: "/login")}

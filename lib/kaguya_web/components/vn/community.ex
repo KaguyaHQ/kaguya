@@ -686,7 +686,6 @@ defmodule KaguyaWeb.VN.Community do
           </div>
         <% :loading -> %>
           <p class="text-sm text-[rgb(var(--foreground-tertiary))]">Loading discussions…</p>
-        <% _ -> %>
       <% end %>
     </section>
     """

@@ -26,7 +26,6 @@ defmodule Mix.Tasks.Kaguya.DumpSync do
                        regenerate series, reindex search, clear caches
   """
   use Mix.Task
-  require Logger
 
   @shortdoc "Sync Kaguya from VNDB PostgreSQL dump"
 

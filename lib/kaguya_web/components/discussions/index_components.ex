@@ -738,6 +738,4 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
       Map.get(target, :is_image_suggestive) == true or
       Map.get(target, "is_image_suggestive") == true
   end
-
-  defp target_cover_needs_blur?(_), do: false
 end

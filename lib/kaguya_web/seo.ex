@@ -425,8 +425,6 @@ defmodule KaguyaWeb.SEO do
     Map.get(images, :medium) || Map.get(images, :small)
   end
 
-  defp first_list_image_url(_), do: nil
-
   defp humanize_slug(slug) when is_binary(slug) do
     slug
     |> String.split("-")

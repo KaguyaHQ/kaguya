@@ -182,8 +182,6 @@ defmodule KaguyaWeb.ReviewLive.Data do
     vn
   end
 
-  defp normalize_user(nil), do: nil
-
   defp normalize_user(%Kaguya.Users.User{} = user) do
     avatar_urls = Users.build_avatar_urls(user.avatar_id)
 

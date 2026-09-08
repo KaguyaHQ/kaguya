@@ -336,10 +336,9 @@ defmodule KaguyaWeb.CharacterLive.Show do
   end
 
   defp has_character_image?(character) do
-    urls = VisualNovels.build_character_image_urls(character) || %{}
+    urls = VisualNovels.build_character_image_urls(character)
 
-    is_binary(Map.get(urls, :large)) or is_binary(Map.get(urls, :small)) or
-      is_binary(Map.get(urls, :medium))
+    is_binary(Map.get(urls, :large)) or is_binary(Map.get(urls, :small))
   end
 
   defp can_edit?(%{can_edit: false}), do: false
@@ -366,7 +365,6 @@ defmodule KaguyaWeb.CharacterLive.Show do
     do: :erlang.float_to_binary(rating, decimals: 1)
 
   defp format_rating(rating) when is_integer(rating), do: "#{rating}.0"
-  defp format_rating(_), do: nil
 
   defp format_count(count) when is_integer(count) and count >= 1_000_000 do
     "#{Float.round(count / 1_000_000, 1)}M"

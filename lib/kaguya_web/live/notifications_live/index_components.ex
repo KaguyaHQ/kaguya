@@ -566,7 +566,6 @@ defmodule KaguyaWeb.NotificationsLive.IndexComponents do
   end
 
   defp humanize_status(status) when is_binary(status), do: String.replace(status, "_", " ")
-  defp humanize_status(_), do: "reviewed"
 
   defp meta_string(%{metadata: meta}, key) when is_map(meta) do
     case Map.get(meta, key) || Map.get(meta, to_string(key)) do

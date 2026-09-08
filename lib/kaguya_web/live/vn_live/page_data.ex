@@ -589,7 +589,6 @@ defmodule KaguyaWeb.VNLive.PageData do
     case Ratings.get_user_rating(vn_id, user_id) do
       {:ok, nil} -> Ratings.create_rating(user_id, vn_id, rating)
       {:ok, _existing} -> Ratings.update_rating(vn_id, user_id, rating)
-      other -> other
     end
   end
 
@@ -729,7 +728,6 @@ defmodule KaguyaWeb.VNLive.PageData do
     case Ratings.get_user_rating(vn_id, user_id) do
       {:ok, nil} -> {:ok, true}
       {:ok, _rating} -> Ratings.delete_rating(vn_id, user_id)
-      error -> error
     end
   end
 
@@ -859,7 +857,6 @@ defmodule KaguyaWeb.VNLive.PageData do
   defp tags_for_vn(vn_id) do
     case VNTags.list_tags_for_vn(vn_id, nil) do
       {:ok, tags} -> Enum.map(tags, &Normalizer.normalize_tag/1)
-      _ -> []
     end
   end
 
@@ -1051,16 +1048,12 @@ defmodule KaguyaWeb.VNLive.PageData do
             has_review: item.has_review
           }
         end)
-
-      _ ->
-        []
     end
   end
 
   defp friend_reviews(vn_id, user_id) do
     case Kaguya.Friends.list_friend_reviews(user_id, vn_id, limit: 5) do
       {:ok, %{items: items}} -> Enum.map(items, &Normalizer.normalize_review/1)
-      _ -> []
     end
   end
 end

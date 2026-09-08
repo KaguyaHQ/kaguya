@@ -3,8 +3,6 @@ defmodule Kaguya.Discussions.Query do
 
   import Ecto.Query
 
-  alias Kaguya.Users.User
-
   def filter_hidden(query, nil) do
     from(q in query, where: is_nil(q.hidden_at) and is_nil(q.deleted_at))
   end
@@ -21,8 +19,6 @@ defmodule Kaguya.Discussions.Query do
   # but still filter mod-hidden comments for non-owners.
   def filter_hidden_comments(query, %{mod_discussions: true}), do: query
   def filter_hidden_comments(query, %{role: :admin}), do: query
-  def filter_hidden_comments(query, %User{role: :admin}), do: query
-  def filter_hidden_comments(query, %User{mod_discussions: true}), do: query
 
   def filter_hidden_comments(query, nil) do
     from(q in query, where: is_nil(q.hidden_at))
@@ -40,7 +36,6 @@ defmodule Kaguya.Discussions.Query do
 
   def viewer_id(nil), do: nil
   def viewer_id(%{id: id}), do: id
-  def viewer_id(%User{id: id}), do: id
   def viewer_id(id), do: id
 
   def maybe_filter_category(query, nil), do: query

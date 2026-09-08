@@ -87,9 +87,6 @@ defmodule KaguyaWeb.SEO.JsonLd do
           "@type" => "Person",
           "name" => owner_json_ld_name(o)
         })
-
-      _ ->
-        base
     end
   end
 
