@@ -51,6 +51,44 @@ defmodule Kaguya.AxiomLogHandlerTest do
     refute Map.has_key?(e, :secret)
   end
 
+  test "retains operational diagnostics while excluding unrelated metadata" do
+    diagnostics = %{
+      handler: :oban_exception,
+      kind: "RuntimeError",
+      error_kind: :invalid_image,
+      image_type: "avatar",
+      image_id: "image-123",
+      date: "2026-09-08",
+      size_bytes: 4096,
+      latest_url: "https://example.test/latest.tar.gz",
+      dated_url: "https://example.test/2026-09-08.tar.gz",
+      key: "dumps/2026-09-08.tar.gz",
+      mode: :full,
+      dry_run: false,
+      chunks: 3,
+      url: "https://example.test/sitemap.xml",
+      ratings: 10,
+      reading_statuses: 20,
+      reviews: 5,
+      users: 30,
+      dau: 8,
+      mau_30d: 25,
+      vns: 50
+    }
+
+    log(:warning, Map.put(diagnostics, :authorization, "must-not-be-exported"))
+    event = last_event()
+
+    for {key, value} <- diagnostics do
+      expected =
+        if is_atom(value) and not is_boolean(value), do: Atom.to_string(value), else: value
+
+      assert Map.fetch!(event, key) == expected
+    end
+
+    refute Map.has_key?(event, :authorization)
+  end
+
   test "sanitizes non-primitive metadata via inspect/1" do
     log(:warning, %{user_id: %{nested: :map}, request_id: {1, 2, 3}})
 

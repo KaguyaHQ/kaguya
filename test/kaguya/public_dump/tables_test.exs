@@ -10,7 +10,7 @@ defmodule Kaguya.PublicDump.TablesTest do
   describe "all/0" do
     test "returns a non-empty list of %Spec{}" do
       specs = Tables.all()
-      assert length(specs) > 0
+      assert [%Spec{} | _] = specs
       assert Enum.all?(specs, &match?(%Spec{}, &1))
     end
 

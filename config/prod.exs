@@ -15,8 +15,9 @@ config :kaguya, :logger, [
      config: %{
        # Forward structured fields to Sentry as tags/extras alongside the
        # canonical metadata so dashboards filter on user_id, live_view, etc.
-       # Keep this list in sync with the :logger :console :metadata list in
-       # config/config.exs.
+       # Deliberate error-context subset of the :logger :default_formatter
+       # metadata in config/config.exs; routine publishing/statistics fields
+       # remain in console/Axiom output.
        metadata: [
          :file,
          :line,
@@ -34,7 +35,17 @@ config :kaguya, :logger, [
          :worker,
          :queue,
          :method,
-         :status
+         :status,
+         :handler,
+         :kind,
+         :error,
+         :errors,
+         :reason,
+         :date,
+         :key,
+         :error_kind,
+         :image_type,
+         :image_id
        ],
        # `:cowboy` / `:bandit` — default; avoid double-report with PlugCapture.
        # `:otp` — Phoenix LiveView uses `:telemetry.span/3` which re-raises

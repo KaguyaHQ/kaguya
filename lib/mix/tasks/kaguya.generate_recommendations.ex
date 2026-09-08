@@ -83,7 +83,7 @@ defmodule Mix.Tasks.Kaguya.GenerateRecommendations do
   end
 
   defp print_result(other, _t) do
-    IO.inspect(other, label: "unexpected result")
+    Mix.shell().error("Unexpected result: #{inspect(other)}")
   end
 
   defp lookup_user_id!(username) do

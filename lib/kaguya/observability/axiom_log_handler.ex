@@ -29,7 +29,7 @@ defmodule Kaguya.Observability.AxiomLogHandler do
   @max_severity 4
 
   # Logger metadata keys promoted to first-class Axiom columns. Keep in sync
-  # with `config :logger, :console, metadata: [...]` in config/config.exs.
+  # with `config :logger, :default_formatter, metadata: [...]` in config/config.exs.
   # Anything not in this list stays out of Axiom — prevents accidental token
   # / PII leakage from upstream libraries that put arbitrary data in metadata.
   @safe_metadata_keys ~w(
@@ -41,6 +41,9 @@ defmodule Kaguya.Observability.AxiomLogHandler do
     worker queue
     event_id attempt count reason error result
     current_status target_status processed dead_letter last_reason errors
+    handler kind error_kind image_type image_id
+    date size_bytes latest_url dated_url key mode dry_run chunks url
+    ratings reading_statuses reviews users dau mau_30d vns
     ip path params
     memory_mb processes_mb ets_mb binary_mb process_count port_count
     atom_count run_queue schedulers memory_limit_mb percent_used
