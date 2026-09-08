@@ -1,3 +1,4 @@
+import {createDialogController} from '../lib/dialog_controller'
 import Cropper from "cropperjs"
 
 // These dimensions keep the cropped output matching the avatar/banner pipeline.
@@ -45,6 +46,7 @@ const ImageCropper = {
     this.cropperReady = false
     this.objectUrl = null
     this.uploading = false
+    this.modal.dataset.dismissable = "true"
 
     this.onTrigger = event => {
       // Sibling controls inside the trigger (e.g. "Delete Banner") opt out
@@ -62,12 +64,11 @@ const ImageCropper = {
     this.onZoomInput = e => this.zoomTo(parseFloat(e.target.value))
     this.onZoomMinus = () => this.zoomBy(-0.1)
     this.onZoomPlus = () => this.zoomBy(0.1)
-    this.onBackdrop = e => {
-      if (e.target === this.modal) this.closeModal()
-    }
-    this.onKeydown = e => {
-      if (e.key === "Escape" && this.el.dataset.state === "open") this.closeModal()
-    }
+    this.dialog = createDialogController(this.modal, () => {
+      this.el.dataset.state = "closed"
+      this.teardownCropper()
+      this.revokeObjectUrl()
+    })
 
     this.onWindowOpen = e => {
       if (e.detail?.id === this.el.id) this.openPicker()
@@ -82,13 +83,13 @@ const ImageCropper = {
     this.zoomSlider?.addEventListener("input", this.onZoomInput)
     this.zoomMinus?.addEventListener("click", this.onZoomMinus)
     this.zoomPlus?.addEventListener("click", this.onZoomPlus)
-    this.modal?.addEventListener("click", this.onBackdrop)
-    document.addEventListener("keydown", this.onKeydown)
 
     this.setZoomControlsEnabled(false)
   },
 
   destroyed() {
+    this.dialog.destroy()
+    this.revokeObjectUrl()
     this.teardownCropper()
     this.trigger?.removeEventListener("click", this.onTrigger)
     this.fileInput?.removeEventListener("change", this.onFileChange)
@@ -98,8 +99,6 @@ const ImageCropper = {
     this.zoomSlider?.removeEventListener("input", this.onZoomInput)
     this.zoomMinus?.removeEventListener("click", this.onZoomMinus)
     this.zoomPlus?.removeEventListener("click", this.onZoomPlus)
-    this.modal?.removeEventListener("click", this.onBackdrop)
-    document.removeEventListener("keydown", this.onKeydown)
     window.removeEventListener("kaguya:open-image-cropper", this.onWindowOpen)
   },
 
@@ -250,15 +249,12 @@ const ImageCropper = {
 
   openModal() {
     this.el.dataset.state = "open"
-    document.body.style.overflow = "hidden"
+    this.dialog.open()
   },
 
   closeModal() {
     if (this.uploading) return
-    this.el.dataset.state = "closed"
-    document.body.style.overflow = ""
-    this.teardownCropper()
-    this.revokeObjectUrl()
+    this.dialog.close()
   },
 
   revokeObjectUrl() {
@@ -271,6 +267,7 @@ const ImageCropper = {
   apply() {
     if (!this.cropper || !this.cropperReady || this.uploading) return
     this.uploading = true
+    this.modal.dataset.dismissable = "false"
 
     const canvas = this.cropper.getCroppedCanvas({
       width: this.preset.output.width,
@@ -332,6 +329,7 @@ const ImageCropper = {
           }
           this.applyPreviewToTargets(previewUrl)
           this.uploading = false
+          this.modal.dataset.dismissable = "true"
           this.closeModal()
           this.pushEvent("image-uploaded", {
             upload_id: reply.upload_id,
@@ -348,6 +346,7 @@ const ImageCropper = {
 
   failApply(message) {
     this.uploading = false
+    this.modal.dataset.dismissable = "true"
     this.showError(message)
     this.pushEvent("image-upload-failed", {image_type: this.imageType, message})
     // Best-effort surface — also flash via Phoenix once user is back to the

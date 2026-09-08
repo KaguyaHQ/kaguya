@@ -106,20 +106,14 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
       |> assign(:dirty, dirty?(assigns.draft, assigns.saved, user_fields ++ mod_fields))
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="mod-perms-dialog"
-      phx-hook="ModalDialog"
-      data-cancel-event="mod_close"
-      class="fixed inset-0 z-80 flex items-center justify-center bg-black/60 px-5"
-      role="presentation"
+      class="flex items-center justify-center bg-black/60 px-5"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("mod_close")}
+      aria-labelledby="mod-perms-title"
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="mod-perms-title"
-        class="w-full max-w-[460px] overflow-hidden rounded-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-base))] shadow-2xl"
-      >
+      <div class="w-full max-w-[460px] overflow-hidden rounded-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-base))] shadow-2xl">
         <div class="relative border-b border-[rgb(var(--border-divider))] px-5 pt-5 pb-4">
           <p
             id="mod-perms-title"
@@ -132,8 +126,7 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
           </p>
           <button
             type="button"
-            phx-click="mod_close"
-            data-modal-cancel
+            data-dialog-close
             disabled={@busy}
             aria-label="Close"
             class="absolute top-3 right-3 inline-flex size-7 cursor-pointer items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] hover:bg-white/8 hover:text-[rgb(var(--foreground-primary))] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[rgb(var(--border-strong-divider,var(--border-divider)))] disabled:opacity-50"
@@ -201,8 +194,7 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
         <div class="flex justify-end gap-2 border-t border-[rgb(var(--border-divider))] px-5 py-4">
           <button
             type="button"
-            phx-click="mod_close"
-            data-modal-cancel
+            data-dialog-close
             disabled={@busy}
             class="h-9 rounded-[6px] bg-[rgb(var(--surface-elevated))] px-4 text-sm font-medium text-[rgb(var(--foreground-primary))] hover:bg-white/8 disabled:opacity-50"
           >
@@ -218,7 +210,7 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -296,15 +288,14 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
 
   defp confirm_dialog(assigns) do
     ~H"""
-    <div
-      class="fixed inset-0 z-80 flex items-center justify-center bg-black/60 px-5"
-      role="presentation"
+    <KaguyaWeb.UI.Dialog.dialog
+      class="flex items-center justify-center bg-black/60 px-5"
+      id="profile-confirm-dialog"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("mod_close")}
+      aria-label={@title}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        class="w-full max-w-[437px] overflow-hidden rounded-[16px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-base))] shadow-2xl"
-      >
+      <div class="w-full max-w-[437px] overflow-hidden rounded-[16px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-base))] shadow-2xl">
         <div class="border-b border-[rgb(var(--border-divider))] px-6 py-4">
           <p class="text-base font-medium text-[rgb(var(--foreground-primary))]">{@title}</p>
         </div>
@@ -314,7 +305,7 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
         <div class="flex justify-end gap-2 border-t border-[rgb(var(--border-divider))] px-5 py-4">
           <button
             type="button"
-            phx-click="mod_close"
+            data-dialog-close
             disabled={@busy}
             class="h-9 rounded-[6px] bg-[rgb(var(--surface-elevated))] px-4 text-sm font-medium text-[rgb(var(--foreground-primary))] hover:bg-white/8 disabled:opacity-50"
           >
@@ -336,7 +327,7 @@ defmodule KaguyaWeb.Components.Profile.ModPanel do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 end

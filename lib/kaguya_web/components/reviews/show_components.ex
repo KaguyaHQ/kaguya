@@ -395,11 +395,12 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
 
   def edit_dialog(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="review-edit-dialog"
-      role="dialog"
-      aria-modal="true"
-      class="fixed inset-0 z-120 flex items-center justify-center bg-black/50 p-4"
+      class="flex items-center justify-center bg-black/50 p-4"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_edit")}
+      aria-label="Edit review"
     >
       <form
         phx-submit="submit_edit"
@@ -428,7 +429,7 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
         <div class="mt-6 flex items-center justify-end gap-2">
           <button
             type="button"
-            phx-click="close_edit"
+            data-dialog-close
             class="bg-button-background-neutral-default text-foreground-primary rounded-full px-4 py-2 text-sm font-semibold"
           >
             Cancel
@@ -442,7 +443,7 @@ defmodule KaguyaWeb.Reviews.ShowComponents do
           </button>
         </div>
       </form>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

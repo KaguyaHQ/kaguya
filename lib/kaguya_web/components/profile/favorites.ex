@@ -439,26 +439,22 @@ defmodule KaguyaWeb.Components.Profile.Favorites do
       |> assign(:error, Map.get(assigns.search, :error))
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@open}
-      class="fixed inset-0 z-100 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
-      role="presentation"
-      phx-window-keydown="close_favorite_search"
-      phx-key="Escape"
+      class="flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
+      id="profile-search-dialog"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_favorite_search")}
+      aria-labelledby="favorite-search-title"
     >
       <button
         type="button"
-        phx-click="close_favorite_search"
+        data-dialog-close
         class="absolute inset-0 cursor-default"
         aria-label="Close favorites search"
       ></button>
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="favorite-search-title"
-        class="relative flex max-h-[88vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[16px] bg-[rgb(var(--surface-base))] shadow-2xl sm:rounded-[16px]"
-      >
+      <div class="relative flex max-h-[88vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[16px] bg-[rgb(var(--surface-base))] shadow-2xl sm:rounded-[16px]">
         <div class="flex items-center gap-2 px-6 pt-6 pr-12 pb-4">
           <button
             :if={@type == :characters and @step == :character_select}
@@ -499,7 +495,7 @@ defmodule KaguyaWeb.Components.Profile.Favorites do
                 autocomplete="off"
                 phx-debounce="350"
                 class="h-11 w-full rounded-full border-none bg-[rgb(var(--surface-elevated))] pr-4 pl-11 text-sm text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-tertiary))] focus:ring-0 focus:outline-none"
-                data-modal-initial-focus
+                data-dialog-initial-focus
               />
             </.form>
             <div class="mt-4 max-h-[320px] min-h-[280px] overflow-y-auto">
@@ -560,7 +556,7 @@ defmodule KaguyaWeb.Components.Profile.Favorites do
           </div>
         <% end %>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

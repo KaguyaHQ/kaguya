@@ -25,21 +25,15 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
 
   def edit_post_dialog(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@open && @post}
       id={@id}
-      phx-hook="ModalDialog"
-      data-cancel-event={@cancel_event}
-      class="fixed inset-0 z-170 flex items-end justify-center bg-black/80 px-0 backdrop-blur-md sm:items-center sm:p-6"
-      role="presentation"
+      class="flex items-end justify-center bg-black/80 px-0 backdrop-blur-md sm:items-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push(@cancel_event)}
+      aria-labelledby={"#{@id}-title"}
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={"#{@id}-title"}
-        class="max-h-full w-full overflow-y-auto bg-[rgb(var(--surface-base))] text-[rgb(var(--foreground-primary))] outline-hidden sm:max-h-[80vh] sm:max-w-[640px] sm:rounded-[12px]"
-      >
+      <div class="max-h-full w-full overflow-y-auto bg-[rgb(var(--surface-base))] text-[rgb(var(--foreground-primary))] outline-hidden sm:max-h-[80vh] sm:max-w-[640px] sm:rounded-[12px]">
         <div class="flex items-center justify-between border-b border-[rgb(var(--border-divider))] px-5 py-3 sm:px-6 sm:pt-6 sm:pb-3">
           <h2
             id={"#{@id}-title"}
@@ -49,8 +43,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
           </h2>
           <button
             type="button"
-            phx-click={@cancel_event}
-            data-modal-cancel
+            data-dialog-close
             class="flex size-9 items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] transition-colors hover:bg-white/6 hover:text-[rgb(var(--foreground-primary))]"
             aria-label="Close"
           >
@@ -85,7 +78,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
                 value={Map.get(@form, "title", @post.title)}
                 placeholder="Title"
                 maxlength="200"
-                data-modal-initial-focus={!@title_locked}
+                data-dialog-initial-focus={!@title_locked}
                 disabled={@title_locked}
                 class={[
                   "w-full bg-transparent text-base font-semibold text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--text-field-placeholder-text))] focus:outline-hidden",
@@ -107,7 +100,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
               rows="6"
               maxlength="20000"
               placeholder="Write something..."
-              data-modal-initial-focus={@title_locked}
+              data-dialog-initial-focus={@title_locked}
               class="max-h-[400px] min-h-[150px] w-full resize-y rounded-none border-0 bg-transparent p-3 text-base text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--text-field-placeholder-text))] focus:outline-hidden"
             ><%= Map.get(@form, "content", @post.content) || "" %></textarea>
           </div>
@@ -115,8 +108,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
           <div class="flex justify-end gap-3 pt-4">
             <button
               type="button"
-              phx-click={@cancel_event}
-              data-modal-cancel
+              data-dialog-close
               class="h-9 rounded-[6px] bg-white/6 px-4 text-sm font-medium text-[rgb(var(--foreground-primary))] transition-colors hover:bg-white/10"
             >
               Cancel
@@ -131,7 +123,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
           </div>
         </form>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 end

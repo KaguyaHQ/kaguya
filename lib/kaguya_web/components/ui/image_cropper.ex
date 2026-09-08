@@ -91,9 +91,12 @@ defmodule KaguyaWeb.UI.ImageCropper do
         aria-hidden="true"
       />
 
-      <div
+      <dialog
+        id={"#{@id}-dialog"}
         data-part="modal"
-        class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm group-data-[state=open]/cropper:flex max-sm:p-0 sm:p-6"
+        class="kaguya-dialog flex items-center justify-center bg-black/80 backdrop-blur-sm max-sm:p-0 sm:p-6"
+        data-viewport="true"
+        aria-label="Crop image"
       >
         <div class={[
           "bg-surface-base text-foreground-primary relative flex w-full max-w-full flex-col items-center gap-6 border-none p-6",
@@ -158,7 +161,7 @@ defmodule KaguyaWeb.UI.ImageCropper do
             </KaguyaWeb.UI.Button.button>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
     """
   end

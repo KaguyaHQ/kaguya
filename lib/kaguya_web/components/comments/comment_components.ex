@@ -445,22 +445,16 @@ defmodule KaguyaWeb.Components.Comments do
     assigns = assign(assigns, :categories, report_categories())
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@comment_id}
       id={"report-comment-dialog-#{@comment_id}"}
-      phx-hook="ModalDialog"
-      data-cancel-event="cancel_report_comment"
-      class="fixed inset-0 z-150 flex items-center justify-center bg-black/80 px-5"
-      role="presentation"
+      class="flex items-center justify-center bg-black/80 px-5"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("cancel_report_comment", target: @target)}
+      aria-labelledby={"report-comment-dialog-#{@comment_id}-title"}
+      aria-describedby={"report-comment-dialog-#{@comment_id}-description"}
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={"report-comment-dialog-#{@comment_id}-title"}
-        aria-describedby={"report-comment-dialog-#{@comment_id}-description"}
-        class="w-full max-w-[480px] rounded-[16px] bg-[rgb(var(--surface-base))] px-5 pt-8 pb-6 shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:px-10"
-      >
+      <div class="w-full max-w-[480px] rounded-[16px] bg-[rgb(var(--surface-base))] px-5 pt-8 pb-6 shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:px-10">
         <p
           id={"report-comment-dialog-#{@comment_id}-title"}
           class="text-xl font-semibold text-[rgb(var(--foreground-primary))] sm:text-2xl"
@@ -479,10 +473,9 @@ defmodule KaguyaWeb.Components.Comments do
           <div class="mt-5 flex justify-end">
             <button
               type="button"
-              phx-click="cancel_report_comment"
+              data-dialog-close
               phx-target={@target}
-              data-modal-cancel
-              data-modal-initial-focus
+              data-dialog-initial-focus
               class="rounded-[8px] bg-[rgb(var(--surface-elevated))] px-[26px] py-3.5 text-sm text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
             >
               Close
@@ -507,7 +500,7 @@ defmodule KaguyaWeb.Components.Comments do
                 id="report-comment-category"
                 name="category"
                 required
-                data-modal-initial-focus
+                data-dialog-initial-focus
                 class="w-full cursor-pointer rounded-[8px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] px-3 py-2.5 text-sm text-[rgb(var(--foreground-primary))] outline-none"
               >
                 <option value="">Select a category</option>
@@ -557,9 +550,8 @@ defmodule KaguyaWeb.Components.Comments do
             <div class="flex justify-end gap-2">
               <button
                 type="button"
-                phx-click="cancel_report_comment"
+                data-dialog-close
                 phx-target={@target}
-                data-modal-cancel
                 class="rounded-[8px] bg-[rgb(var(--surface-elevated))] px-[26px] py-3.5 text-sm text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
               >
                 Cancel
@@ -576,7 +568,7 @@ defmodule KaguyaWeb.Components.Comments do
           </form>
         <% end %>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -585,22 +577,16 @@ defmodule KaguyaWeb.Components.Comments do
 
   def delete_confirm_dialog(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@comment_id}
       id={"delete-comment-dialog-#{@comment_id}"}
-      phx-hook="ModalDialog"
-      data-cancel-event="cancel_delete_comment"
-      class="fixed inset-0 z-150 flex items-center justify-center bg-black/80 px-5"
-      role="presentation"
+      class="flex items-center justify-center bg-black/80 px-5"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("cancel_delete_comment", target: @target)}
+      aria-labelledby={"delete-comment-dialog-#{@comment_id}-title"}
+      aria-describedby={"delete-comment-dialog-#{@comment_id}-description"}
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={"delete-comment-dialog-#{@comment_id}-title"}
-        aria-describedby={"delete-comment-dialog-#{@comment_id}-description"}
-        class="w-full max-w-[380px] rounded-[14px] bg-[#0A0A0A] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.55)]"
-      >
+      <div class="w-full max-w-[380px] rounded-[14px] bg-[#0A0A0A] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.55)]">
         <p
           id={"delete-comment-dialog-#{@comment_id}-title"}
           class="text-lg font-medium text-[rgb(var(--foreground-primary))]"
@@ -617,10 +603,9 @@ defmodule KaguyaWeb.Components.Comments do
         <div class="mt-5 flex justify-end gap-2.5">
           <button
             type="button"
-            phx-click="cancel_delete_comment"
+            data-dialog-close
             phx-target={@target}
-            data-modal-cancel
-            data-modal-initial-focus
+            data-dialog-initial-focus
             class="h-9 rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 text-[13px] font-normal text-[rgb(var(--foreground-secondary))] transition hover:bg-white/8"
           >
             Cancel
@@ -635,7 +620,7 @@ defmodule KaguyaWeb.Components.Comments do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

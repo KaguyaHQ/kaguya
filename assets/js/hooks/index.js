@@ -22,7 +22,7 @@ import ListLayoutIsland from "./list_layout_island"
 import LvNavGetForm from "./lv_nav_get_form"
 import MobileRecommendationVote from "./mobile_recommendation_vote"
 import MobileSearchHistory from "./mobile_search_history"
-import ModalDialog from "./modal_dialog"
+import Gallery from "./gallery"
 import NotFoundButton from "./not_found_button"
 import NotificationsReadTracker from "./notifications_read_tracker"
 import PaginationScroll from "./pagination_scroll"
@@ -68,7 +68,7 @@ export default {
   LvNavGetForm,
   MobileRecommendationVote,
   MobileSearchHistory,
-  ModalDialog,
+  Gallery,
   NotFoundButton,
   NotificationsReadTracker,
   PaginationScroll,

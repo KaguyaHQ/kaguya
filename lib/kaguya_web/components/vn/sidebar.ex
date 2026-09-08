@@ -41,7 +41,6 @@ defmodule KaguyaWeb.VN.Sidebar do
     ~H"""
     <aside class="sticky top-28 hidden h-fit lg:block">
       <%= if cover = cover_url(@display_vn) do %>
-        <%!-- TODO(show.ex): no new event needed — open_media_lightbox already exists --%>
         <button
           id="vn-sidebar-cover-button"
           type="button"
@@ -192,19 +191,16 @@ defmodule KaguyaWeb.VN.Sidebar do
 
   def mobile_action_drawer(assigns) do
     ~H"""
-    <%!-- TODO(show.ex): list/recommendation dialogs (if added later) should also receive the body scroll-lock JS pattern used here --%>
-    <div
-      class="fixed inset-0 z-120 lg:hidden"
-      role="dialog"
-      aria-modal="true"
+    <KaguyaWeb.UI.Dialog.dialog
+      class="lg:hidden"
       aria-labelledby="mobile-action-drawer-title"
-      tabindex="-1"
-      phx-mounted={Phoenix.LiveView.JS.add_class("overflow-hidden", to: "body")}
-      phx-remove={Phoenix.LiveView.JS.remove_class("overflow-hidden", to: "body")}
+      id="vn-mobile-action-drawer"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_action_drawer")}
     >
       <button
         type="button"
-        phx-click="close_action_drawer"
+        data-dialog-close
         class="absolute inset-0 cursor-default bg-black/45"
         aria-label="Close actions"
       ></button>
@@ -232,7 +228,7 @@ defmodule KaguyaWeb.VN.Sidebar do
           </div>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

@@ -201,11 +201,12 @@ defmodule KaguyaWeb.VN.Similar do
 
   def add_dialog(assigns) do
     ~H"""
-    <div
-      class="fixed inset-0 z-50 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
+    <KaguyaWeb.UI.Dialog.dialog
+      class="flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
       aria-labelledby="similar-dialog-title"
+      id="vn-add-dialog"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_recommendation_dialog")}
     >
       <div class="w-full max-w-[437px] overflow-hidden rounded-t-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] shadow-2xl sm:rounded-[16px]">
         <div class="flex items-center justify-between gap-4 border-b border-[rgb(var(--border-divider))] py-3.5 pr-[21px] pl-6">
@@ -217,7 +218,7 @@ defmodule KaguyaWeb.VN.Similar do
           </h2>
           <button
             type="button"
-            phx-click="close_recommendation_dialog"
+            data-dialog-close
             class="flex size-11 items-center justify-center rounded-full border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] text-[rgb(var(--foreground-primary))] transition hover:bg-[rgb(var(--surface-menu-item-hover))]"
             aria-label="Close similar VN search"
           >
@@ -302,7 +303,7 @@ defmodule KaguyaWeb.VN.Similar do
           </div>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

@@ -179,21 +179,18 @@ defmodule KaguyaWeb.VNLive.Show.Components do
       |> assign(:content_length, review_content_length(assigns.form))
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="review-dialog"
-      phx-hook="ModalDialog"
-      class="fixed inset-0 z-50 flex items-stretch bg-black/75 p-0 backdrop-blur-md sm:items-center sm:justify-center sm:p-6"
-      role="presentation"
+      class="flex items-stretch bg-black/75 p-0 backdrop-blur-md sm:items-center sm:justify-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_review_dialog")}
+      aria-labelledby="review-dialog-title"
     >
       <.form
         for={@form}
         as={:review}
         phx-change="update_review_form"
         phx-submit="save_review"
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="review-dialog-title"
         class="relative z-10 flex size-full flex-col overflow-y-auto bg-[rgb(var(--surface-base))] shadow-[0_18px_70px_rgba(0,0,0,0.55)] sm:grid sm:h-auto sm:max-h-[80vh] sm:min-h-[479px] sm:max-w-[960px] sm:grid-cols-[180px_1fr] sm:gap-12 sm:overflow-hidden sm:rounded-lg sm:p-12 sm:pb-6"
       >
         <input type="hidden" name="review[status]" value={@form["status"] || "READ"} />
@@ -207,8 +204,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </h2>
           <button
             type="button"
-            phx-click="close_review_dialog"
-            data-modal-cancel
+            data-dialog-close
             class="-mr-1 flex size-11 items-center justify-center rounded-full text-[rgb(var(--foreground-primary))] transition hover:bg-white/6"
             aria-label="Close review dialog"
           >
@@ -301,8 +297,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
             </h2>
             <button
               type="button"
-              phx-click="close_review_dialog"
-              data-modal-cancel
+              data-dialog-close
               class="flex size-8 shrink-0 items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] transition hover:bg-white/6 hover:text-[rgb(var(--foreground-primary))]"
               aria-label="Close review dialog"
             >
@@ -413,7 +408,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
             <textarea
               name="review[content]"
               rows="10"
-              data-modal-initial-focus
+              data-dialog-initial-focus
               class="max-h-[236px] min-h-[236px] w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm/6 text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-tertiary))] focus:outline-none sm:min-h-[224px] lg:max-h-[calc(60vh-200px)]"
               placeholder="Write a review..."
             ><%= @form["content"] %></textarea>
@@ -474,7 +469,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </p>
         </div>
       </.form>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -583,19 +578,14 @@ defmodule KaguyaWeb.VNLive.Show.Components do
       |> assign(:new_list_form, to_form(%{"name" => assigns.new_list_name}, as: :list))
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="list-dialog"
-      phx-hook="ModalDialog"
-      class="fixed inset-0 z-50 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
-      role="presentation"
+      class="flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_list_dialog")}
+      aria-labelledby="list-dialog-title"
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="list-dialog-title"
-        class="relative z-10 w-full max-w-[525px] overflow-hidden rounded-t-[16px] bg-[rgb(var(--surface-base))] shadow-2xl sm:rounded-[16px]"
-      >
+      <div class="relative z-10 w-full max-w-[525px] overflow-hidden rounded-t-[16px] bg-[rgb(var(--surface-base))] shadow-2xl sm:rounded-[16px]">
         <div class="flex items-center justify-between gap-4 border-b border-[rgb(var(--border-divider))] px-7 py-5 text-left">
           <h2
             id="list-dialog-title"
@@ -674,7 +664,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                 value={@new_list_name}
                 maxlength="80"
                 placeholder="Create a new list"
-                data-modal-initial-focus
+                data-dialog-initial-focus
                 class="h-10 min-w-0 flex-1 rounded-[8px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] px-3 text-sm text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-tertiary))] focus:border-white/15 focus:outline-none"
               />
               <button
@@ -692,8 +682,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           <div class="mt-5 flex items-center justify-end gap-3">
             <button
               type="button"
-              phx-click="close_list_dialog"
-              data-modal-cancel
+              data-dialog-close
               class="h-11 rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 text-sm font-normal text-[rgb(var(--foreground-primary))] transition hover:bg-[rgb(var(--surface-menu-item-hover))]"
             >
               Cancel
@@ -710,25 +699,20 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </div>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
   def recommendation_dialog(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="recommendation-dialog"
-      phx-hook="ModalDialog"
-      class="fixed inset-0 z-50 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
-      role="presentation"
+      class="flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_recommendation_dialog")}
+      aria-labelledby="recommendation-dialog-title"
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="recommendation-dialog-title"
-        class="relative z-10 w-full max-w-[437px] rounded-t-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] shadow-2xl sm:rounded-t-[12px] sm:rounded-b-[16px]"
-      >
+      <div class="relative z-10 w-full max-w-[437px] rounded-t-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] shadow-2xl sm:rounded-t-[12px] sm:rounded-b-[16px]">
         <div class="flex items-center justify-between gap-4 border-b border-[rgb(var(--border-divider))] py-3.5 pr-[21px] pl-6">
           <h2
             id="recommendation-dialog-title"
@@ -738,8 +722,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </h2>
           <button
             type="button"
-            phx-click="close_recommendation_dialog"
-            data-modal-cancel
+            data-dialog-close
             class="flex size-11 items-center justify-center rounded-full border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] text-[rgb(var(--foreground-primary))] transition hover:bg-[rgb(var(--border-divider))]"
             aria-label="Close recommendation search"
           >
@@ -755,7 +738,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           />
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -767,19 +750,14 @@ defmodule KaguyaWeb.VNLive.Show.Components do
     assigns = assign(assigns, :has_query?, String.trim(assigns.query || "") != "")
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="tag-dialog"
-      phx-hook="ModalDialog"
-      class="fixed inset-0 z-50 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
-      role="presentation"
+      class="flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_tag_dialog")}
+      aria-labelledby="tag-dialog-title"
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="tag-dialog-title"
-        class="relative z-10 w-full max-w-[420px] overflow-hidden rounded-t-[14px] bg-[#0A0A0A] shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:rounded-[14px]"
-      >
+      <div class="relative z-10 w-full max-w-[420px] overflow-hidden rounded-t-[14px] bg-[#0A0A0A] shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:rounded-[14px]">
         <div class="px-5 pt-5 pb-4">
           <div class="mb-3 flex items-center justify-between gap-4">
             <h2
@@ -790,8 +768,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
             </h2>
             <button
               type="button"
-              phx-click="close_tag_dialog"
-              data-modal-cancel
+              data-dialog-close
               class="flex size-8 items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] transition hover:bg-white/6 hover:text-[rgb(var(--foreground-primary))]"
               aria-label="Close tag dialog"
             >
@@ -804,7 +781,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
               name="tag_search[query]"
               value={@query}
               placeholder="Search tags..."
-              data-modal-initial-focus
+              data-dialog-initial-focus
               phx-debounce="150"
               class="h-10 w-full rounded-[8px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] px-3 text-sm text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-tertiary))] focus:border-[rgb(var(--text-field-border-focus))] focus:outline-none"
             />
@@ -836,7 +813,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -844,19 +821,14 @@ defmodule KaguyaWeb.VNLive.Show.Components do
 
   def quote_dialog(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="quote-dialog"
-      phx-hook="ModalDialog"
-      class="fixed inset-0 z-50 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
-      role="presentation"
+      class="flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_quote_dialog")}
+      aria-labelledby="quote-dialog-title"
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="quote-dialog-title"
-        class="relative z-10 w-full max-w-[560px] rounded-t-[16px] bg-[rgb(var(--surface-base))] p-0 shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:rounded-[16px]"
-      >
+      <div class="relative z-10 w-full max-w-[560px] rounded-t-[16px] bg-[rgb(var(--surface-base))] p-0 shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:rounded-[16px]">
         <div class="flex items-center justify-between gap-4">
           <h2
             id="quote-dialog-title"
@@ -866,8 +838,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </h2>
           <button
             type="button"
-            phx-click="close_quote_dialog"
-            data-modal-cancel
+            data-dialog-close
             class="mt-4 mr-5 flex size-8 items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] transition hover:bg-white/6 hover:text-[rgb(var(--foreground-primary))]"
             aria-label="Close quote dialog"
           >
@@ -881,7 +852,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
                 name="quote[text]"
                 rows="5"
                 required
-                data-modal-initial-focus
+                data-dialog-initial-focus
                 placeholder="Paste the quote here..."
                 class="w-full resize-none rounded-none border-0 bg-transparent px-4 py-3.5 text-[16px] leading-[1.65] text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-quaternary))]/70 placeholder:italic focus:outline-none"
                 style="font-family: var(--font-source-serif)"
@@ -947,8 +918,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           <div class="flex justify-end gap-2 px-6 pb-5">
             <button
               type="button"
-              phx-click="close_quote_dialog"
-              data-modal-cancel
+              data-dialog-close
               class="h-9 rounded-[4px] bg-white/6 px-4 text-sm font-medium text-[rgb(var(--foreground-primary))] transition hover:bg-white/10"
             >
               Cancel
@@ -962,7 +932,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </div>
         </.form>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -970,26 +940,25 @@ defmodule KaguyaWeb.VNLive.Show.Components do
 
   def media_lightbox(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="media-lightbox"
-      phx-hook="ModalDialog"
       data-media-lightbox
-      class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/90 p-0 backdrop-blur-md"
-      role="presentation"
+      class="flex items-center justify-center overflow-hidden bg-black/90 p-0 backdrop-blur-md"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_media_lightbox")}
+      aria-label={"#{@media.heading} viewer"}
     >
       <button
         type="button"
-        phx-click="close_media_lightbox"
-        data-modal-cancel
+        data-dialog-close
         class="absolute inset-0 cursor-pointer"
         aria-label="Close media preview"
       ></button>
 
       <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-label={"#{@media.heading} viewer"}
+        id="media-gallery"
+        phx-hook="Gallery"
+        data-gallery-fullscreen
         class="pointer-events-none relative flex size-full flex-col p-3 sm:p-5"
       >
         <header class="pointer-events-auto z-20 mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-1 pb-2 text-white">
@@ -1001,9 +970,8 @@ defmodule KaguyaWeb.VNLive.Show.Components do
             <span class="hidden text-xs text-white/45 md:inline">← → navigate · Esc close</span>
             <button
               type="button"
-              phx-click="close_media_lightbox"
-              data-modal-cancel
-              data-modal-initial-focus
+              data-dialog-close
+              data-dialog-initial-focus
               class="flex size-10 items-center justify-center rounded-full border border-white/10 bg-black/45 text-white backdrop-blur-xl transition hover:border-white/20 hover:bg-white/15 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white/70"
               aria-label="Close image viewer"
             >
@@ -1113,7 +1081,7 @@ defmodule KaguyaWeb.VNLive.Show.Components do
           </div>
         </footer>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

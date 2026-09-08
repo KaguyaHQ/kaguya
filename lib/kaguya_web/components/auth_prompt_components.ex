@@ -77,15 +77,12 @@ defmodule KaguyaWeb.AuthPromptComponents do
 
   def auth_prompt_modal(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id={@id}
-      role="dialog"
-      aria-modal="true"
       aria-labelledby={"#{@id}-title"}
-      phx-window-keydown={hide_auth_prompt(@id)}
-      phx-key="escape"
-      style="display: none"
-      class="fixed inset-0 z-140 items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+      class="flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+      viewport
+      auto_open={false}
     >
       <button
         type="button"
@@ -140,25 +137,16 @@ defmodule KaguyaWeb.AuthPromptComponents do
           </div>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
   def show_auth_prompt(id, message \\ "Sign in to Kaguya") do
     JS.push("show_auth_prompt", value: %{message: message})
-    |> JS.show(
-      to: "##{id}",
-      display: "flex",
-      transition: {"transition ease-out duration-200", "opacity-0", "opacity-100"}
-    )
-    |> JS.add_class("overflow-hidden", to: "body")
+    |> KaguyaWeb.UI.Dialog.show("##{id}")
   end
 
   def hide_auth_prompt(id) do
-    JS.hide(
-      to: "##{id}",
-      transition: {"transition ease-in duration-150", "opacity-100", "opacity-0"}
-    )
-    |> JS.remove_class("overflow-hidden", to: "body")
+    KaguyaWeb.UI.Dialog.hide("##{id}")
   end
 end

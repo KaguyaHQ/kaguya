@@ -9,6 +9,10 @@ defmodule KaguyaWeb.UI.Dialog do
   and inert background — no JS focus management needed. Native `close`/`cancel`
   events are forwarded to the server via `on_close` so it can flip its assign.
 
+  Set `viewport` for a full-viewport surface whose contents own panel layout.
+  Set `auto_open={false}` for persistent client-opened dialogs and use `show/2`
+  and `hide/2`. The hook shares counted scroll locking with the image cropper.
+
   The `<dialog>` element **is** the panel — pass panel cosmetics (background,
   border, radius, shadow, width) via `class`. Close buttons opt in with
   `<.dialog_cancel>` (or any element carrying `data-dialog-close`).
@@ -44,7 +48,9 @@ defmodule KaguyaWeb.UI.Dialog do
   attr :id, :string, required: true
   attr :on_close, :any, default: nil
   attr :dismissable, :boolean, default: true
-  attr :class, :string, default: nil
+  attr :auto_open, :boolean, default: true
+  attr :viewport, :boolean, default: false
+  attr :class, :any, default: nil
   attr :rest, :global
   slot :inner_block, required: true
 
@@ -53,15 +59,19 @@ defmodule KaguyaWeb.UI.Dialog do
     <dialog
       id={@id}
       phx-hook="Dialog"
+      phx-mounted={Phoenix.LiveView.JS.ignore_attributes(["open"])}
       data-on-close={@on_close}
       data-dismissable={to_string(@dismissable)}
+      data-auto-open={to_string(@auto_open)}
+      data-viewport={to_string(@viewport)}
       class={
         [
           # Structure only (centering + backdrop). The caller owns the panel
           # cosmetics — width, padding, background, border, radius, shadow — so
           # its classes never conflict with a baked-in default (there is no
           # tw_merge here; a baked `p-6` would beat a caller's `p-0`).
-          "m-auto backdrop:bg-black/80",
+          "kaguya-dialog",
+          !@viewport && "m-auto backdrop:bg-black/80",
           @class
         ]
       }
@@ -70,6 +80,14 @@ defmodule KaguyaWeb.UI.Dialog do
       {render_slot(@inner_block)}
     </dialog>
     """
+  end
+
+  def show(js \\ %Phoenix.LiveView.JS{}, selector) do
+    Phoenix.LiveView.JS.dispatch(js, "kaguya:dialog-open", to: selector)
+  end
+
+  def hide(js \\ %Phoenix.LiveView.JS{}, selector) do
+    Phoenix.LiveView.JS.dispatch(js, "kaguya:dialog-close", to: selector)
   end
 
   attr :class, :string, default: nil

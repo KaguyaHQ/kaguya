@@ -386,12 +386,13 @@ defmodule KaguyaWeb.SettingsLive.Index do
 
   defp danger_confirm_dialog(assigns) do
     ~H"""
-    <div
-      class="fixed inset-0 z-50 flex items-end justify-center bg-black/80 px-4 py-5 backdrop-blur-sm sm:items-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
+    <KaguyaWeb.UI.Dialog.dialog
+      class="flex items-end justify-center bg-black/80 px-4 py-5 backdrop-blur-sm sm:items-center sm:p-6"
       aria-labelledby={"#{@id}-title"}
       aria-describedby={"#{@id}-description"}
+      id={@id}
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_danger_dialog")}
     >
       <div class="w-full max-w-[380px] rounded-[14px] bg-[#0A0A0A] px-6 py-5 shadow-[0_8px_40px_rgba(0,0,0,0.55)] max-sm:max-w-[320px]">
         <h2
@@ -406,7 +407,7 @@ defmodule KaguyaWeb.SettingsLive.Index do
         <div class="mt-5 flex w-full items-center justify-end gap-2.5 max-sm:flex-row">
           <button
             type="button"
-            phx-click="close_danger_dialog"
+            data-dialog-close
             class="active:bg-button-background-neutral-pressed bg-button-background-neutral-default border-button-border-secondary hover:bg-button-background-neutral-hover text-foreground-secondary h-[36px] rounded-[8px] border px-4 text-[13px] font-normal transition"
           >
             Cancel
@@ -420,7 +421,7 @@ defmodule KaguyaWeb.SettingsLive.Index do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

@@ -21,8 +21,6 @@ defmodule KaguyaWeb.VNLive.Show do
     TagActions
   }
 
-  alias Phoenix.LiveView.JS
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -584,16 +582,6 @@ defmodule KaguyaWeb.VNLive.Show do
       />
       <Components.quote_dialog :if={@quote_dialog_open} characters={@characters} />
       <Components.media_lightbox :if={@media_lightbox} media={@media_lightbox} />
-      <div
-        :if={@action_drawer_open}
-        id="action-drawer-scroll-lock"
-        class="hidden"
-        phx-window-keydown="close_action_drawer"
-        phx-key="Escape"
-        phx-mounted={JS.add_class("overflow-hidden", to: "body")}
-        phx-remove={JS.remove_class("overflow-hidden", to: "body")}
-      >
-      </div>
       <Sidebar.mobile_action_drawer
         :if={@action_drawer_open}
         viewer={@viewer}

@@ -180,28 +180,22 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
       assign(assigns, :visible_errors, if(assigns.show_errors?, do: assigns.errors, else: %{}))
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@open}
       id="new-post-dialog"
-      phx-hook="ModalDialog"
-      class="fixed inset-0 z-120 flex items-end justify-center bg-black/80 backdrop-blur-md sm:items-center sm:p-6"
-      role="presentation"
+      class="flex items-end justify-center bg-black/80 backdrop-blur-md sm:items-center sm:p-6"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_new_post")}
+      aria-labelledby="new-post-dialog-title"
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-post-dialog-title"
-        class="bg-surface-base text-foreground-primary max-h-full w-full overflow-y-auto outline-hidden sm:max-h-[80vh] sm:max-w-[720px] sm:rounded-lg"
-      >
+      <div class="bg-surface-base text-foreground-primary max-h-full w-full overflow-y-auto outline-hidden sm:max-h-[80vh] sm:max-w-[720px] sm:rounded-lg">
         <div class="border-border-divider flex items-center justify-between border-b px-5 py-3 sm:border-b-0 sm:px-6 sm:pt-6 sm:pb-0">
           <h2 id="new-post-dialog-title" class="text-foreground-primary text-lg font-semibold">
             New Post
           </h2>
           <button
             type="button"
-            phx-click="close_new_post"
-            data-modal-cancel
+            data-dialog-close
             class="sm:hover:text-foreground-primary sm:text-foreground-secondary text-foreground-primary flex size-11 items-center justify-center rounded-full transition-colors hover:bg-white/6 sm:size-8"
             aria-label="Close"
           >
@@ -229,7 +223,7 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
                   value={@form["title"] || ""}
                   placeholder="Title"
                   maxlength="200"
-                  data-modal-initial-focus
+                  data-dialog-initial-focus
                   class={[
                     "placeholder:text-text-field-placeholder-text text-foreground-primary w-full bg-transparent text-base font-semibold focus:outline-hidden",
                     @visible_errors[:title] && "placeholder:text-semantic-error/60"
@@ -260,7 +254,7 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
             <div class="flex justify-end gap-3 pt-4">
               <button
                 type="button"
-                phx-click="close_new_post"
+                data-dialog-close
                 class="text-foreground-primary h-9 rounded-[4px] bg-white/6 px-4 text-sm font-medium transition-colors hover:bg-white/10"
               >
                 Cancel
@@ -277,7 +271,7 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
           </form>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
 
     <.confirm_dialog
       :if={@discard_open}

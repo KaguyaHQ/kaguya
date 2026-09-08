@@ -154,11 +154,10 @@ defmodule KaguyaWeb.CommentsComponentTest do
     html = render(view)
 
     assert html =~ ~s(id="delete-comment-dialog-#{comment.id}")
-    assert html =~ ~s(phx-hook="ModalDialog")
-    assert html =~ ~s(data-cancel-event="cancel_delete_comment")
-    assert html =~ ~s(data-modal-cancel)
+    assert has_element?(view, "dialog#delete-comment-dialog-#{comment.id}[data-on-close]")
+    assert has_element?(view, "#delete-comment-dialog-#{comment.id} [data-dialog-close]")
 
-    html = render_click(element(view, "#delete-comment-dialog-#{comment.id} button", "Cancel"))
+    html = view |> with_target("#comments") |> render_click("cancel_delete_comment")
     refute html =~ ~s(id="delete-comment-dialog-#{comment.id}")
     assert Repo.get!(ListComment, comment.id)
   end
@@ -222,9 +221,8 @@ defmodule KaguyaWeb.CommentsComponentTest do
 
     assert html =~ "Report Comment"
     assert html =~ ~s(id="report-comment-dialog-#{comment.id}")
-    assert html =~ ~s(phx-hook="ModalDialog")
-    assert html =~ ~s(data-cancel-event="cancel_report_comment")
-    assert html =~ ~s(data-modal-initial-focus)
+    assert has_element?(view, "dialog#report-comment-dialog-#{comment.id}[data-on-close]")
+    assert has_element?(view, "#report-comment-dialog-#{comment.id} [data-dialog-initial-focus]")
 
     html =
       render_submit(element(view, "#report-comment-form"), %{

@@ -135,9 +135,13 @@ defmodule KaguyaWeb.Lists.ShowComponents do
         />
       </Cover.cover_tooltip_provider>
 
-      <div
+      <KaguyaWeb.UI.Dialog.dialog
         :if={@fullscreen}
-        class="fixed inset-0 z-120 overflow-auto bg-[rgb(var(--surface-base))] p-2 sm:p-4"
+        class="overflow-auto bg-[rgb(var(--surface-base))] p-2 sm:p-4"
+        id="lists-tier-board"
+        viewport
+        on_close={Phoenix.LiveView.JS.push("close_tier_fullscreen")}
+        aria-label="Tier list"
       >
         <div class="mb-3 flex items-center justify-between gap-3">
           <p class="truncate text-sm font-semibold text-[rgb(var(--foreground-primary))]">
@@ -145,7 +149,7 @@ defmodule KaguyaWeb.Lists.ShowComponents do
           </p>
           <button
             type="button"
-            phx-click="close_tier_fullscreen"
+            data-dialog-close
             class="flex size-9 items-center justify-center rounded-[8px] bg-[rgb(var(--surface-elevated))] text-[rgb(var(--foreground-secondary))] transition hover:text-[rgb(var(--foreground-primary))]"
             aria-label="Close tier list fullscreen"
           >
@@ -157,7 +161,7 @@ defmodule KaguyaWeb.Lists.ShowComponents do
             <.tier_board_inner items={@items} tiers={@tiers} fade_read={@fade_read} />
           </Cover.cover_tooltip_provider>
         </div>
-      </div>
+      </KaguyaWeb.UI.Dialog.dialog>
     </div>
     """
   end

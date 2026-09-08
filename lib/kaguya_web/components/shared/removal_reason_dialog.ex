@@ -6,9 +6,8 @@ defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
   trail in `Kaguya.Discussions.hide_post/2`.
 
   Submission is purely a form `phx-submit`: the parent LiveView owns the
-  event (default `submit_hide_post`) and the busy/open state. Driven by
-  data attrs (`data-modal-panel`, `data-modal-cancel`, etc.) so the existing
-  `ModalDialog` hook in `app.js` handles focus trap + Esc-to-close.
+  event (default `submit_hide_post`) and the busy/open state. It uses
+  the shared native dialog lifecycle for dismissal, focus and scroll locking.
   """
 
   use KaguyaWeb, :html
@@ -47,22 +46,16 @@ defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
     assigns = assign(assigns, :reasons, @reasons)
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@open}
       id={@id}
-      phx-hook="ModalDialog"
-      data-cancel-event={@cancel_event}
-      class="fixed inset-0 z-170 flex items-center justify-center bg-black/80 px-5"
-      role="presentation"
+      class="flex items-center justify-center bg-black/80 px-5"
+      viewport
+      on_close={Phoenix.LiveView.JS.push(@cancel_event)}
+      aria-labelledby={"#{@id}-title"}
+      aria-describedby={"#{@id}-description"}
     >
-      <div
-        data-modal-panel
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={"#{@id}-title"}
-        aria-describedby={"#{@id}-description"}
-        class="w-full max-w-[540px] overflow-hidden rounded-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-base))] shadow-[0_8px_40px_rgba(0,0,0,0.55)]"
-      >
+      <div class="w-full max-w-[540px] overflow-hidden rounded-[12px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-base))] shadow-[0_8px_40px_rgba(0,0,0,0.55)]">
         <div class="flex items-start justify-between gap-3 border-b border-[rgb(var(--border-divider))] px-5 py-4">
           <div class="min-w-0">
             <p
@@ -80,8 +73,7 @@ defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
           </div>
           <button
             type="button"
-            phx-click={@cancel_event}
-            data-modal-cancel
+            data-dialog-close
             aria-label="Close"
             class="flex size-9 shrink-0 items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] transition hover:bg-white/6 hover:text-[rgb(var(--foreground-primary))]"
           >
@@ -102,7 +94,7 @@ defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
             <select
               name="reason"
               required
-              data-modal-initial-focus
+              data-dialog-initial-focus
               data-removal-reason
               class="h-12 cursor-pointer rounded-[8px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] px-4 text-sm text-[rgb(var(--foreground-primary))] outline-none"
             >
@@ -165,8 +157,7 @@ defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                phx-click={@cancel_event}
-                data-modal-cancel
+                data-dialog-close
                 class="h-10 rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 text-sm text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
               >
                 Cancel
@@ -183,7 +174,7 @@ defmodule KaguyaWeb.SharedComponents.RemovalReasonDialog do
           </div>
         </form>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 end

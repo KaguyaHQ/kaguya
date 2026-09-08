@@ -350,14 +350,18 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
   def mobile_search_overlay(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@show}
-      class="fixed inset-0 z-100 flex flex-col bg-[rgb(var(--surface-base))] lg:hidden"
+      class="flex flex-col bg-[rgb(var(--surface-base))] lg:hidden"
+      id="lists-mobile-search-overlay"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_mobile_search")}
+      aria-label="Search visual novels"
     >
       <div class="flex items-center gap-3 border-b border-white/5 px-4 py-3">
         <button
           type="button"
-          phx-click="close_mobile_search"
+          data-dialog-close
           class="flex size-11 shrink-0 items-center justify-center p-0 text-[rgb(var(--foreground-primary))]"
           aria-label="Close search"
         >
@@ -435,7 +439,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -484,16 +488,18 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
   def confirm_dialog(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@dialog}
-      class="fixed inset-0 z-70 flex items-center justify-center bg-black/60 px-5"
-      role="presentation"
+      class="flex items-center justify-center bg-black/60 px-5"
+      id="lists-confirm-dialog"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_dialog")}
+      aria-labelledby={
+        if @dialog == :discard, do: "discard-dialog-title", else: "delete-dialog-title"
+      }
     >
       <div
         :if={@dialog == :discard}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="discard-dialog-title"
         class="w-full max-w-[360px] rounded-[16px] bg-[rgb(var(--surface-base))] p-6 shadow-2xl"
       >
         <p id="discard-dialog-title" class="text-lg font-medium text-[rgb(var(--foreground-primary))]">
@@ -513,7 +519,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           </button>
           <button
             type="button"
-            phx-click="close_dialog"
+            data-dialog-close
             class="h-[41px] rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 py-3 text-sm font-normal text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
           >
             Keep editing
@@ -523,9 +529,6 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
       <div
         :if={@dialog == :delete}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-dialog-title"
         class="w-full max-w-[437px] overflow-hidden rounded-t-[12px] rounded-b-[16px] bg-[rgb(var(--surface-base))] shadow-2xl"
       >
         <div class="flex items-center justify-between gap-2 border-b border-[rgb(var(--border-divider))] py-3.5 pr-[21px] pl-6">
@@ -538,7 +541,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           </p>
           <button
             type="button"
-            phx-click="close_dialog"
+            data-dialog-close
             class="flex size-11 items-center rounded-full border border-[rgb(var(--border-divider))] bg-transparent p-3 text-[rgb(var(--foreground-primary))] transition hover:bg-[rgb(var(--surface-elevated))]"
             aria-label="Close"
           >
@@ -554,7 +557,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           <div class="mt-4 flex w-full items-center justify-end gap-2">
             <button
               type="button"
-              phx-click="close_dialog"
+              data-dialog-close
               class="flex h-[41px] items-center gap-2 rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 py-3 text-sm font-normal text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
             >
               Cancel
@@ -575,7 +578,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           </div>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -589,17 +592,15 @@ defmodule KaguyaWeb.Lists.FormComponents do
       |> assign(:can_add_tier, length(assigns.tiers || []) < @max_tier_count)
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       :if={@open}
-      class="fixed inset-0 z-80 flex items-center justify-center bg-black/60 px-5"
-      role="presentation"
+      class="flex items-center justify-center bg-black/60 px-5"
+      id="lists-tier-dialog"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_tier_editor")}
+      aria-labelledby="tier-dialog-title"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="tier-dialog-title"
-        class="w-full max-w-[500px] overflow-hidden rounded-[12px] bg-[rgb(var(--surface-base))] shadow-2xl"
-      >
+      <div class="w-full max-w-[500px] overflow-hidden rounded-[12px] bg-[rgb(var(--surface-base))] shadow-2xl">
         <div class="border-b border-[rgb(var(--border-divider))] px-5 py-4">
           <p
             id="tier-dialog-title"
@@ -717,7 +718,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
         <div class="flex w-full items-center justify-end gap-2 px-5 pb-5">
           <button
             type="button"
-            phx-click="close_tier_editor"
+            data-dialog-close
             class="h-10 rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 text-sm font-normal text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
           >
             Cancel
@@ -731,7 +732,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           </button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 

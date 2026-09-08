@@ -2,10 +2,7 @@ defmodule KaguyaWeb.UI.ConfirmDialog do
   @moduledoc """
   A modal confirmation dialog for guard prompts and destructive confirms.
 
-  Built on the lightweight `ModalDialog` JS hook (focus trap, Escape/overlay
-  dismiss, scroll lock, focus restore) rather than SaladUI, because every
-  confirm dialog in the app is driven by LiveView state (`:if` + server events),
-  which bypasses SaladUI's client state machine anyway.
+  Uses the shared native dialog for focus, dismissal and scroll locking.
 
   Open/close is owned by the parent LiveView: render the dialog only when it
   should be open (`:if={@open?}`), and wire `cancel_event` to the assign that
@@ -66,23 +63,19 @@ defmodule KaguyaWeb.UI.ConfirmDialog do
     assigns = assign(assigns, :destructive?, assigns.tone == :destructive)
 
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id={@id}
-      phx-hook="ModalDialog"
       class={[
-        "fixed inset-0 z-130 flex items-center justify-center bg-black/80 p-6",
+        "flex items-center justify-center bg-black/80 p-6",
         @class
       ]}
-      role="presentation"
+      viewport
+      on_close={Phoenix.LiveView.JS.push(@cancel_event)}
+      aria-labelledby={"#{@id}-title"}
+      aria-describedby={"#{@id}-desc"}
+      role="alertdialog"
     >
-      <div
-        data-modal-panel
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={"#{@id}-title"}
-        aria-describedby={"#{@id}-desc"}
-        class="bg-surface-base w-full max-w-[360px] rounded-[16px] p-6 shadow-[0_16px_80px_rgba(0,0,0,0.6)]"
-      >
+      <div class="bg-surface-base w-full max-w-[360px] rounded-[16px] p-6 shadow-[0_16px_80px_rgba(0,0,0,0.6)]">
         <p id={"#{@id}-title"} class="text-foreground-primary text-lg font-medium">
           {@title}
         </p>
@@ -103,16 +96,15 @@ defmodule KaguyaWeb.UI.ConfirmDialog do
           <.button
             variant={if @destructive?, do: "neutral", else: "neutral-inverse"}
             size="small"
-            phx-click={@cancel_event}
-            data-modal-cancel
-            data-modal-initial-focus
+            data-dialog-close
+            data-dialog-initial-focus
             class={@destructive? && "order-1"}
           >
             {@cancel_label}
           </.button>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 end

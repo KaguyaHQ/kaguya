@@ -3,7 +3,6 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
 
   use KaguyaWeb, :html
 
-  alias Phoenix.LiveView.JS
   alias KaguyaWeb.BrowseLive.TagSnapshot
   alias KaguyaWeb.UI.Checkbox
 
@@ -18,7 +17,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
     <div class="flex items-center gap-2 px-4 sm:hidden">
       <button
         type="button"
-        phx-click={JS.show(to: "#browse-mode-drawer")}
+        phx-click={KaguyaWeb.UI.Dialog.show("#browse-mode-drawer")}
         class="bg-button-background-neutral-inverse-default text-button-text-on-neutral-inverse inline-flex h-9 items-center gap-2 rounded-[8px] px-3 text-sm font-semibold"
         aria-haspopup="dialog"
         aria-controls="browse-mode-drawer"
@@ -28,7 +27,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
 
       <button
         type="button"
-        phx-click={JS.show(to: "#browse-sort-drawer")}
+        phx-click={KaguyaWeb.UI.Dialog.show("#browse-sort-drawer")}
         class="bg-button-background-neutral-default text-foreground-primary inline-flex h-9 min-w-0 items-center gap-1.5 rounded-[8px] px-3 text-sm font-medium"
         aria-haspopup="dialog"
         aria-controls="browse-sort-drawer"
@@ -39,7 +38,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
 
       <button
         type="button"
-        phx-click={JS.show(to: "#browse-filter-panel")}
+        phx-click={KaguyaWeb.UI.Dialog.show("#browse-filter-panel")}
         class="bg-button-background-neutral-default text-foreground-primary ml-auto inline-flex h-9 items-center gap-2 rounded-[8px] px-3 text-sm font-medium"
         aria-haspopup="dialog"
         aria-controls="browse-filter-panel"
@@ -65,17 +64,16 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
 
   defp mode_drawer(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="browse-mode-drawer"
-      style="display: none"
-      class="fixed inset-0 z-125 sm:hidden"
-      role="dialog"
-      aria-modal="true"
+      class="sm:hidden"
       aria-labelledby="browse-mode-title"
+      viewport
+      auto_open={false}
     >
       <button
         type="button"
-        phx-click={JS.hide(to: "#browse-mode-drawer")}
+        phx-click={KaguyaWeb.UI.Dialog.hide("#browse-mode-drawer")}
         class="absolute inset-0 cursor-default bg-black/60 backdrop-blur-[2px]"
         aria-label="Close browse type"
       />
@@ -86,7 +84,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           <.link
             :for={option <- @options}
             patch={option.href}
-            phx-click={JS.hide(to: "#browse-mode-drawer")}
+            phx-click={KaguyaWeb.UI.Dialog.hide("#browse-mode-drawer")}
             rel="nofollow"
             class={drawer_option_class(option.selected?)}
           >
@@ -94,7 +92,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           </.link>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -102,17 +100,16 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
 
   defp sort_drawer(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="browse-sort-drawer"
-      style="display: none"
-      class="fixed inset-0 z-125 sm:hidden"
-      role="dialog"
-      aria-modal="true"
+      class="sm:hidden"
       aria-labelledby="browse-sort-title"
+      viewport
+      auto_open={false}
     >
       <button
         type="button"
-        phx-click={JS.hide(to: "#browse-sort-drawer")}
+        phx-click={KaguyaWeb.UI.Dialog.hide("#browse-sort-drawer")}
         class="absolute inset-0 cursor-default bg-black/60 backdrop-blur-[2px]"
         aria-label="Close sort"
       />
@@ -123,7 +120,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           <.link
             :for={option <- @options}
             patch={option.href}
-            phx-click={JS.hide(to: "#browse-sort-drawer")}
+            phx-click={KaguyaWeb.UI.Dialog.hide("#browse-sort-drawer")}
             rel="nofollow"
             class={drawer_option_class(option.selected?)}
           >
@@ -131,7 +128,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           </.link>
         </div>
       </div>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
@@ -139,15 +136,12 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
 
   defp filter_panel(assigns) do
     ~H"""
-    <div
+    <KaguyaWeb.UI.Dialog.dialog
       id="browse-filter-panel"
-      style="display: none"
-      class="bg-surface-base text-foreground-primary fixed inset-0 z-130 sm:hidden"
-      role="dialog"
-      aria-modal="true"
+      class="bg-surface-base text-foreground-primary sm:hidden"
       aria-labelledby="browse-filter-title"
-      phx-window-keydown={JS.hide(to: "#browse-filter-panel")}
-      phx-key="Escape"
+      viewport
+      auto_open={false}
     >
       <form
         id="browse-mobile-filter-form"
@@ -169,7 +163,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
             <button
               id="browse-filter-close"
               type="button"
-              phx-click={JS.hide(to: "#browse-filter-panel")}
+              phx-click={KaguyaWeb.UI.Dialog.hide("#browse-filter-panel")}
               class="text-foreground-primary rounded-md px-2 py-1.5 text-sm hover:bg-white/8"
               aria-label="Close filters without applying changes"
             >
@@ -189,7 +183,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
             <button
               id="browse-filter-done"
               type="submit"
-              phx-click={JS.hide(to: "#browse-filter-panel")}
+              phx-click={KaguyaWeb.UI.Dialog.hide("#browse-filter-panel")}
               class="text-foreground-primary text-sm font-semibold"
             >
               Done
@@ -327,7 +321,7 @@ defmodule KaguyaWeb.BrowseLive.MobileControls do
           </div>
         </div>
       </form>
-    </div>
+    </KaguyaWeb.UI.Dialog.dialog>
     """
   end
 
