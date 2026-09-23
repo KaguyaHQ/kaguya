@@ -83,3 +83,58 @@ test("typing after a cleared draft starts saving again", t => {
   editor.destroyed()
   assert.equal(storage.get("review:one"), "Further edits after a failed delete")
 })
+
+function composer(t, collapsible = true) {
+  const previousWindow = globalThis.window
+  globalThis.window = new EventTarget()
+  const actions = {style: {display: ""}}
+  const submit = {disabled: true}
+  const textarea = Object.assign(new EventTarget(), {
+    value: "", style: {}, scrollHeight: 0, blur() {}
+  })
+  const el = Object.assign(new EventTarget(), {
+    dataset: {collapsible: String(collapsible)},
+    querySelector(selector) {
+      if (selector === "textarea") return textarea
+      if (selector === "[data-markdown-editor-actions]") return actions
+      return submit
+    }
+  })
+  const editor = {...MarkdownEditor, el, handleEvent() {}}
+  editor.mounted()
+  t.after(() => {
+    editor.destroyed()
+    globalThis.window = previousWindow
+  })
+  return {editor, el, textarea, actions, submit}
+}
+
+test("top-level composer opens, cancels, stays collapsed after a patch, and reopens", t => {
+  const {editor, el, textarea, actions, submit} = composer(t)
+  assert.equal(actions.style.display, "none")
+  el.dispatchEvent(new Event("focusin"))
+  assert.equal(actions.style.display, "")
+  textarea.value = "Discard this draft"
+  textarea.dispatchEvent(new Event("input"))
+  assert.equal(submit.disabled, false)
+  el.dispatchEvent(new Event("kaguya:reply-input-cancel"))
+  assert.equal(textarea.value, "")
+  assert.equal(submit.disabled, true)
+  assert.equal(actions.style.display, "none")
+  actions.style.display = ""
+  editor.updated()
+  assert.equal(actions.style.display, "none")
+  el.dispatchEvent(new Event("focusin"))
+  assert.equal(actions.style.display, "")
+})
+
+test("a patch preserves an open draft and reply/edit actions do not collapse", t => {
+  const {editor, el, textarea, actions} = composer(t, false)
+  textarea.value = "Keep this draft"
+  editor.updated()
+  assert.equal(textarea.value, "Keep this draft")
+  assert.equal(actions.style.display, "")
+  el.dispatchEvent(new Event("kaguya:reply-input-cancel"))
+  assert.equal(textarea.value, "")
+  assert.equal(actions.style.display, "")
+})

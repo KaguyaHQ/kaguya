@@ -76,6 +76,7 @@ defmodule KaguyaWeb.CommentsComponent do
         target={@myself}
         submit_event="create_comment"
         cancel_event="cancel_composer"
+        collapsible
         current_user={@current_user}
         button_text="Comment"
         placeholder="Add a comment..."

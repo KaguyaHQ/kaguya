@@ -4,6 +4,7 @@
 
 const MarkdownEditor = {
   mounted() {
+    this.expanded = false
     this.submitButton =
       this.el.querySelector("[data-markdown-editor-submit]") ||
       this.el.querySelector("[data-reply-submit]")
@@ -59,6 +60,8 @@ const MarkdownEditor = {
       if (!event.target.closest("button") && this.textarea) this.textarea.focus()
     }
     this._onFocusIn = () => {
+      this.expanded = true
+      this._sync()
       if (this.el.dataset.expandEvent) {
         this.pushEventTo(this.el, this.el.dataset.expandEvent, {})
       }
@@ -69,6 +72,7 @@ const MarkdownEditor = {
       this.textarea.value = ""
       this.textarea.dispatchEvent(new Event("input", {bubbles: true}))
       this.textarea.blur()
+      this.expanded = false
       this._sync()
     }
 
@@ -138,6 +142,13 @@ const MarkdownEditor = {
 
   _sync() {
     if (!this.textarea) return
+    // Only the top-level comment composer collapses. Keep this state in the
+    // hook so an unrelated LiveView patch cannot reopen a cancelled composer.
+    if (this.el.dataset.collapsible === "true") {
+      if (this.textarea.value.length > 0) this.expanded = true
+      const actions = this.el.querySelector("[data-markdown-editor-actions]")
+      if (actions) actions.style.display = this.expanded ? "" : "none"
+    }
     // The submit button only lives inside the editor when the hook owns the
     // form (comment composer). When attached to a nested element (review
     // dialog), the parent form owns Save and we just keep the textarea

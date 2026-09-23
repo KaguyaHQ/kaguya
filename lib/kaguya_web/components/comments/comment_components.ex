@@ -33,6 +33,7 @@ defmodule KaguyaWeb.Components.Comments do
       target={@target}
       submit_event="create_comment"
       cancel_event="cancel_composer"
+      collapsible
       current_user={@current_user}
       button_text="Comment"
       placeholder="Add a comment..."
@@ -55,6 +56,7 @@ defmodule KaguyaWeb.Components.Comments do
   attr :button_text, :string, default: "Reply"
   attr :placeholder, :string, default: "Add a reply..."
   attr :rows, :integer, default: 1
+  attr :collapsible, :boolean, default: false
   attr :class, :any, default: nil
 
   def reply_input(assigns) do
@@ -66,6 +68,7 @@ defmodule KaguyaWeb.Components.Comments do
       cancel_event={@cancel_event}
       value={@content}
       rows={@rows}
+      collapsible={@collapsible}
       placeholder={@placeholder}
       submit_label={@button_text}
       class={["w-full", @parent_comment_id && "mt-3", @class]}

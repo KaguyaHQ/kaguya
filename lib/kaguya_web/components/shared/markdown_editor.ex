@@ -51,6 +51,7 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
   attr :name, :string, default: "content", doc: "Textarea name (POST'd on submit)."
   attr :value, :string, default: "", doc: "Pre-populated content (e.g. for edit forms)."
   attr :rows, :integer, default: 1
+  attr :collapsible, :boolean, default: false
   attr :maxlength, :integer, default: 5000
   attr :placeholder, :string, default: ""
 
@@ -98,6 +99,7 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
         phx-target={@target}
         phx-hook="MarkdownEditor"
         data-expand-event={@expand_event}
+        data-collapsible={to_string(@collapsible)}
         class={@form_class || @default_form_class}
       >
         <%!--
@@ -126,6 +128,8 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
           <% @show_actions -> %>
             <div
               id={"#{@id}-actions"}
+              data-markdown-editor-actions
+              style={if @collapsible && String.trim(@value || "") == "", do: "display: none;"}
               class="flex items-center justify-end gap-2 px-2.5 pb-2.5 lg:px-3 lg:pb-3"
             >
               {render_slot(@before_actions)} {render_slot(@extra_actions)}
