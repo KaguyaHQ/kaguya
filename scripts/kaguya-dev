@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""Start the snapshot-safe development server from this checkout."""
+import os
+from pathlib import Path
+import shutil
+import sys
+
+# Resolve symlinks so ~/.local/bin/kaguya-dev works from any directory.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'scripts'))
+from dev_config import local_password
+
+
+def main():
+    os.chdir(ROOT)
+    os.environ['KAGUYA_LOCAL_DB_PASSWORD'] = local_password()
+    os.environ['MIX_ENV'] = 'dev'
+    os.environ['PORT'] = '4001'
+    mise = shutil.which('mise')
+    if not mise and (Path.home() / '.local/bin/mise').is_file():
+        mise = str(Path.home() / '.local/bin/mise')
+    args = ['mix', 'run', '--no-start', '--no-halt', 'scripts/dev-server.exs']
+    if mise:
+        args = [mise, 'exec', '--', *args]
+    os.execvp(args[0], args)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, RuntimeError) as error:
+        sys.exit(f'Cannot start Kaguya: {error}')

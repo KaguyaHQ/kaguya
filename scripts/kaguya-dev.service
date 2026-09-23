@@ -1,0 +1,11 @@
+[Unit]
+Description=Kaguya local development server
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/kaguya-dev
+TimeoutStopSec=30
+KillMode=control-group
+
+[Install]
+WantedBy=default.target
