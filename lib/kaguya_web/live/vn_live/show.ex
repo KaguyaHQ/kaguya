@@ -47,6 +47,8 @@ defmodule KaguyaWeb.VNLive.Show do
        pending_status: nil,
        pending_rating: nil,
        clear_status_dialog_open?: false,
+       reading_dates_form: nil,
+       reading_dates_error: nil,
        review_dialog_open: false,
        review_delete_dialog_open?: false,
        review_date_picker_open?: false,
@@ -133,6 +135,8 @@ defmodule KaguyaWeb.VNLive.Show do
             friend_activity: [],
             friend_reviews: [],
             clear_status_dialog_open?: false,
+            reading_dates_form: nil,
+            reading_dates_error: nil,
             review_dialog_open: false,
             review_delete_dialog_open?: false,
             review_date_picker_open?: false,
@@ -223,6 +227,24 @@ defmodule KaguyaWeb.VNLive.Show do
 
     {:noreply, socket}
   end
+
+  def handle_event("open_reading_dates", params, socket),
+    do: socket |> ensure_viewer_bundle() |> StatusActions.open_dates(params)
+
+  def handle_event("close_reading_dates", _params, socket),
+    do: {:noreply, assign(socket, reading_dates_form: nil, reading_dates_error: nil)}
+
+  def handle_event("change_reading_dates", params, socket),
+    do: StatusActions.change_dates(socket, params)
+
+  def handle_event("set_reading_date_today", params, socket),
+    do: StatusActions.set_date_today(socket, params)
+
+  def handle_event("clear_reading_date", params, socket),
+    do: StatusActions.clear_date(socket, params)
+
+  def handle_event("save_reading_dates", params, socket),
+    do: StatusActions.save_dates(socket, params)
 
   def handle_event("set_status", params, socket),
     do: socket |> ensure_viewer_bundle() |> StatusActions.set_status(params)
@@ -562,6 +584,11 @@ defmodule KaguyaWeb.VNLive.Show do
       <Components.review_delete_dialog
         :if={@review_delete_dialog_open?}
         draft_key={review_draft_key(@current_user, @display_vn)}
+      />
+      <Sidebar.reading_dates_dialog
+        :if={@reading_dates_form}
+        form={@reading_dates_form}
+        error={@reading_dates_error}
       />
       <Components.clear_status_dialog :if={@clear_status_dialog_open?} />
       <Components.list_dialog

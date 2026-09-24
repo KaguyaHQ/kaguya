@@ -27,6 +27,110 @@ defmodule KaguyaWeb.VNLive.ShowTest do
     :ok
   end
 
+  test "status summary shows saved dates and edits them without a review", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+
+    vn =
+      Repo.insert!(
+        VisualNovel.changeset(%VisualNovel{}, %{title: "Status summary", slug: "status-summary"})
+      )
+
+    conn = Plug.Test.init_test_session(conn, %{current_user_id: user.id})
+    {:ok, view, _} = live_and_wait(conn, ~p"/vn/#{vn.slug}")
+    render_click(view, "set_status", %{"status" => "CURRENTLY_READING"})
+    assert has_element?(view, "#sidebar-reading-summary", "Currently reading")
+    assert has_element?(view, "#sidebar-reading-summary time[datetime='#{Date.utc_today()}']")
+    yesterday = Date.add(Date.utc_today(), -1)
+    view |> element("#sidebar-reading-summary-dates-trigger") |> render_click()
+    assert has_element?(view, "#reading-dates-dialog")
+
+    view
+    |> element("button[phx-click=set_reading_date_today][phx-value-field=date_finished]")
+    |> render_click()
+
+    assert has_element?(view, "#dates_date_finished[value='#{Date.utc_today()}']")
+    assert has_element?(view, "#dates_date_started[value='#{Date.utc_today()}']")
+
+    assert is_nil(
+             Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id).date_finished
+           )
+
+    params = %{"date_started" => Date.to_iso8601(yesterday), "date_finished" => ""}
+    view |> form("#reading-dates-form", dates: params) |> render_change()
+
+    assert Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id).date_started ==
+             Date.utc_today()
+
+    render_click(view, "close_reading_dates")
+    refute has_element?(view, "#reading-dates-dialog")
+    view |> element("#sidebar-reading-summary-dates-trigger") |> render_click()
+    assert has_element?(view, "#dates_date_started[value='#{Date.utc_today()}']")
+    view |> form("#reading-dates-form", dates: params) |> render_submit()
+    refute has_element?(view, "#reading-dates-dialog")
+
+    assert has_element?(view, "#sidebar-reading-summary time[datetime='#{yesterday}']")
+
+    assert Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id).date_started ==
+             yesterday
+
+    view |> element("#sidebar-reading-summary-dates-trigger") |> render_click()
+
+    bad = %{
+      "date_started" => Date.to_iso8601(Date.utc_today()),
+      "date_finished" => Date.to_iso8601(yesterday)
+    }
+
+    view |> form("#reading-dates-form", dates: bad) |> render_submit()
+    assert has_element?(view, "#reading-dates-error", "Finished must be on or after Started")
+
+    assert Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id).date_started ==
+             yesterday
+
+    render_submit(view, "save_reading_dates", %{
+      "dates" => %{"date_started" => "invalid", "date_finished" => ""}
+    })
+
+    assert has_element?(view, "#reading-dates-error", "Enter a valid date")
+
+    render_submit(view, "save_reading_dates", %{
+      "dates" => %{
+        "date_started" => Date.to_iso8601(Date.add(Date.utc_today(), 1)),
+        "date_finished" => ""
+      }
+    })
+
+    assert has_element?(view, "#reading-dates-error", "cannot be in the future")
+
+    same_day = %{
+      "date_started" => Date.to_iso8601(yesterday),
+      "date_finished" => Date.to_iso8601(yesterday)
+    }
+
+    view |> form("#reading-dates-form", dates: same_day) |> render_submit()
+    saved = Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id)
+    assert saved.date_started == saved.date_finished
+    assert has_element?(view, "#sidebar-reading-summary-dates-trigger", "Started")
+    assert has_element?(view, "#sidebar-reading-summary-dates-trigger", "Finished")
+    view |> element("#sidebar-reading-summary-dates-trigger") |> render_click()
+
+    view
+    |> element("button[aria-label='Clear finished']")
+    |> render_click()
+
+    assert has_element?(view, "#dates_date_started[value='#{yesterday}']")
+    view |> form("#reading-dates-form") |> render_submit()
+
+    assert is_nil(
+             Repo.get_by!(ReadingStatus, user_id: user.id, visual_novel_id: vn.id).date_finished
+           )
+
+    render_click(view, "set_status", %{"status" => "ON_HOLD"})
+    assert has_element?(view, "#sidebar-reading-summary", "Paused")
+    {:ok, fresh, _} = live_and_wait(conn, ~p"/vn/#{vn.slug}")
+    assert has_element?(fresh, "#sidebar-reading-summary", "Paused")
+    assert has_element?(fresh, "#sidebar-reading-summary time[datetime='#{yesterday}']")
+  end
+
   test "renders a VN page from direct contexts", %{conn: conn} do
     vn =
       %VisualNovel{}

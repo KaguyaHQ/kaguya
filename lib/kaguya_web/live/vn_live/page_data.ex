@@ -244,13 +244,17 @@ defmodule KaguyaWeb.VNLive.PageData do
     end
   end
 
-  def set_reading_status(slug, %{id: user_id} = viewer, status) do
+  def set_reading_status(slug, viewer, status, dates \\ %{})
+
+  def set_reading_status(slug, %{id: user_id} = viewer, status, dates) do
     with {:ok, vn} <- require_vn(slug),
          {:ok, status} <- reading_status_atom(status),
          {:ok, _} <-
-           Shelves.set_reading_status(user_id, vn.id, %{
-             status: status
-           }) do
+           Shelves.set_reading_status(
+             user_id,
+             vn.id,
+             Map.put(Map.take(dates, [:date_started, :date_finished]), :status, status)
+           ) do
       # Reading status feeds the public core's readers/want-to-read rosters
       # and counts, so the cached core must be dropped.
       VNPageCache.invalidate(vn.id)

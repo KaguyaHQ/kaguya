@@ -14,6 +14,8 @@ defmodule KaguyaWeb.VN.Sidebar do
   use KaguyaWeb, :html
 
   import KaguyaWeb.AuthPromptComponents, only: [auth_button: 1]
+  import KaguyaWeb.UI.Input
+  import KaguyaWeb.UI.Dialog
   import KaguyaWeb.UI.Menu
 
   import KaguyaWeb.VN.Icons
@@ -117,6 +119,12 @@ defmodule KaguyaWeb.VN.Sidebar do
         signed_in?={signed_in?}
         current_path={@current_path}
       />
+      <.reading_summary
+        :if={signed_in?}
+        id={@id_prefix <> "-reading-summary"}
+        viewer_vn={controls_vn}
+        variant={@variant}
+      />
       <.rating_row
         viewer_vn={controls_vn}
         id={@id_prefix <> "-rating-stars"}
@@ -124,13 +132,15 @@ defmodule KaguyaWeb.VN.Sidebar do
         signed_in?={signed_in?}
         current_path={@current_path}
       />
-      <.review_or_log_button
-        viewer_vn={controls_vn}
-        variant={@variant}
-        signed_in?={signed_in?}
-        current_path={@current_path}
-      />
-      <.add_to_lists_button variant={@variant} signed_in?={signed_in?} current_path={@current_path} />
+      <div class="border-border-divider/50 mx-3 flex flex-col border-t py-1">
+        <.review_or_log_button
+          viewer_vn={controls_vn}
+          variant={@variant}
+          signed_in?={signed_in?}
+          current_path={@current_path}
+        />
+        <.add_to_lists_button variant={@variant} signed_in?={signed_in?} current_path={@current_path} />
+      </div>
     </div>
     """
   end
@@ -275,8 +285,8 @@ defmodule KaguyaWeb.VN.Sidebar do
       data-active={@active || ""}
       class={[
         "flex items-start",
-        @mobile? && "gap-0 px-10 pt-6 pb-4",
-        !@mobile? && "gap-1 px-1.5 pt-4 pb-3"
+        @mobile? && "gap-0 px-10 pt-4 pb-0",
+        !@mobile? && "gap-1 px-1.5 pt-3 pb-0"
       ]}
     >
       <.status_segment
@@ -292,9 +302,9 @@ defmodule KaguyaWeb.VN.Sidebar do
         placement={if @mobile?, do: "bottom", else: "right"}
         align={if @mobile?, do: "end", else: "start"}
         side_offset={8}
-        class={@overflow_trigger_class <> "mt-3 mr-1"}
+        class={[@overflow_trigger_class, "mt-1.5 mr-1 shrink-0"]}
       >
-        <:trigger aria-label="More reading statuses">
+        <:trigger aria-label="More actions">
           <.status_glyph kind={:more} active?={@overflow_active?} />
           <span
             :if={@overflow_active?}
@@ -333,6 +343,14 @@ defmodule KaguyaWeb.VN.Sidebar do
             <span class="truncate text-[rgb(var(--foreground-secondary))]">{segment.label}</span>
           </.menu_item>
           <.menu_item
+            :if={Map.get(@viewer_vn, :my_rating)}
+            event="clear_rating"
+            role="menuitem"
+            class="hover:bg-surface-elevated text-foreground-secondary text-style-body2Regular flex min-h-11 w-full items-center gap-2 px-4 py-2 text-left"
+          >
+            <Lucide.x class="size-4 shrink-0" aria-hidden /> Clear rating
+          </.menu_item>
+          <.menu_item
             :if={@has_status?}
             event="clear_status"
             role="menuitem"
@@ -348,7 +366,7 @@ defmodule KaguyaWeb.VN.Sidebar do
         is_logged_in={false}
         modal_id="vn-auth-prompt"
         auth_message="Sign in to update your library"
-        class="relative mt-3 mr-1 flex size-8 cursor-pointer items-center justify-center rounded-full text-[rgb(var(--foreground-tertiary))] transition hover:text-[rgb(var(--foreground-secondary))]"
+        class="relative mt-1.5 mr-1 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[rgb(var(--foreground-tertiary))] transition hover:text-[rgb(var(--foreground-secondary))]"
         aria-label="Sign in to set status"
       >
         <.status_glyph kind={:more} active?={false} />
@@ -452,18 +470,14 @@ defmodule KaguyaWeb.VN.Sidebar do
     <div
       :if={@show_rating?}
       class={[
-        "group/rating relative flex w-full flex-col items-center border-t border-[rgb(var(--border-divider))]",
+        "group/rating relative flex w-full flex-row-reverse items-center gap-3 px-4",
         @mobile? &&
-          "gap-0 bg-transparent py-3 [&_.rating-star]:size-[34px] [&_.rating-star_svg]:size-[34px]!",
-        !@mobile? && "gap-1.5 bg-[rgb(var(--surface-elevated))]/35 px-4 py-[13px]"
+          "justify-center bg-transparent py-2 [&_.rating-star]:size-7 [&_.rating-star_svg]:size-7!",
+        !@mobile? && "justify-end pt-2 pb-3"
       ]}
     >
-      <span class={[
-        "text-[13px] font-normal text-[rgb(var(--foreground-secondary))]",
-        @mobile? && "mb-0.5 leading-5",
-        !@mobile? && "leading-5"
-      ]}>
-        Rate
+      <span class="text-foreground-tertiary text-style-captionRegular shrink-0">
+        {if @rating, do: "Rating", else: "Rate"}
       </span>
       <div
         class={[
@@ -478,7 +492,7 @@ defmodule KaguyaWeb.VN.Sidebar do
           data-rating={@rating || ""}
           data-has-rating={if @rating, do: "true", else: "false"}
           aria-label="Set your rating"
-          class="rating-stars flex items-center justify-center gap-1 max-sm:gap-2"
+          class="rating-stars flex items-center justify-center gap-1"
         >
           <.rating_star :for={i <- 0..4} index={i} rating={@rating} />
           <.auth_button
@@ -493,22 +507,6 @@ defmodule KaguyaWeb.VN.Sidebar do
             <span class="sr-only">Sign in to rate</span>
           </.auth_button>
         </div>
-        <button
-          :if={@signed_in? && @rating}
-          type="button"
-          phx-click="clear_rating"
-          class={[
-            "absolute top-1/2 z-20 flex size-[27px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition duration-200 hover:bg-[rgb(var(--surface-menu-item-hover))]",
-            "left-[-27px] translate-x-2 opacity-0 pointer-coarse:translate-x-0 pointer-coarse:opacity-100 [@media(hover:hover)]:group-hover/rating:translate-x-0 [@media(hover:hover)]:group-hover/rating:opacity-100",
-            @mobile? && "translate-x-0 opacity-100"
-          ]}
-          aria-label="Clear rating"
-        >
-          <Lucide.x
-            class="size-4 text-[#667088] dark:text-[rgb(var(--foreground-tertiary))]"
-            aria-hidden
-          />
-        </button>
       </div>
     </div>
     """
@@ -533,9 +531,9 @@ defmodule KaguyaWeb.VN.Sidebar do
         type="button"
         phx-click="open_review_dialog"
         class={[
-          "flex w-full cursor-pointer items-center justify-center gap-2 rounded-none border-0 border-t border-[rgb(var(--border-divider))] bg-transparent text-[13px] font-normal text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
-          @mobile? && "h-12",
-          !@mobile? && "h-11"
+          "text-style-captionMedium flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border-0 bg-transparent text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
+          @mobile? && "h-11",
+          !@mobile? && "h-9"
         ]}
       >
         <%= if @has_review? do %>
@@ -551,9 +549,9 @@ defmodule KaguyaWeb.VN.Sidebar do
         modal_id="vn-auth-prompt"
         auth_message="Sign in to write a review"
         class={[
-          "flex w-full cursor-pointer items-center justify-center gap-2 rounded-none border-0 border-t border-[rgb(var(--border-divider))] bg-transparent text-[13px] font-normal text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
-          @mobile? && "h-12",
-          !@mobile? && "h-11"
+          "text-style-captionMedium flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border-0 bg-transparent text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
+          @mobile? && "h-11",
+          !@mobile? && "h-9"
         ]}
       >
         Review or log…
@@ -575,9 +573,9 @@ defmodule KaguyaWeb.VN.Sidebar do
         type="button"
         phx-click="open_list_dialog"
         class={[
-          "flex w-full cursor-pointer items-center justify-center gap-2 rounded-none border-0 border-t border-[rgb(var(--border-divider))] bg-transparent px-4 py-3 text-[13px] font-normal text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
-          @mobile? && "h-12",
-          !@mobile? && "h-11"
+          "text-style-captionMedium flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border-0 bg-transparent px-1 py-2 text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
+          @mobile? && "h-11",
+          !@mobile? && "h-9"
         ]}
       >
         Add to lists
@@ -589,9 +587,9 @@ defmodule KaguyaWeb.VN.Sidebar do
         modal_id="vn-auth-prompt"
         auth_message="Sign in to add visual novels to lists"
         class={[
-          "flex w-full cursor-pointer items-center justify-center gap-2 rounded-none border-0 border-t border-[rgb(var(--border-divider))] bg-transparent px-4 py-3 text-[13px] font-normal text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
-          @mobile? && "h-12",
-          !@mobile? && "h-11"
+          "text-style-captionMedium flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border-0 bg-transparent px-1 py-2 text-[rgb(var(--foreground-secondary))] ring-0 transition [-webkit-tap-highlight-color:transparent] hover:bg-transparent focus:bg-transparent active:bg-transparent [@media(hover:hover)]:hover:bg-[rgb(var(--surface-menu-item-hover))] [@media(hover:hover)]:active:bg-[rgb(var(--surface-menu-item-pressed))]",
+          @mobile? && "h-11",
+          !@mobile? && "h-9"
         ]}
       >
         Add to lists
@@ -657,6 +655,147 @@ defmodule KaguyaWeb.VN.Sidebar do
   defp overflow_indicator_class("DID_NOT_FINISH"), do: "bg-[rgb(var(--status-dnf))]"
   defp overflow_indicator_class("NOT_INTERESTED"), do: "bg-[rgb(var(--status-not-interested))]"
   defp overflow_indicator_class(_), do: "bg-[rgb(var(--foreground-primary))]"
+
+  attr :id, :string, required: true
+  attr :viewer_vn, :map, required: true
+
+  attr :variant, :atom, default: :desktop
+
+  defp reading_summary(assigns) do
+    status = Map.get(assigns.viewer_vn, :my_reading_status)
+
+    labels = %{
+      "CURRENTLY_READING" => "Currently reading",
+      "READ" => "Read",
+      "WANT_TO_READ" => "Wishlist",
+      "ON_HOLD" => "Paused",
+      "DID_NOT_FINISH" => "Did not finish",
+      "NOT_INTERESTED" => "Not interested"
+    }
+
+    assigns =
+      assign(assigns,
+        status: status,
+        label: status && Map.get(labels, status.status, status.status),
+        started: status && Map.get(status, :date_started),
+        finished: status && Map.get(status, :date_finished)
+      )
+
+    ~H"""
+    <div
+      :if={@status}
+      id={@id}
+      class={[
+        "flex flex-col px-4 py-0",
+        @variant == :mobile && "items-center",
+        @variant != :mobile && "items-start"
+      ]}
+    >
+      <span role="status" aria-live="polite" class="sr-only">{@label}</span>
+      <span
+        :if={@status.status in ["ON_HOLD", "DID_NOT_FINISH", "NOT_INTERESTED"]}
+        class="text-foreground-secondary text-style-captionMedium mb-1"
+      >{@label}</span>
+      <button
+        id={@id <> "-dates-trigger"}
+        type="button"
+        phx-click="open_reading_dates"
+        aria-label={if @started || @finished, do: "Edit reading dates", else: "Add reading dates"}
+        class="hover:bg-surface-elevated hover:text-foreground-primary text-foreground-secondary text-style-captionRegular inline-flex min-h-8 items-center justify-start gap-2 rounded-md px-0"
+      >
+        <Lucide.calendar_days class="size-3.5 shrink-0" aria-hidden />
+        <%= if @started || @finished do %>
+          <span class="grid grid-cols-[auto_auto] gap-x-2 gap-y-1 py-1 text-left">
+            <%= for {label, date} <- [{"Started", @started}, {"Finished", @finished}], date do %>
+              <span class="text-foreground-tertiary">{label}</span>
+              <time class="text-foreground-primary" datetime={Date.to_iso8601(date)}>{Calendar.strftime(
+                date,
+                "%d %b %Y"
+              )}</time>
+            <% end %>
+          </span>
+        <% else %>
+          <span>Add reading dates</span>
+        <% end %>
+      </button>
+    </div>
+    """
+  end
+
+  attr :form, :any, required: true
+  attr :error, :string, default: nil
+
+  def reading_dates_dialog(assigns) do
+    ~H"""
+    <.dialog
+      id="reading-dates-dialog"
+      on_close={JS.push("close_reading_dates")}
+      aria-labelledby="reading-dates-title"
+      class="bg-surface-elevated border-border-divider text-foreground-primary w-[min(420px,calc(100vw-32px))] rounded-xl border p-6 shadow-xl"
+    >
+      <h2 id="reading-dates-title" class="text-style-body1Medium">Reading dates</h2>
+      <p class="text-foreground-secondary text-style-body2Regular mt-2">
+        Leave a date blank if you don’t remember it.
+      </p>
+      <.form
+        for={@form}
+        id="reading-dates-form"
+        phx-hook="ReadingDates"
+        phx-change="change_reading_dates"
+        phx-submit="save_reading_dates"
+        class="mt-3 space-y-4"
+      >
+        <div :for={{field, label} <- [date_started: "Started", date_finished: "Finished"]}>
+          <div class="mb-2 flex h-8 items-center justify-between gap-3">
+            <label for={@form[field].id} class="text-style-body2Medium">{label}</label>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                phx-click="set_reading_date_today"
+                phx-value-field={field}
+                aria-label={"Set " <> String.downcase(label) <> " to today"}
+                class="focus-visible:outline-foreground-primary/70 hover:bg-surface-elevated hover:text-foreground-primary text-foreground-secondary text-style-captionRegular h-8 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-offset-2"
+              >Today</button>
+              <button
+                :if={@form[field].value not in [nil, ""]}
+                type="button"
+                phx-click={
+                  JS.dispatch("reading-date:clear",
+                    to: "#reading-dates-form",
+                    detail: %{id: @form[field].id}
+                  )
+                  |> JS.push("clear_reading_date", value: %{field: field})
+                }
+                phx-value-field={field}
+                aria-label={"Clear " <> String.downcase(label)}
+                class="focus-visible:outline-foreground-primary/70 hover:bg-surface-elevated hover:text-foreground-primary text-foreground-secondary text-style-captionRegular h-8 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-offset-2"
+              >Clear</button>
+            </div>
+          </div>
+          <.input
+            field={@form[field]}
+            type="date"
+            control_size="roomy"
+            class="text-style-body2Regular scheme-dark"
+            max={Date.to_iso8601(Date.utc_today())}
+          />
+        </div>
+        <p
+          :if={@error}
+          id="reading-dates-error"
+          role="alert"
+          class="text-semantic-error text-style-body2Regular"
+        >
+          {@error}
+        </p>
+        <div class="flex justify-end gap-2 pt-2">
+          <.dialog_cancel>Cancel</.dialog_cancel>
+          <button type="submit" class="btn btn-brand btn-small" phx-disable-with="Saving…">Save</button>
+        </div>
+      </.form>
+    </.dialog>
+    """
+  end
 
   defp active_status(%{my_reading_status: %{status: status}}) when is_binary(status), do: status
   defp active_status(_), do: nil

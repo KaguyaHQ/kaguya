@@ -28,6 +28,7 @@ import NotFoundButton from "./not_found_button"
 import NotificationsReadTracker from "./notifications_read_tracker"
 import PaginationScroll from "./pagination_scroll"
 import RatingStars from "./rating_stars"
+import ReadingDates from "./reading_dates"
 import ReadMore from "./read_more"
 import RelationSearch from "./relation_search"
 import ReleaseFilters from "./release_filters"
@@ -75,6 +76,7 @@ export default {
   NotificationsReadTracker,
   PaginationScroll,
   RatingStars,
+  ReadingDates,
   ReadMore,
   RelationSearch,
   ReleaseFilters,
