@@ -141,11 +141,11 @@ defmodule KaguyaWeb.VNLive.ShowTest do
       })
       |> Repo.insert!()
 
-    {:ok, _view, html} = live_and_wait(conn, ~p"/vn/#{vn.slug}")
+    {:ok, view, html} = live_and_wait(conn, ~p"/vn/#{vn.slug}")
 
     assert html =~ "Test VN"
     assert html =~ "Reviews"
-    assert html =~ "Nothing recommended yet"
+    assert has_element?(view, "#recommendations", "No recommendations yet.")
     assert html =~ "Sign in"
   end
 
