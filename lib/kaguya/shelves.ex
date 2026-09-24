@@ -53,7 +53,11 @@ defmodule Kaguya.Shelves do
       end
 
       maybe_autofill_date_started(user_id, visual_novel_ids, status, attrs)
-      maybe_autofill_date_finished(user_id, visual_novel_ids, status, attrs)
+
+      previously_reading_ids =
+        Enum.filter(visual_novel_ids, &(existing_status(existing, &1) == :currently_reading))
+
+      maybe_autofill_date_finished(user_id, previously_reading_ids, status, attrs)
 
       if changed_vn_ids != [] do
         record_status_activities(user_id, changed_vn_ids, status)
@@ -304,8 +308,10 @@ defmodule Kaguya.Shelves do
 
   defp maybe_autofill_date_started(_user_id, _vn_ids, _status, _attrs), do: :ok
 
-  # A dateless :read row sinks in every `desc_nulls_last` "Recently read" sort.
-  # Fills a blank only; an existing date is never overwritten.
+  # Only Reading -> Read implies finishing now. Direct Read may be an old backlog
+  # entry, so keep its date unknown. Explicit dates (including nil) always win.
+  defp maybe_autofill_date_finished(_user_id, [], _status, _attrs), do: :ok
+
   defp maybe_autofill_date_finished(user_id, visual_novel_ids, :read, attrs) do
     if Map.has_key?(attrs, :date_finished) do
       :ok

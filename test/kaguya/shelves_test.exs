@@ -98,14 +98,51 @@ defmodule Kaguya.ShelvesTest do
   end
 
   describe "set_reading_status/3 — date_finished auto-fill" do
-    test "stamps today when marking a VN read without a date" do
+    test "leaves dates blank when marking a VN read directly" do
       user = UserFixtures.insert_user!()
       vn = insert_vn!("finished-autofill-new")
 
       assert {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :read})
 
-      assert %ReadingStatus{date_finished: d} = get_status(user.id, vn.id)
-      assert d == Date.utc_today()
+      assert %ReadingStatus{date_started: nil, date_finished: nil} = get_status(user.id, vn.id)
+    end
+
+    test "bulk Read fills only entries previously Reading and preserves saved dates" do
+      user = UserFixtures.insert_user!()
+      statuses = [nil, :want_to_read, :on_hold, :did_not_finish, :read, :currently_reading]
+
+      entries =
+        for status <- statuses do
+          vn = insert_vn!("finished-transition-#{status || :new}")
+          if status, do: Shelves.set_reading_status(user.id, vn.id, %{status: status})
+          {vn, status}
+        end
+
+      saved = insert_vn!("finished-transition-saved")
+      manual = ~D[2019-06-02]
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, saved.id, %{status: :read, date_finished: manual})
+
+      {:ok, _} =
+        Shelves.set_reading_status(user.id, saved.id, %{
+          status: :currently_reading,
+          date_started: manual
+        })
+
+      ids = [saved.id | Enum.map(entries, fn {vn, _} -> vn.id end)]
+      assert {:ok, _} = Shelves.set_reading_status(user.id, ids, %{status: :read})
+
+      for {vn, previous} <- entries do
+        status = get_status(user.id, vn.id)
+        assert status.status == :read
+        expected = if previous == :currently_reading, do: Date.utc_today(), else: nil
+        assert status.date_finished == expected
+        assert status.date_started == expected
+      end
+
+      assert %ReadingStatus{date_started: ^manual, date_finished: ^manual} =
+               get_status(user.id, saved.id)
     end
 
     test "never overwrites a read date the user already set" do
@@ -124,6 +161,7 @@ defmodule Kaguya.ShelvesTest do
     test "respects an explicit :date_finished key passed by importers (even when nil)" do
       user = UserFixtures.insert_user!()
       vn = insert_vn!("finished-autofill-importer")
+      {:ok, _} = Shelves.set_reading_status(user.id, vn.id, %{status: :currently_reading})
 
       {:ok, _} =
         Shelves.set_reading_status(user.id, vn.id, %{status: :read, date_finished: nil})
