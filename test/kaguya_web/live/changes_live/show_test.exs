@@ -29,8 +29,9 @@ defmodule KaguyaWeb.ChangesLive.ShowTest do
 
     {:ok, view, html} = live(conn, ~p"/vn/#{vn.slug}/history/#{change.id}")
 
-    assert html =~ "Revision r2"
-    assert has_element?(view, "#revision-diff-row-description")
+    assert has_element?(view, "h1", "Revision 2")
+    assert has_element?(view, "#revision-diff-row-description", "Before")
+    assert has_element?(view, "#revision-diff-row-description", "After")
     assert html =~ "Copy link"
     assert html =~ "Edit entity"
     assert html =~ "Update description"
@@ -44,9 +45,9 @@ defmodule KaguyaWeb.ChangesLive.ShowTest do
     assert html =~ "data-share-button"
   end
 
-  test "initial revision renders the no previous state message", %{conn: conn} do
+  test "initial revision shows recorded values rather than the current entry", %{conn: conn} do
     user = insert_user!()
-    vn = insert_vn!(title: "Initial VN")
+    vn = insert_vn!(title: "Initial VN", description: "Original description", has_ero: false)
     insert_initial_title!(vn, "en", "Initial VN")
 
     {:ok, _change} =
@@ -54,11 +55,15 @@ defmodule KaguyaWeb.ChangesLive.ShowTest do
 
     [initial | _] = revisions_for(vn)
 
-    {:ok, view, html} = live(conn, ~p"/vn/#{vn.slug}/history/#{initial.id}")
+    {:ok, view, _html} = live(conn, ~p"/vn/#{vn.slug}/history/#{initial.id}")
 
-    assert html =~ "Revision r1"
-    assert html =~ "No previous state to compare."
-    assert has_element?(view, "#revision-initial-empty")
+    assert has_element?(view, "h1", "Revision 1")
+    assert has_element?(view, "#revision-initial-snapshot", "Initial version")
+    assert has_element?(view, "#revision-initial-field-title dd", "Initial VN")
+    assert has_element?(view, "#revision-initial-field-description dd", "Original description")
+    refute has_element?(view, "#revision-initial-field-description dd", "First")
+    assert has_element?(view, "#revision-initial-field-has_ero dd", "No")
+    refute has_element?(view, "#revision-initial-empty")
   end
 
   test "revision detail links to adjacent earlier and later revisions", %{conn: conn} do
@@ -76,10 +81,20 @@ defmodule KaguyaWeb.ChangesLive.ShowTest do
 
     {:ok, _view, html} = live(conn, ~p"/vn/#{vn.slug}/history/#{r2.id}")
 
-    assert html =~ "earlier"
-    assert html =~ "later"
+    assert html =~ "Previous"
+    assert html =~ "Next"
     assert html =~ ~s(href="/vn/#{vn.slug}/history/#{r1.id}")
     assert html =~ ~s(href="/vn/#{vn.slug}/history/#{r3.id}")
+
+    {:ok, first_view, _html} = live(conn, ~p"/vn/#{vn.slug}/history/#{r1.id}")
+    assert has_element?(first_view, "#revision-previous[aria-disabled=true]", "Previous")
+    refute has_element?(first_view, "a#revision-previous")
+    assert has_element?(first_view, "a#revision-next[href='/vn/#{vn.slug}/history/#{r2.id}']")
+
+    {:ok, last_view, _html} = live(conn, ~p"/vn/#{vn.slug}/history/#{r3.id}")
+    assert has_element?(last_view, "#revision-next[aria-disabled=true]", "Next")
+    refute has_element?(last_view, "a#revision-next")
+    assert has_element?(last_view, "a#revision-previous[href='/vn/#{vn.slug}/history/#{r2.id}']")
   end
 
   test "release revision links back to the parent VN history", %{conn: conn} do
@@ -114,8 +129,10 @@ defmodule KaguyaWeb.ChangesLive.ShowTest do
         user
       )
 
-    {:ok, _view, html} = live(conn, ~p"/vn/#{vn.slug}/history/#{change.id}")
+    {:ok, view, html} = live(conn, ~p"/vn/#{vn.slug}/history/#{change.id}")
 
+    assert has_element?(view, "#revision-diff-row-relations", "Added")
+    refute has_element?(view, "#revision-diff-row-relations", "Before")
     assert html =~ "Relations"
     assert html =~ "[official] Sequel: Xi Jjia Cheng Zhen"
     refute html =~ ~s("related_vn_id")

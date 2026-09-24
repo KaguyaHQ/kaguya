@@ -64,16 +64,59 @@ defmodule KaguyaWeb.ChangesLive.Show do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto mt-8 max-w-6xl px-4 pb-20 sm:px-6 lg:mt-10">
-      <div class="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <div class="mx-auto mt-6 max-w-5xl px-4 pb-20 sm:px-6 lg:mt-8">
+      <div class="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <.link
           navigate={@back_href}
           class="hover:text-foreground-primary text-foreground-tertiary text-sm transition-colors"
         >
-          &larr; Back to history
+          &larr; History
         </.link>
 
         <div class="text-foreground-tertiary flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <nav
+            aria-label="Revision navigation"
+            class="flex shrink-0 flex-nowrap items-center gap-3 sm:gap-4"
+          >
+            <.link
+              :if={@previous_href}
+              id="revision-previous"
+              navigate={@previous_href}
+              class="hover:text-foreground-primary text-foreground-tertiary w-20 shrink-0 text-sm whitespace-nowrap transition-colors"
+            >
+              &larr; Previous
+            </.link>
+            <span
+              :if={!@previous_href}
+              id="revision-previous"
+              role="link"
+              aria-disabled="true"
+              class="text-foreground-quaternary w-20 shrink-0 cursor-default text-sm whitespace-nowrap"
+            >
+              &larr; Previous
+            </span>
+            <.link
+              :if={@next_href}
+              id="revision-next"
+              navigate={@next_href}
+              class="hover:text-foreground-primary text-foreground-tertiary w-14 shrink-0 text-sm whitespace-nowrap transition-colors"
+            >
+              Next &rarr;
+            </.link>
+            <span
+              :if={!@next_href}
+              id="revision-next"
+              role="link"
+              aria-disabled="true"
+              class="text-foreground-quaternary w-14 shrink-0 cursor-default text-sm whitespace-nowrap"
+            >
+              Next &rarr;
+            </span>
+          </nav>
+          <span
+            class="border-border-divider h-4 border-l"
+            aria-hidden="true"
+          ></span>
           <button
             type="button"
             data-share-button
@@ -92,8 +135,8 @@ defmodule KaguyaWeb.ChangesLive.Show do
         </div>
       </div>
 
-      <section :if={@change} class="space-y-6">
-        <header>
+      <section :if={@change} class="space-y-5">
+        <header id="revision-header" class="border-border-divider border-b pb-5">
           <p :if={@entity && @entity[:title]} class="text-foreground-tertiary text-sm">
             <.link
               :if={@entity[:href]}
@@ -103,20 +146,11 @@ defmodule KaguyaWeb.ChangesLive.Show do
               {@entity[:title]}
             </.link>
             <span :if={!@entity[:href]}>{@entity[:title]}</span>
-            <span aria-hidden="true">·</span>
-            <span class="lowercase">{@entity_type_label}</span>
           </p>
 
-          <div class="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-2">
-            <.link
-              :if={@previous_href}
-              navigate={@previous_href}
-              class="hover:text-foreground-primary text-foreground-tertiary text-sm transition-colors"
-            >
-              &larr; earlier
-            </.link>
-            <h1 class="text-foreground-primary text-2xl font-semibold">
-              Revision r{@change.revision_number}
+          <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+            <h1 class="text-foreground-primary text-2xl font-semibold tracking-tight">
+              Revision {@change.revision_number}
             </h1>
             <span
               :if={@change.action == :revert}
@@ -124,19 +158,9 @@ defmodule KaguyaWeb.ChangesLive.Show do
             >
               Revert
             </span>
-            <.link
-              :if={@next_href}
-              navigate={@next_href}
-              class="hover:text-foreground-primary text-foreground-tertiary ml-auto text-sm transition-colors"
-            >
-              later &rarr;
-            </.link>
           </div>
 
-          <p class="text-foreground-secondary mt-2 text-sm">
-            {@action_label}
-            <span aria-hidden="true" class="text-foreground-tertiary">·</span>
-            by
+          <p class="text-foreground-tertiary mt-1 text-sm">
             <.link
               :if={@user[:href]}
               navigate={@user[:href]}
@@ -147,7 +171,7 @@ defmodule KaguyaWeb.ChangesLive.Show do
             <span :if={!@user[:href]} class="text-foreground-primary">{@user[:display_name]}</span>
             <span aria-hidden="true" class="text-foreground-tertiary">·</span>
             <time title={@inserted_at_label} class="text-foreground-tertiary">
-              {@relative_time}
+              {@inserted_at_label}
             </time>
             <span :if={@source_label} aria-hidden="true" class="text-foreground-tertiary">·</span>
             <span :if={@source_label} class="text-foreground-tertiary">{@source_label}</span>
@@ -155,7 +179,7 @@ defmodule KaguyaWeb.ChangesLive.Show do
 
           <p
             :if={@summary && String.trim(@summary) != ""}
-            class="border-l-border-divider text-foreground-primary mt-3 border-l-2 pl-3 text-sm italic"
+            class="text-foreground-secondary mt-2 max-w-prose text-sm/relaxed wrap-break-word"
           >
             {@summary}
           </p>
@@ -204,18 +228,12 @@ defmodule KaguyaWeb.ChangesLive.Show do
           </.form>
         </section>
 
-        <div
+        <RevisionDiffTable.initial_snapshot
           :if={is_nil(@previous_change)}
-          id="revision-initial-empty"
-          class="bg-surface-base border-border-divider rounded-[8px] border px-5 py-8 text-center"
-        >
-          <p class="text-foreground-primary text-sm font-medium">
-            No previous state to compare.
-          </p>
-          <p class="text-foreground-tertiary mt-1 text-sm">
-            This is the first recorded revision for this entry.
-          </p>
-        </div>
+          snapshot={@current_snapshot}
+          entity_type={@change.entity_type}
+          current_user={@current_user}
+        />
 
         <RevisionDiffTable.diff_table
           :if={@previous_change}

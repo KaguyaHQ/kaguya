@@ -4,8 +4,8 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
 
   This is intentionally separate from the compact profile activity diff. It
   uses the same revision payload shape, but optimizes for the full detail page:
-  field label, previous revision, and current revision columns with readable
-  collection rows and media thumbnails.
+  field sections with full-width additions and removals, paired replacements,
+  readable collections, and media thumbnails.
   """
 
   use KaguyaWeb, :html
@@ -144,6 +144,85 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
     series: ~w(name description entries producers)
   }
 
+  attr :snapshot, :map, default: nil
+  attr :entity_type, :any, default: nil
+  attr :current_user, :map, default: nil
+
+  def initial_snapshot(assigns) do
+    assigns = assign(assigns, :entries, snapshot_entries(assigns.snapshot, assigns.entity_type))
+
+    ~H"""
+    <section
+      :if={@entries != []}
+      id="revision-initial-snapshot"
+      aria-labelledby="revision-initial-heading"
+      class="space-y-3"
+    >
+      <div>
+        <h2 id="revision-initial-heading" class="text-foreground-primary text-sm font-semibold">
+          Initial version
+        </h2>
+        <p class="text-foreground-tertiary mt-1 text-sm">
+          Values recorded when this entry was created.
+        </p>
+      </div>
+      <dl class="border-border-divider divide-border-divider divide-y rounded-lg border">
+        <div
+          :for={entry <- @entries}
+          id={"revision-initial-field-#{entry.field}"}
+          class="grid gap-3 p-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-5 sm:p-5"
+        >
+          <dt class="text-foreground-secondary text-sm font-medium">{field_label(entry.field)}</dt>
+          <dd class="text-foreground-primary min-w-0 text-sm">
+            <%= cond do %>
+              <% entry.collection -> %>
+                <.collection_cell items={entry.value} tone={:neutral} current_user={@current_user} />
+              <% image_scalar_field?(entry.field) -> %>
+                <.image_scalar_cell
+                  field={entry.field}
+                  value={entry.value}
+                  url={read_image_url(@snapshot, entry.field)}
+                  snapshot={@snapshot}
+                  tone={:neutral}
+                  current_user={@current_user}
+                />
+              <% true -> %>
+                <.value_cell field={entry.field} value={entry.value} tone={:neutral} />
+            <% end %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <p :if={@entries == []} id="revision-initial-empty" class="text-foreground-tertiary text-sm">
+      The initial version’s contents aren’t available.
+    </p>
+    """
+  end
+
+  defp image_scalar_field?(field), do: MapSet.member?(@image_scalar_fields, field)
+
+  defp snapshot_entries(snapshot, entity_type) do
+    hist = value_of(snapshot, :hist)
+
+    if is_map(hist) do
+      scalars =
+        @scalar_fields
+        |> Enum.reject(&MapSet.member?(@state_fields, &1))
+        |> Enum.map(&%{field: &1, value: value_of(hist, &1), collection: false})
+
+      collections =
+        ~w(titles relations characters covers screenshots external_links images visual_novels appearances entries producers links extlinks)
+        |> Enum.map(&%{field: &1, value: value_of(snapshot, &1), collection: true})
+
+      (scalars ++ collections)
+      |> Enum.reject(&(&1.value in [nil, "", []]))
+      |> Enum.sort_by(& &1.field)
+      |> order_entries(entity_type)
+    else
+      []
+    end
+  end
+
   attr :diff_entries, :list, default: []
   attr :current_snapshot, :map, default: nil
   attr :previous_snapshot, :map, default: nil
@@ -166,45 +245,49 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
       |> then(fn entries -> if state_entry, do: [state_entry | entries], else: entries end)
       |> order_entries(assigns.entity_type)
 
-    assigns = assign(assigns, :ordered_entries, ordered_entries)
+    assigns =
+      assigns
+      |> assign(:ordered_entries, ordered_entries)
+      |> assign(
+        :shared_columns,
+        ordered_entries != [] and Enum.all?(ordered_entries, &paired_entry?/1)
+      )
 
     ~H"""
-    <div class="bg-surface-base border-border-divider overflow-hidden rounded-[8px] border">
-      <table class="divide-border-divider min-w-full divide-y text-sm">
-        <thead class="bg-surface-elevated/70 text-left">
-          <tr :if={@previous_revision_meta || @current_revision_meta}>
-            <th
-              scope="col"
-              class="text-foreground-tertiary w-[18%] px-4 py-3 align-top text-xs font-medium tracking-normal uppercase"
-            >
-              Field
-            </th>
-            <th scope="col" class="w-[41%] px-4 py-3 align-top">
-              <.revision_header_cell meta={@previous_revision_meta} fallback="No previous revision" />
-            </th>
-            <th scope="col" class="w-[41%] px-4 py-3 align-top">
-              <.revision_header_cell meta={@current_revision_meta} fallback="—" current?={true} />
-            </th>
-          </tr>
-          <tr
-            :if={!@previous_revision_meta && !@current_revision_meta}
-            class="text-foreground-tertiary text-xs font-medium tracking-normal uppercase"
-          >
-            <th scope="col" class="w-[18%] px-4 py-3">Field</th>
-            <th scope="col" class="w-[41%] px-4 py-3">Previous revision</th>
-            <th scope="col" class="w-[41%] px-4 py-3">Current revision</th>
-          </tr>
-        </thead>
-        <tbody class="divide-border-divider divide-y">
-          <.field_row
-            :for={entry <- @ordered_entries}
-            entry={entry}
-            previous_snapshot={@previous_snapshot}
-            current_snapshot={@current_snapshot}
-            current_user={@current_user}
+    <div id="revision-changes" class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <h2 class="text-foreground-primary font-semibold">
+          {length(@ordered_entries)} {if length(@ordered_entries) == 1, do: "field", else: "fields"} changed
+        </h2>
+        <div class="text-foreground-tertiary flex items-center gap-2">
+          <.revision_header_cell meta={@previous_revision_meta} fallback="Previous revision" />
+          <span aria-hidden="true">→</span>
+          <.revision_header_cell
+            meta={@current_revision_meta}
+            fallback="Current revision"
+            current?={true}
           />
-        </tbody>
-      </table>
+        </div>
+      </div>
+      <div class="border-border-divider divide-border-divider divide-y rounded-lg border">
+        <div
+          :if={@shared_columns}
+          id="revision-column-headings"
+          class="text-foreground-tertiary hidden grid-cols-[9rem_minmax(0,1fr)] gap-5 px-5 py-3 text-xs md:grid"
+          aria-hidden="true"
+        >
+          <span>Field</span>
+          <div class="grid grid-cols-2 gap-4"><span>Before</span><span>After</span></div>
+        </div>
+        <.field_row
+          :for={entry <- @ordered_entries}
+          entry={entry}
+          shared_columns={@shared_columns}
+          previous_snapshot={@previous_snapshot}
+          current_snapshot={@current_snapshot}
+          current_user={@current_user}
+        />
+      </div>
     </div>
     """
   end
@@ -230,32 +313,7 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
         >
           r{@meta.revision_number}
         </span>
-        <span class="text-foreground-tertiary text-xs font-medium tracking-normal uppercase">
-          {@meta.action_label}
-        </span>
       </div>
-
-      <p class="text-foreground-tertiary text-xs">
-        By
-        <.link
-          :if={@meta.author.href}
-          navigate={@meta.author.href}
-          class="hover:text-foreground-primary text-foreground-secondary transition-colors hover:underline"
-        >
-          {@meta.author.display_name}
-        </.link>
-        <span :if={!@meta.author.href} class="text-foreground-secondary">
-          {@meta.author.display_name}
-        </span>
-        · {@meta.inserted_at_label}
-      </p>
-
-      <p
-        :if={@meta.summary && String.trim(@meta.summary) != ""}
-        class="text-foreground-secondary line-clamp-2 text-xs italic"
-      >
-        {@meta.summary}
-      </p>
     </div>
     <p :if={!@meta} class="text-foreground-tertiary text-xs tracking-normal normal-case">
       {@fallback}
@@ -267,6 +325,8 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
   attr :current_snapshot, :map, default: nil
   attr :previous_snapshot, :map, default: nil
   attr :current_user, :map, default: nil
+
+  attr :shared_columns, :boolean, default: false
 
   defp field_row(assigns) do
     field = to_string(value_of(assigns.entry, :field))
@@ -289,60 +349,95 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
         MapSet.member?(@scalar_fields, field) and has_any_key?(assigns.entry, [:old, :new])
       )
 
+    old_present =
+      if assigns.scalar or assigns.image_scalar,
+        do: old not in [nil, "", []],
+        else: list_value(value_of(assigns.entry, :removed)) != []
+
+    new_present =
+      if assigns.scalar or assigns.image_scalar,
+        do: new not in [nil, "", []],
+        else:
+          list_value(value_of(assigns.entry, :added)) != [] or
+            list_value(value_of(assigns.entry, :changed)) != []
+
+    assigns =
+      assign(assigns,
+        old_present: old_present,
+        new_present: new_present,
+        collection_changed: list_value(value_of(assigns.entry, :changed)) != []
+      )
+
     ~H"""
-    <tr id={"revision-diff-row-#{@field}"} class="align-top">
-      <th scope="row" class="text-foreground-secondary p-4 text-left text-sm font-medium">
+    <section
+      id={"revision-diff-row-#{@field}"}
+      aria-labelledby={"revision-field-#{@field}"}
+      class="grid gap-3 p-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-5 sm:p-5"
+    >
+      <h3 id={"revision-field-#{@field}"} class="text-foreground-primary text-sm font-medium">
         {@label}
-      </th>
-      <td class="text-foreground-primary p-4">
-        <%= cond do %>
-          <% @image_scalar -> %>
-            <.image_scalar_cell
-              field={@field}
-              value={@old}
-              url={read_image_url(@previous_snapshot, @field)}
-              snapshot={@previous_snapshot}
-              tone={:removed}
-              current_user={@current_user}
-            />
-          <% @long_text -> %>
-            <.value_cell field={@field} value={@old} tone={:removed} />
-          <% @scalar -> %>
-            <.value_cell field={@field} value={@old} tone={:removed} />
-          <% true -> %>
-            <.collection_cell
-              items={value_of(@entry, :removed)}
-              changed={[]}
-              tone={:removed}
-              current_user={@current_user}
-            />
-        <% end %>
-      </td>
-      <td class="text-foreground-primary p-4">
-        <%= cond do %>
-          <% @image_scalar -> %>
-            <.image_scalar_cell
-              field={@field}
-              value={@new}
-              url={read_image_url(@current_snapshot, @field)}
-              snapshot={@current_snapshot}
-              tone={:added}
-              current_user={@current_user}
-            />
-          <% @long_text -> %>
-            <.value_cell field={@field} value={@new} tone={:added} />
-          <% @scalar -> %>
-            <.value_cell field={@field} value={@new} tone={:added} />
-          <% true -> %>
-            <.collection_cell
-              items={value_of(@entry, :added)}
-              changed={value_of(@entry, :changed)}
-              tone={:added}
-              current_user={@current_user}
-            />
-        <% end %>
-      </td>
-    </tr>
+      </h3>
+      <div class={["grid min-w-0 gap-4", (@old_present and @new_present) && "md:grid-cols-2"]}>
+        <div :if={@old_present} class="text-foreground-primary min-w-0 space-y-2">
+          <p class={["text-foreground-tertiary text-xs", @shared_columns && "md:sr-only"]}>
+            {if @new_present, do: "Before", else: "Removed"}
+          </p>
+          <%= cond do %>
+            <% @image_scalar -> %>
+              <.image_scalar_cell
+                field={@field}
+                value={@old}
+                url={read_image_url(@previous_snapshot, @field)}
+                snapshot={@previous_snapshot}
+                tone={:removed}
+                current_user={@current_user}
+              />
+            <% @long_text -> %>
+              <.value_cell field={@field} value={@old} tone={:removed} />
+            <% @scalar -> %>
+              <.value_cell field={@field} value={@old} tone={:removed} />
+            <% true -> %>
+              <.collection_cell
+                items={value_of(@entry, :removed)}
+                changed={[]}
+                tone={:removed}
+                current_user={@current_user}
+              />
+          <% end %>
+        </div>
+        <div :if={@new_present} class="text-foreground-primary min-w-0 space-y-2">
+          <p class={["text-foreground-tertiary text-xs", @shared_columns && "md:sr-only"]}>
+            {cond do
+              @old_present -> "After"
+              @collection_changed -> "Added / updated"
+              true -> "Added"
+            end}
+          </p>
+          <%= cond do %>
+            <% @image_scalar -> %>
+              <.image_scalar_cell
+                field={@field}
+                value={@new}
+                url={read_image_url(@current_snapshot, @field)}
+                snapshot={@current_snapshot}
+                tone={:added}
+                current_user={@current_user}
+              />
+            <% @long_text -> %>
+              <.value_cell field={@field} value={@new} tone={:added} />
+            <% @scalar -> %>
+              <.value_cell field={@field} value={@new} tone={:added} />
+            <% true -> %>
+              <.collection_cell
+                items={value_of(@entry, :added)}
+                changed={value_of(@entry, :changed)}
+                tone={:added}
+                current_user={@current_user}
+              />
+          <% end %>
+        </div>
+      </div>
+    </section>
     """
   end
 
@@ -374,7 +469,7 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
       |> assign(:item, image_item(assigns.url, assigns.snapshot, assigns.field))
 
     ~H"""
-    <div :if={@visible} class={item_class(@tone)}>
+    <div :if={@visible} class={image_item_class(@tone)}>
       <.thumbnail item={@item} current_user={@current_user} />
       <span :if={!@url} class="min-w-0 font-mono text-xs wrap-break-word">
         {format_scalar_value(@field, @value)}
@@ -517,7 +612,7 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
       <img
         src={@url}
         alt=""
-        class="size-full object-cover"
+        class="size-full object-contain"
         loading="lazy"
         decoding="async"
         data-nsfw-blur={if @nsfw_blur?, do: "1"}
@@ -525,6 +620,15 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
       />
     </span>
     """
+  end
+
+  defp paired_entry?(entry) do
+    if has_any_key?(entry, [:old, :new]) do
+      value_of(entry, :old) not in [nil, "", []] and value_of(entry, :new) not in [nil, "", []]
+    else
+      list_value(value_of(entry, :removed)) != [] and
+        (list_value(value_of(entry, :added)) != [] or list_value(value_of(entry, :changed)) != [])
+    end
   end
 
   defp state_entry(previous_snapshot, current_snapshot, entries) do
@@ -885,9 +989,9 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
 
   defp thumbnail_shape(item) do
     if present?(value_of(item, :screenshot_id)) do
-      "h-16 aspect-video"
+      "w-48 max-w-full aspect-video"
     else
-      "h-16 aspect-[3/4]"
+      "h-40 max-w-full aspect-[3/4]"
     end
   end
 
@@ -922,12 +1026,16 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
   defp maybe_flag(flags, true, label), do: flags ++ [to_string(label)]
   defp maybe_flag(flags, _condition, _label), do: flags
 
+  defp value_class(:neutral), do: "text-foreground-primary text-sm"
+
   defp value_class(:removed),
     do: "rounded-[6px] border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-100"
 
   defp value_class(:added),
     do:
       "rounded-[6px] border border-green-500/25 bg-green-500/10 px-3 py-2 text-sm text-green-100"
+
+  defp item_class(:neutral), do: "text-foreground-primary flex items-center gap-3 text-sm"
 
   defp item_class(:removed),
     do:
@@ -941,17 +1049,21 @@ defmodule KaguyaWeb.Components.Shared.RevisionDiffTable do
     do:
       "flex items-center gap-3 rounded-[6px] border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100"
 
+  defp image_item_class(:neutral),
+    do:
+      "text-foreground-secondary inline-flex w-fit max-w-full flex-col items-start gap-2 text-xs"
+
   defp image_item_class(:removed),
     do:
-      "inline-flex w-fit max-w-full items-center gap-2 rounded-[6px] border border-red-500/25 bg-red-500/10 p-2 text-xs text-red-100"
+      "inline-flex w-fit max-w-full flex-col items-start gap-2 rounded-[6px] border border-red-500/40 text-xs text-foreground-secondary"
 
   defp image_item_class(:added),
     do:
-      "inline-flex w-fit max-w-full items-center gap-2 rounded-[6px] border border-green-500/25 bg-green-500/10 p-2 text-xs text-green-100"
+      "inline-flex w-fit max-w-full flex-col items-start gap-2 rounded-[6px] border border-green-500/40 text-xs text-foreground-secondary"
 
   defp image_item_class(:changed),
     do:
-      "inline-flex w-fit max-w-full items-center gap-2 rounded-[6px] border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100"
+      "inline-flex w-fit max-w-full flex-col items-start gap-2 rounded-[6px] border border-amber-500/40 text-xs text-foreground-secondary"
 
   defp list_value(value) when is_list(value), do: value
   defp list_value(_), do: []
