@@ -151,7 +151,7 @@ defmodule KaguyaWeb.VN.Collections do
         character={@character}
         sizes="100px"
         class="aspect-square w-full object-cover"
-        fallback_class="aspect-square w-full bg-[rgb(var(--surface-banner))]"
+        fallback_class="aspect-square w-full bg-[rgb(var(--surface-elevated))]"
         rounded="rounded-[4px]"
       />
       <span class={[

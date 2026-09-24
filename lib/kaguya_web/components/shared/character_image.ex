@@ -94,11 +94,21 @@ defmodule KaguyaWeb.SharedComponents.CharacterImage do
       />
     <% else %>
       <span
-        class={[@fallback_class, @rounded, "block"]}
+        class={[@fallback_class, @rounded, "flex items-center justify-center"]}
+        role="img"
+        aria-label={
+          if @alt == "", do: "No portrait available", else: "#{@alt}: no portrait available"
+        }
         title={if @show_name_tooltip, do: nil, else: @name}
         data-character-name={if @show_name_tooltip, do: @name}
         {@rest}
-      />
+      >
+        <Lucide.user_round
+          class="text-foreground-tertiary size-[32%]"
+          stroke-width="1.5"
+          aria-hidden="true"
+        />
+      </span>
     <% end %>
     """
   end
