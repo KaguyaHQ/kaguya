@@ -5,7 +5,7 @@ defmodule KaguyaWeb.Components.Profile.Stats.Charting do
 
   alias KaguyaWeb.Format
 
-  @donut_colors ["#06D6A0", "#00BBF9", "#E879A0", "#FFD166", "#A78BFA", "#F97316"]
+  @donut_colors ["#568DE5", "#E5AC52", "#DC598B", "#56B6A0", "#A582D7", "#CF7963"]
 
   def build_year_chart(titles_hist, hours_hist, score_hist, param_key) do
     titles = count_histogram(titles_hist)
@@ -205,15 +205,17 @@ defmodule KaguyaWeb.Components.Profile.Stats.Charting do
       |> Enum.reduce({0.0, []}, fn {item, index}, {offset, acc} ->
         percent = if total == 0, do: 0.0, else: item.value / total * 100
         dash = circumference * percent / 100
-        gap = circumference - dash
+        spacing = if length(items) > 1, do: min(4.0, dash / 3), else: 0.0
+        visible_dash = dash - spacing
+        gap = circumference - visible_dash
 
         segment =
           item
-          |> Map.put(:color, Enum.at(@donut_colors, rem(index, length(@donut_colors))))
-          |> Map.put(:percent, format_decimal(percent, 1))
-          |> Map.put(:dash, Float.round(dash, 2))
+          |> Map.put_new(:color, Enum.at(@donut_colors, rem(index, length(@donut_colors))))
+          |> Map.put(:percent, round(percent))
+          |> Map.put(:dash, Float.round(visible_dash, 2))
           |> Map.put(:gap, Float.round(gap, 2))
-          |> Map.put(:offset, Float.round(-offset, 2))
+          |> Map.put(:offset, Float.round(-(offset + spacing / 2), 2))
 
         {offset + dash, [segment | acc]}
       end)

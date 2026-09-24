@@ -374,7 +374,7 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
     |> maybe_chip(filters.read_year, "readYear", &"Read in #{&1}")
     |> maybe_chip(filters.release_year, "releaseYear", &"Released in #{&1}")
     |> maybe_chip(filters.length_category, "length", &humanize_slug/1)
-    |> maybe_chip(filters.age_rating, "ageRating", &age_label/1)
+    |> maybe_chip(filters.h_content, "hContent", &h_content_label/1)
     |> Enum.reverse()
   end
 
@@ -394,7 +394,8 @@ defmodule KaguyaWeb.Components.Profile.Library.ControlBar do
 
   defp humanize_slug(value), do: to_string(value)
 
-  defp age_label("unknown"), do: "Unknown Age Rating"
-  defp age_label("all_ages"), do: "All Ages"
-  defp age_label(value), do: value
+  defp h_content_label("unknown"), do: "H-scenes: Unknown"
+  defp h_content_label("with"), do: "With H"
+  defp h_content_label("without"), do: "No H"
+  defp h_content_label(_), do: nil
 end

@@ -18,10 +18,24 @@ defmodule Kaguya.Library do
 
   @tag_relevance_threshold 0.72
 
-  # Length/age bucket CASE expressions shared by group_by and select. Boundaries
-  # mirror `length_category_range/1` and `age_rating_range/1`.
+  # Shared bucket expressions keep chart counts and library filters consistent.
   @length_bucket_sql "CASE WHEN ? < 120 THEN 'very_short' WHEN ? < 600 THEN 'short' WHEN ? < 1800 THEN 'medium' WHEN ? < 3000 THEN 'long' ELSE 'very_long' END"
-  @age_bucket_sql "CASE WHEN ? < 12 THEN 'all_ages' WHEN ? < 16 THEN '13+' WHEN ? < 18 THEN '16+' ELSE '18+' END"
+  @h_content_sql """
+  CASE
+    WHEN ? IS TRUE OR EXISTS (
+      SELECT 1 FROM vn_releases r
+      WHERE r.visual_novel_id = ? AND r.hidden_at IS NULL AND r.has_ero IS TRUE
+    ) THEN 'with'
+    WHEN EXISTS (
+      SELECT 1 FROM vn_releases r
+      WHERE r.visual_novel_id = ? AND r.hidden_at IS NULL AND r.has_ero IS FALSE
+    ) AND NOT EXISTS (
+      SELECT 1 FROM vn_releases r
+      WHERE r.visual_novel_id = ? AND r.hidden_at IS NULL AND r.has_ero IS NULL
+    ) THEN 'without'
+    ELSE 'unknown'
+  END
+  """
 
   # ============================================================================
   # Public API
@@ -53,7 +67,7 @@ defmodule Kaguya.Library do
       read_year: Map.get(args, :read_year),
       release_year: Map.get(args, :release_year),
       length_category: Map.get(args, :length_category),
-      age_rating: Map.get(args, :age_rating),
+      h_content: Map.get(args, :h_content),
       allowed_categories: Keyword.get(opts, :allowed_categories)
     })
   end
@@ -188,38 +202,26 @@ defmodule Kaguya.Library do
   end
 
   @doc """
-  Age rating distribution for a user's library VNs.
-  Buckets by `min_age`: all_ages (0/nil), 13+ (12–15), 16+ (16–17), 18+ (18+).
-  VNs with no `min_age` are excluded.
+  H-scene distribution across VNs, not the particular editions a user played.
+  Positive VN or release evidence counts as with; without requires known release
+  records. Missing release evidence is unknown, rather than a default false.
   """
-  def library_age_rating_dist(user_id, args \\ %{}, opts \\ []) do
-    status = Map.get(args, :status)
-    allowed = Keyword.get(opts, :allowed_categories)
-
+  def library_h_content_dist(user_id, args \\ %{}, opts \\ []) do
     rows =
       ReadingStatus
       |> join(:inner, [rs], vn in VisualNovel, on: vn.id == rs.visual_novel_id)
       |> where([rs, _vn], rs.user_id == ^user_id)
-      |> where([_rs, vn], not is_nil(vn.min_age))
-      |> maybe_filter_dist_category(allowed)
-      |> filter_dist_status(status)
-      |> group_by(
-        [_rs, vn],
-        fragment(@age_bucket_sql, vn.min_age, vn.min_age, vn.min_age)
-      )
+      |> maybe_filter_dist_category(Keyword.get(opts, :allowed_categories))
+      |> filter_dist_status(Map.get(args, :status))
+      |> group_by([_rs, vn], fragment(@h_content_sql, vn.has_ero, vn.id, vn.id, vn.id))
       |> select(
         [rs, vn],
-        {fragment(@age_bucket_sql, vn.min_age, vn.min_age, vn.min_age), count(rs.id)}
+        {fragment(@h_content_sql, vn.has_ero, vn.id, vn.id, vn.id), count(rs.id)}
       )
       |> Repo.all()
       |> Map.new()
 
-    %{
-      "all_ages" => Map.get(rows, "all_ages", 0),
-      "13+" => Map.get(rows, "13+", 0),
-      "16+" => Map.get(rows, "16+", 0),
-      "18+" => Map.get(rows, "18+", 0)
-    }
+    Map.merge(%{"with" => 0, "without" => 0, "unknown" => 0}, rows)
   end
 
   # ============================================================================
@@ -294,7 +296,7 @@ defmodule Kaguya.Library do
     |> maybe_filter_read_year(Map.get(args, :read_year))
     |> maybe_filter_release_year(Map.get(args, :release_year))
     |> maybe_filter_length_category(Map.get(args, :length_category))
-    |> maybe_filter_age_rating(Map.get(args, :age_rating))
+    |> maybe_filter_h_content(Map.get(args, :h_content))
   end
 
   # True when any narrowing filter is set, meaning the shelf's cached
@@ -304,7 +306,7 @@ defmodule Kaguya.Library do
       not is_nil(Map.get(args, :allowed_categories)) or
       not is_nil(Map.get(args, :read_year)) or not is_nil(Map.get(args, :release_year)) or
       Enum.any?(
-        [:tag_slug, :producer_slug, :original_language, :length_category, :age_rating],
+        [:tag_slug, :producer_slug, :original_language, :length_category, :h_content],
         &present?(Map.get(args, &1))
       )
   end
@@ -533,28 +535,11 @@ defmodule Kaguya.Library do
   defp length_category_range("very_long"), do: {3000, 999_999}
   defp length_category_range(_), do: {0, 999_999}
 
-  defp maybe_filter_age_rating(query, nil), do: query
-  defp maybe_filter_age_rating(query, ""), do: query
-
-  defp maybe_filter_age_rating(query, "unknown") do
-    where(query, [vn], is_nil(vn.min_age))
+  defp maybe_filter_h_content(query, bucket) when bucket in ["with", "without", "unknown"] do
+    where(query, [vn], fragment(@h_content_sql, vn.has_ero, vn.id, vn.id, vn.id) == ^bucket)
   end
 
-  defp maybe_filter_age_rating(query, bucket) when is_binary(bucket) do
-    {min_age, max_age} = age_rating_range(bucket)
-
-    where(
-      query,
-      [vn],
-      not is_nil(vn.min_age) and vn.min_age >= ^min_age and vn.min_age < ^max_age
-    )
-  end
-
-  defp age_rating_range("all_ages"), do: {0, 12}
-  defp age_rating_range("13+"), do: {12, 16}
-  defp age_rating_range("16+"), do: {16, 18}
-  defp age_rating_range("18+"), do: {18, 999}
-  defp age_rating_range(_), do: {0, 999}
+  defp maybe_filter_h_content(query, _), do: query
 
   defp maybe_filter_rating(query, nil), do: query
   defp maybe_filter_rating(query, rating), do: where(query, [user_rating: r], r.rating == ^rating)

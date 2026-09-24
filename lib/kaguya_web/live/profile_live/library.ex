@@ -8,7 +8,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
       `wishlist`, `paused`, `did-not-finish`, `not-interested`, or a
       custom shelf slug).
     * Filters in the query string: `q`, `sort`, `rating`, `tag`, `producer`,
-      `language`, `readYear`, `releaseYear`, `length`, `ageRating`, `page`.
+      `language`, `readYear`, `releaseYear`, `length`, `hContent`, `page`.
     * Sort values match production kebab strings (`highest-rated`,
       `recently-added`, etc.). See `LibraryData.parse_sort/1`.
 
@@ -21,6 +21,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
   Client-side prefs (localStorage):
     * `fadeReadLibrary` → fade-read toggle (visible to non-owner viewers).
     * `showDatesLibrary` → show-dates toggle (visible to the owner).
+    * `libraryView` → grid/list layout for all library pages.
 
   Bridged via the `LibraryPrefs` JS hook — see `assets/js/app.js`.
   """
@@ -45,11 +46,13 @@ defmodule KaguyaWeb.ProfileLive.Library do
      |> assign(:root?, false)
      |> assign(:fade_read, false)
      |> assign(:show_dates, false)
+     |> assign(:library_view, "grid")
      |> assign(:mobile_search_open, false)
      |> assign(:open_actions, %{})
      |> assign(:new_label_name, "")
      |> assign(:open_dropdown, nil)
      |> assign(:items_state, %{})
+     |> assign(:priority_cover_ids, MapSet.new())
      |> assign(:loaded_count, 0)
      |> assign(:items_empty?, true)}
   end
@@ -184,6 +187,17 @@ defmodule KaguyaWeb.ProfileLive.Library do
   def handle_event("set_show_dates", %{"value" => value}, socket) do
     {:noreply, set_display_preference(socket, :show_dates, truthy(value))}
   end
+
+  def handle_event("set_library_view", %{"value" => value}, socket)
+      when value in ["grid", "list"] do
+    {:noreply,
+     socket
+     |> assign(:open_actions, %{})
+     |> assign(:open_dropdown, nil)
+     |> set_display_preference(:library_view, value)}
+  end
+
+  def handle_event("set_library_view", _, socket), do: {:noreply, socket}
 
   def handle_event("set_item_status", %{"vn-id" => vn_id, "status" => status}, socket) do
     with true <- owner?(socket),
@@ -405,6 +419,9 @@ defmodule KaguyaWeb.ProfileLive.Library do
     socket =
       if reset? do
         socket
+        # Prioritize a small first-screen batch, not every cover on the page.
+        # Keep these IDs stable when rows are re-emitted or more pages append.
+        |> assign(:priority_cover_ids, MapSet.new(Enum.take(items, 6), & &1.vn.id))
         |> stream(:library_items, items, reset: true)
         |> assign(:items_state, Map.new(items, &{&1.vn.id, &1}))
         |> assign(:loaded_count, length(items))
@@ -666,7 +683,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
   defp field_for("readYear"), do: :read_year
   defp field_for("releaseYear"), do: :release_year
   defp field_for("length"), do: :length_category
-  defp field_for("ageRating"), do: :age_rating
+  defp field_for("hContent"), do: :h_content
   defp field_for("rating"), do: :rating
   defp field_for("sort"), do: :sort
   defp field_for("search"), do: :search
@@ -697,6 +714,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
         phx-hook="LibraryPrefs"
         data-fade-read={to_string(@fade_read)}
         data-show-dates={to_string(@show_dates)}
+        data-library-view={@library_view}
         data-is-owner={to_string(@profile.viewer.is_mine)}
         data-is-logged-in={to_string(@profile.viewer.is_logged_in)}
         class="mt-8 lg:mt-10"
@@ -712,18 +730,46 @@ defmodule KaguyaWeb.ProfileLive.Library do
             fade_read={@fade_read}
             show_dates={@show_dates}
             mobile_search_open={@mobile_search_open}
+            library_view={@library_view}
           />
 
           <section class="h-full scroll-mt-24" id="vns">
             <div class="text-foreground-primary scroll-mt-32 rounded-[12px]">
-              <ControlBar.control_bar
-                shelf={@shelf}
-                filters={@filters}
-                tags={@library.tags}
-                ratings_dist={@library.ratings_dist}
-                profile={@profile}
-                fade_read={@fade_read}
-              />
+              <div class="hidden items-center gap-3 lg:flex">
+                <div class="min-w-0 flex-1 max-lg:hidden">
+                  <ControlBar.control_bar
+                    shelf={@shelf}
+                    filters={@filters}
+                    tags={@library.tags}
+                    ratings_dist={@library.ratings_dist}
+                    profile={@profile}
+                    fade_read={@fade_read}
+                  />
+                </div>
+                <div
+                  role="group"
+                  aria-label="Library view"
+                  class="border-border-divider flex shrink-0 gap-1 rounded-lg border p-1"
+                >
+                  <button
+                    :for={mode <- ["grid", "list"]}
+                    id={"library-view-#{mode}"}
+                    type="button"
+                    data-library-view-toggle={mode}
+                    aria-label={if mode == "grid", do: "Grid view", else: "List view"}
+                    title={if mode == "grid", do: "Grid view", else: "List view"}
+                    aria-pressed={to_string(@library_view == mode)}
+                    class={[
+                      "inline-flex size-8 items-center justify-center rounded-md hover:bg-white/8 focus-visible:outline-2",
+                      @library_view == mode && "text-foreground-primary bg-white/10",
+                      @library_view != mode && "text-foreground-tertiary"
+                    ]}
+                  >
+                    <Lucide.layout_grid :if={mode == "grid"} class="size-4" aria-hidden />
+                    <Lucide.list :if={mode == "list"} class="size-4" aria-hidden />
+                  </button>
+                </div>
+              </div>
 
               <ControlBar.active_filters
                 filters={@filters}
@@ -731,6 +777,8 @@ defmodule KaguyaWeb.ProfileLive.Library do
               />
 
               <Grid.grid
+                view={@library_view}
+                priority_cover_ids={@priority_cover_ids}
                 items={@streams.library_items}
                 items_empty?={@items_empty?}
                 custom_shelves={@library.custom_shelves}

@@ -22,6 +22,8 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
   alias KaguyaWeb.SharedComponents.Cover
   alias KaguyaWeb.SharedComponents.StatusChangeList
 
+  attr :view, :string, default: "grid", values: ["grid", "list"]
+  attr :priority_cover_ids, :any, default: MapSet.new()
   attr :items, :any, required: true, doc: "@streams.library_items"
   attr :items_empty?, :boolean, required: true
   attr :custom_shelves, :list, required: true
@@ -55,11 +57,23 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
       <p class="text-foreground-tertiary text-sm">No visual novels here yet</p>
     </div>
 
+    <div
+      :if={@view == "list" and !@items_empty?}
+      class="border-border-divider text-foreground-tertiary text-style-captionMedium mt-5 hidden grid-cols-[minmax(0,1fr)_105px_65px_110px_110px_36px] gap-3 border-b px-2 pb-3 md:grid"
+      aria-hidden="true"
+    >
+      <span>Visual novel</span><span>Status</span><span>Rating</span><span>Started</span><span>Finished</span><span></span>
+    </div>
     <Cover.cover_tooltip_provider :if={!@items_empty?} id="library-cover-tooltip">
       <div
         id="library-items"
         phx-update="stream"
-        class="grid grid-cols-4 gap-2.5 px-4 pt-3 pb-5 sm:gap-4 sm:pt-5 sm:pb-10 md:grid-cols-5 md:gap-x-3 md:px-0 lg:grid-cols-6 lg:gap-x-4"
+        class={
+          if @view == "grid",
+            do:
+              "grid grid-cols-4 gap-2.5 px-4 pt-3 pb-5 sm:gap-4 sm:pt-5 sm:pb-10 md:grid-cols-5 md:gap-x-3 md:px-0 lg:grid-cols-6 lg:gap-x-4",
+            else: "px-4 pb-5 md:px-0"
+        }
       >
         <div
           :for={{dom_id, item} <- @items}
@@ -70,42 +84,155 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
             @open_dropdown == item.vn.id && "z-150"
           ]}
         >
-          <% faded = @show_fade_for_viewer and Map.get(item, :viewer_status) == :read %>
-          <div class="relative aspect-1/1.5 overflow-hidden rounded-[4px]">
-            <Cover.cover
-              vn={item.vn}
-              sizes="(max-width: 420px) 110px, 137px"
-              link
-              show_title_tooltip
-              class={["size-full rounded-[4px] object-cover object-center", faded && "opacity-20"]}
-            />
-            <div
-              :if={@profile.viewer.is_mine}
-              class="pointer-events-none absolute inset-0 hidden bg-black opacity-0 transition-opacity duration-300 group-hover:opacity-40 lg:block"
-            >
+          <.list_item
+            :if={@view == "list"}
+            item={item}
+            profile={@profile}
+            editing?={Map.get(@open_actions, item.vn.id) == :dates}
+            eager={MapSet.member?(@priority_cover_ids, item.vn.id)}
+            faded={@show_fade_for_viewer and Map.get(item, :viewer_status) == :read}
+          />
+          <%= if @view == "grid" do %>
+            <% faded = @show_fade_for_viewer and Map.get(item, :viewer_status) == :read %>
+            <div class="relative aspect-1/1.5 overflow-hidden rounded-[4px]">
+              <Cover.cover
+                vn={item.vn}
+                eager={MapSet.member?(@priority_cover_ids, item.vn.id)}
+                sizes="(max-width: 420px) 110px, 137px"
+                link
+                show_title_tooltip
+                class={["size-full rounded-[4px] object-cover object-center", faded && "opacity-20"]}
+              />
+              <div
+                :if={@profile.viewer.is_mine}
+                class="pointer-events-none absolute inset-0 hidden bg-black opacity-0 transition-opacity duration-300 group-hover:opacity-40 lg:block"
+              >
+              </div>
             </div>
-          </div>
 
-          <.grid_item_actions
-            :if={@profile.viewer.is_mine}
-            item={item}
-            custom_shelves={@custom_shelves}
-            profile={@profile}
-            open_action={Map.get(@open_actions, item.vn.id)}
-            new_label_name={@new_label_name}
-            open?={@open_dropdown == item.vn.id}
-          />
+            <.grid_item_actions
+              :if={@profile.viewer.is_mine}
+              item={item}
+              custom_shelves={@custom_shelves}
+              profile={@profile}
+              open_action={Map.get(@open_actions, item.vn.id)}
+              new_label_name={@new_label_name}
+              open?={@open_dropdown == item.vn.id}
+            />
 
-          <.grid_meta
-            item={item}
-            profile={@profile}
-            show_dates={@show_dates}
-            is_read_shelf={@is_read_shelf}
-            today_year={@today_year}
-          />
+            <.grid_meta
+              item={item}
+              profile={@profile}
+              show_dates={@show_dates}
+              is_read_shelf={@is_read_shelf}
+              today_year={@today_year}
+            />
+          <% end %>
         </div>
       </div>
     </Cover.cover_tooltip_provider>
+    """
+  end
+
+  attr :item, :map, required: true
+  attr :profile, :map, required: true
+  attr :editing?, :boolean, required: true
+  attr :eager, :boolean, default: false
+  attr :faded, :boolean, default: false
+
+  defp list_item(assigns) do
+    status = Enum.find(LibraryData.permanent_shelves(), &(&1.status == assigns.item.status))
+    assigns = assign(assigns, :status_label, if(status, do: status.label, else: "—"))
+
+    ~H"""
+    <div class={[
+      "border-border-divider/50 grid grid-cols-[56px_minmax(0,1fr)_36px] items-center gap-x-3 gap-y-1 border-b py-4 md:grid-cols-[minmax(0,1fr)_105px_65px_110px_110px_36px] md:gap-3 md:px-2 md:py-2.5",
+      @faded && "opacity-30"
+    ]}>
+      <div class="contents md:flex md:min-w-0 md:items-center md:gap-4">
+        <div class="col-start-1 row-span-4 row-start-1 h-21 w-14 self-start overflow-hidden rounded-sm md:h-15 md:w-10 md:shrink-0">
+          <Cover.cover
+            vn={@item.vn}
+            eager={@eager}
+            sizes="(min-width: 768px) 40px, 56px"
+            link
+            class="size-full object-cover"
+          />
+        </div>
+        <.link
+          navigate={"/vn/#{@item.vn.slug}"}
+          class="group/title hover:text-foreground-secondary text-style-body2Medium col-span-2 col-start-2 row-start-1 min-w-0 pr-8 max-md:self-start md:self-center md:pr-0"
+        >
+          <span class="line-clamp-2 wrap-break-word group-hover/title:line-clamp-none group-focus/title:line-clamp-none">{@item.vn.title}</span>
+        </.link>
+      </div>
+      <div class="col-span-2 col-start-2 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:contents">
+        <span class="text-foreground-secondary text-style-body2Regular">{@status_label}</span>
+        <span
+          class={[
+            "text-foreground-secondary text-style-body2Regular tabular-nums",
+            is_nil(@item.rating) && "max-md:hidden"
+          ]}
+          aria-label="Rating"
+        >
+          <%= if @item.rating do %>
+            {@item.rating} <span aria-hidden="true">★</span>
+          <% else %>
+            —
+          <% end %>
+        </span>
+      </div>
+      <span class="text-foreground-secondary text-style-body2Regular col-span-2 col-start-2 row-start-3 tabular-nums md:col-auto md:row-auto">
+        <span class="text-foreground-tertiary md:sr-only">Started </span>
+        <time :if={@item.date_started} datetime={Date.to_iso8601(@item.date_started)}>{Calendar.strftime(
+          @item.date_started,
+          "%d %b %Y"
+        )}</time>
+        <span :if={!@item.date_started}>—</span>
+      </span>
+      <span class="text-foreground-secondary text-style-body2Regular col-span-2 col-start-2 row-start-4 tabular-nums md:col-auto md:row-auto">
+        <span class="text-foreground-tertiary md:sr-only">Finished </span>
+        <time :if={@item.date_finished} datetime={Date.to_iso8601(@item.date_finished)}>{Calendar.strftime(
+          @item.date_finished,
+          "%d %b %Y"
+        )}</time>
+        <span :if={!@item.date_finished}>—</span>
+      </span>
+      <button
+        :if={@profile.viewer.is_mine}
+        type="button"
+        id={"library-edit-dates-#{@item.vn.id}"}
+        phx-click="toggle_library_action"
+        phx-value-vn-id={@item.vn.id}
+        phx-value-action="dates"
+        aria-label={"Edit dates for " <> @item.vn.title}
+        aria-expanded={to_string(@editing?)}
+        class="hover:text-foreground-primary text-foreground-secondary inline-flex size-9 items-center justify-center rounded-md hover:bg-white/5 max-md:col-start-3 max-md:row-start-1 max-md:self-start"
+      >
+        <Lucide.calendar_days class="size-4" aria-hidden />
+      </button>
+      <div
+        :if={@profile.viewer.is_mine and @editing?}
+        id={"library-row-dates-#{@item.vn.id}"}
+        class="col-span-full flex flex-col items-start gap-2 overflow-x-auto py-2 md:items-end"
+      >
+        <button
+          type="button"
+          phx-click="toggle_library_action"
+          phx-value-vn-id={@item.vn.id}
+          phx-value-action="dates"
+          class="text-foreground-secondary text-style-body2Regular rounded px-2 py-1 hover:bg-white/5"
+        >Close date editor</button>
+        <.live_component
+          module={KaguyaWeb.SharedComponents.DateRangePicker}
+          id={"library-date-#{@item.vn.id}"}
+          status={picker_status(@item)}
+          date_started={@item.date_started}
+          date_finished={@item.date_finished}
+          notify={:library_date_picked}
+        />
+      </div>
+    </div>
     """
   end
 

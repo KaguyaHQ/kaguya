@@ -58,7 +58,7 @@ defmodule KaguyaWeb.ProfileLive.StatsTest do
       assert html =~ "Ratings"
       assert html =~ "Length"
       assert html =~ "Languages"
-      assert html =~ "Age Rating"
+      assert html =~ "The H factor"
       assert html =~ "2"
       refute html =~ "coming soon"
     end
@@ -95,6 +95,60 @@ defmodule KaguyaWeb.ProfileLive.StatsTest do
       assert text =~ "10 Developers"
       refute text =~ "913 Hours"
       refute text =~ "01 Developers"
+    end
+  end
+
+  test "H factor buckets and library links agree, including missing release data", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+    mixed = insert_vn!("Mixed editions", has_ero: false, min_age: 0)
+    without = insert_vn!("No H-scenes", has_ero: false, min_age: 18)
+    unknown = insert_vn!("Missing releases", has_ero: false)
+    positive = insert_vn!("Confirmed VN flag", has_ero: true)
+    hidden = insert_vn!("Only hidden releases", has_ero: false)
+    vns = [mixed, without, unknown, positive, hidden]
+    Enum.each(vns, &insert_status!(user, &1, ~D[2026-01-01]))
+
+    for {vn, ero, hidden_at} <- [
+          {mixed, true, nil},
+          {mixed, false, nil},
+          {without, false, nil},
+          {hidden, false, ~U[2026-01-01 00:00:00Z]}
+        ] do
+      Repo.insert!(%Kaguya.Releases.Release{
+        visual_novel_id: vn.id,
+        title: vn.title,
+        has_ero: ero,
+        hidden_at: hidden_at
+      })
+    end
+
+    assert Kaguya.Library.library_h_content_dist(user.id, %{status: :read}) == %{
+             "with" => 2,
+             "without" => 1,
+             "unknown" => 2
+           }
+
+    for {bucket, expected, label} <- [
+          {"with", [mixed, positive], "With H"},
+          {"without", [without], "No H"},
+          {"unknown", [unknown, hidden], "Unknown"}
+        ] do
+      {:ok, stats_view, _} = live(conn, "/@#{user.username}/stats")
+      path = "/@#{user.username}/library/read?hContent=#{bucket}"
+      assert has_element?(stats_view, "h2", "The H factor")
+      result = stats_view |> element("li a[href='#{path}']", label) |> render_click()
+      {:ok, library_view, _} = follow_redirect(result, conn, path)
+
+      for vn <- vns do
+        assert has_element?(library_view, "#library-item-#{vn.id}") == vn in expected
+      end
+
+      library_view
+      |> element("button[phx-click=remove_filter][phx-value-key=hContent]")
+      |> render_click()
+
+      assert_patch(library_view, "/@#{user.username}/library/read")
+      Enum.each(vns, &assert(has_element?(library_view, "#library-item-#{&1.id}")))
     end
   end
 

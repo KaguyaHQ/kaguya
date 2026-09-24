@@ -26,6 +26,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
   attr :tags, :list, required: true
   attr :profile, :map, required: true
   attr :fade_read, :boolean, required: true
+  attr :library_view, :string, default: "grid"
   attr :show_dates, :boolean, required: true
   attr :mobile_search_open, :boolean, required: true
 
@@ -96,6 +97,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
           active={@active}
           fade_read={@fade_read}
           show_dates={@show_dates}
+          library_view={@library_view}
         />
       </div>
     </div>
@@ -188,6 +190,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
   attr :profile, :map, required: true
   attr :active, :string, required: true
   attr :fade_read, :boolean, required: true
+  attr :library_view, :string, default: "grid"
   attr :show_dates, :boolean, required: true
 
   defp mobile_more_menu(assigns) do
@@ -311,6 +314,21 @@ defmodule KaguyaWeb.Components.Profile.Library.Toolbar do
             </p>
           </div>
         </details>
+
+        <div class="bg-border-divider my-1 h-px" />
+        <button
+          :for={mode <- ["grid", "list"]}
+          type="button"
+          id={"library-mobile-view-#{mode}"}
+          data-library-view-toggle={mode}
+          data-menu-dismiss
+          aria-pressed={to_string(@library_view == mode)}
+          class={FilterControl.option_class(@library_view == mode)}
+        >
+          <Lucide.layout_grid :if={mode == "grid"} class="size-4" aria-hidden />
+          <Lucide.list :if={mode == "list"} class="size-4" aria-hidden />
+          {if mode == "grid", do: "Grid view", else: "List view"}
+        </button>
 
         <div :if={@show_dates_toggle or @show_fade_toggle} class="bg-border-divider my-1 h-px" />
 

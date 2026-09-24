@@ -27,6 +27,58 @@ defmodule KaguyaWeb.ProfileLive.LibraryTest do
     })
   end
 
+  test "list view keeps dates and filtering while switching layouts", %{conn: conn} do
+    owner = UserFixtures.insert_user!()
+    vn = insert_vn!("List view reading dates")
+
+    insert_status!(owner, vn, :read, %{
+      date_started: ~D[2020-01-02],
+      date_finished: ~D[2020-02-03]
+    })
+
+    {:ok, view, _} = live(conn, "/@#{owner.username}/library")
+
+    render_click(view, "set_library_view", %{"value" => "list"})
+    assert has_element?(view, "#library-view-list[aria-pressed='true']")
+    assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-01-02']")
+    assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-02-03']")
+    refute has_element?(view, "#library-edit-dates-#{vn.id}")
+
+    view |> element("#library-shelf-READ") |> render_click()
+    assert has_element?(view, "#library-view-list[aria-pressed='true']")
+    assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-02-03']")
+
+    render_click(view, "set_library_view", %{"value" => "grid"})
+    refute has_element?(view, "#library-item-#{vn.id} time")
+    render_click(view, "set_library_view", %{"value" => "list"})
+    assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-01-02']")
+  end
+
+  test "owner can save a date through the list row's existing picker", %{conn: conn} do
+    owner = UserFixtures.insert_user!()
+    vn = insert_vn!("Editable list dates")
+    insert_status!(owner, vn, :currently_reading, %{date_started: ~D[2020-01-02]})
+    conn = Plug.Test.init_test_session(conn, %{current_user_id: owner.id})
+    {:ok, view, _} = live(conn, "/@#{owner.username}/library")
+    render_click(view, "set_library_view", %{"value" => "list"})
+    view |> element("#library-edit-dates-#{vn.id}") |> render_click()
+    assert has_element?(view, "#library-row-dates-#{vn.id}")
+
+    view
+    |> element("#library-date-#{vn.id} button[phx-value-date='2020-01-05']")
+    |> render_click()
+
+    assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-01-05']")
+
+    assert Repo.get_by!(ReadingStatus, user_id: owner.id, visual_novel_id: vn.id).date_finished ==
+             ~D[2020-01-05]
+
+    render_click(view, "set_library_view", %{"value" => "grid"})
+    render_click(view, "set_library_view", %{"value" => "list"})
+    refute has_element?(view, "#library-row-dates-#{vn.id}")
+    assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-01-05']")
+  end
+
   describe "GET /@:username/library" do
     test "shared filter actions preserve selection and patch the library URL", %{conn: conn} do
       owner = UserFixtures.insert_user!()

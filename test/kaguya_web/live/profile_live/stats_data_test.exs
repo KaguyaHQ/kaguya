@@ -23,7 +23,7 @@ defmodule KaguyaWeb.ProfileLive.StatsDataTest do
       assert stats.read_year_chart.titles == []
       assert stats.length_items == []
       assert stats.language_items == []
-      assert stats.age_items == []
+      assert stats.h_content_items == []
     end
 
     test "builds charts and distribution items from existing reading stats" do
@@ -34,7 +34,7 @@ defmodule KaguyaWeb.ProfileLive.StatsDataTest do
           release_date: ~D[2024-01-01],
           length_minutes: 180,
           original_language: "en",
-          min_age: 18
+          has_ero: true
         )
 
       insert_status!(user, vn, ~D[2025-02-03])
@@ -49,7 +49,7 @@ defmodule KaguyaWeb.ProfileLive.StatsDataTest do
       assert [%{period: "2025", value: 1}] = stats.read_year_chart.titles
       assert [%{label: "English", value: 1}] = stats.language_items
       assert Enum.any?(stats.length_items, &(&1.key == "short" and &1.value == 1))
-      assert Enum.any?(stats.age_items, &(&1.key == "18+" and &1.value == 1))
+      assert Enum.any?(stats.h_content_items, &(&1.key == "with" and &1.value == 1))
     end
   end
 

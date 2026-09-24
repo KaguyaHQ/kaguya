@@ -145,9 +145,12 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
       read_year: parse_int(params["readYear"]),
       release_year: parse_int(params["releaseYear"]),
       length_category: nilify(params["length"]),
-      age_rating: nilify(params["ageRating"])
+      h_content: parse_h_content(params["hContent"])
     }
   end
+
+  defp parse_h_content(value) when value in ["with", "without", "unknown"], do: value
+  defp parse_h_content(_), do: nil
 
   defp nilify(value) when is_binary(value) do
     case String.trim(value) do
@@ -198,7 +201,7 @@ defmodule KaguyaWeb.ProfileLive.LibraryData do
     {:read_year, "readYear"},
     {:release_year, "releaseYear"},
     {:length_category, "length"},
-    {:age_rating, "ageRating"},
+    {:h_content, "hContent"},
     {:page, "page"}
   ]
 

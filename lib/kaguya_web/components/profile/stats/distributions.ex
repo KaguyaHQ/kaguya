@@ -101,14 +101,14 @@ defmodule KaguyaWeb.Components.Profile.Stats.Distributions do
             <li>
               <.link
                 navigate={"/@#{@username}/library/read?#{@filter_key}=#{URI.encode(item.slug || "")}"}
-                class="group flex items-center"
+                class="group flex min-h-8 items-center"
               >
                 <span class="w-[142px] truncate pr-3 text-sm font-medium transition-colors group-hover:text-[rgb(var(--text-link-hover))] md:w-[172px] md:pr-4 md:text-base">
                   {item.name}
                 </span>
                 <span class="relative flex min-w-0 flex-1 items-center">
                   <span
-                    class="h-6 origin-left animate-[barGrow_900ms_cubic-bezier(0.16,1,0.3,1)_both] rounded-[4px] motion-reduce:animate-none lg:h-7"
+                    class="h-3 origin-left animate-[barGrow_900ms_cubic-bezier(0.16,1,0.3,1)_both] rounded-[3px] motion-reduce:animate-none lg:h-4"
                     style={"width: #{bar_width(value, @max_value)}%; background-color: #{@color}"}
                   />
                   <span class="flex items-center pl-2.5 text-sm font-medium tabular-nums max-md:text-xs">
@@ -131,18 +131,28 @@ defmodule KaguyaWeb.Components.Profile.Stats.Distributions do
   attr :filter_key, :string, required: true
   attr :center_label, :string, required: true
 
+  attr :help, :string, default: nil
+
   def donut_section(assigns) do
-    total = Enum.reduce(assigns.items, 0, &(&1.value + &2))
+    items =
+      if assigns.filter_key == "hContent" do
+        colors = %{"with" => "#DC598B", "without" => "#E5AC52", "unknown" => "#A1A1AA"}
+        Enum.map(assigns.items, &Map.put(&1, :color, Map.fetch!(colors, &1.key)))
+      else
+        assigns.items
+      end
+
+    total = Enum.reduce(items, 0, &(&1.value + &2))
 
     assigns =
       assigns
       |> assign(:total, total)
-      |> assign(:segments, donut_segments(assigns.items, total))
+      |> assign(:segments, donut_segments(items, total))
 
     ~H"""
-    <.chart_card :if={@items != []} title={@title}>
+    <.chart_card :if={@items != []} title={@title} help={@help} help_id={"stats-#{@filter_key}-help"}>
       <div class="mt-8 flex items-center gap-8 px-[12px] max-lg:flex-col lg:mt-9 lg:px-0">
-        <div class="relative h-[200px] w-[200px] shrink-0 rounded-full lg:h-[220px] lg:w-[220px]">
+        <div class="relative size-50 shrink-0 rounded-full lg:size-55">
           <svg
             viewBox="0 0 220 220"
             class="absolute inset-0 size-full -rotate-90"
@@ -154,8 +164,8 @@ defmodule KaguyaWeb.Components.Profile.Stats.Distributions do
               cy="110"
               r="91"
               fill="none"
-              stroke="rgba(255,255,255,.10)"
-              stroke-width="31"
+              stroke="none"
+              stroke-width="22"
             />
             <g class="kaguya-donut-sweep">
               <%= for segment <- @segments do %>
@@ -166,7 +176,7 @@ defmodule KaguyaWeb.Components.Profile.Stats.Distributions do
                     r="91"
                     fill="none"
                     stroke={segment.color}
-                    stroke-width="31"
+                    stroke-width="22"
                     stroke-dasharray={"#{segment.dash} #{segment.gap}"}
                     stroke-dashoffset={segment.offset}
                     class="opacity-95 transition-opacity hover:opacity-80"
@@ -188,7 +198,7 @@ defmodule KaguyaWeb.Components.Profile.Stats.Distributions do
           </div>
         </div>
 
-        <ul class="flex min-w-0 flex-col max-lg:w-full">
+        <ul class="flex w-full min-w-0 flex-col">
           <%= for segment <- @segments do %>
             <li>
               <.link
@@ -199,7 +209,7 @@ defmodule KaguyaWeb.Components.Profile.Stats.Distributions do
                   class="size-2.5 shrink-0 rounded-[2px]"
                   style={"background-color: #{segment.color}"}
                 />
-                <span class="truncate text-sm transition-colors group-hover:text-[rgb(var(--text-link-hover))]">
+                <span class="min-w-0 text-sm whitespace-normal transition-colors group-hover:text-[rgb(var(--text-link-hover))]">
                   {segment.label}
                 </span>
                 <span class="ml-auto shrink-0 text-sm text-[rgb(var(--foreground-secondary))] tabular-nums">

@@ -6,7 +6,10 @@ const LibraryPrefs = {
   mounted() {
     this._syncFromStorage()
     this._onClick = event => {
-      if (event.target.closest("[data-fade-toggle]") && this._canFade()) {
+      const viewToggle = event.target.closest("[data-library-view-toggle]")
+      if (viewToggle) {
+        this._setPreference("libraryView", "set_library_view", viewToggle.dataset.libraryViewToggle)
+      } else if (event.target.closest("[data-fade-toggle]") && this._canFade()) {
         this._fadeValue = !this._fadeValue
         this._setPreference("fadeReadLibrary", "set_fade_read", this._fadeValue)
       } else if (event.target.closest("[data-show-dates-toggle]") && this._isOwner()) {
@@ -44,6 +47,11 @@ const LibraryPrefs = {
   },
 
   _syncFromStorage() {
+    let view
+    try { view = localStorage.getItem("libraryView") } catch (_error) {}
+    if (["grid", "list"].includes(view) && view !== this.el.dataset.libraryView) {
+      this.pushEvent("set_library_view", {value: view})
+    }
     this._scope = this._currentScope()
     this._fadeValue = this._read("fadeReadLibrary", this.el.dataset.fadeRead === "true")
     this._datesValue = this._read("showDatesLibrary", this.el.dataset.showDates === "true")

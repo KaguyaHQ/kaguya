@@ -58,7 +58,7 @@ defmodule KaguyaWeb.Components.Profile.Stats.ListProgress do
             r="85"
             fill="none"
             stroke="currentColor"
-            stroke-width="10"
+            stroke-width="7"
             class="text-white/8"
           />
           <circle
@@ -66,8 +66,8 @@ defmodule KaguyaWeb.Components.Profile.Stats.ListProgress do
             cy="95"
             r="85"
             fill="none"
-            stroke="#00BBF9"
-            stroke-width="10"
+            stroke="#568DE5"
+            stroke-width="7"
             stroke-linecap="round"
             stroke-dasharray={@circumference}
             stroke-dashoffset={@offset}

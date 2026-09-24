@@ -56,10 +56,10 @@ defmodule KaguyaWeb.Components.Profile.Stats.ChartingTest do
           4
         )
 
-      assert first.percent == "25.0"
-      assert first.color == "#06D6A0"
-      assert second.percent == "75.0"
-      assert second.color == "#00BBF9"
+      assert first.percent == 25
+      assert first.color == "#568DE5"
+      assert second.percent == 75
+      assert second.color == "#E5AC52"
     end
   end
 end

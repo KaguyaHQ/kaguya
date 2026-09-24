@@ -22,11 +22,10 @@ defmodule KaguyaWeb.ProfileLive.StatsData do
     {"very_long", "50+ hours", "50h+"}
   ]
 
-  @age_buckets [
-    {"all_ages", "All Ages"},
-    {"13+", "13+"},
-    {"16+", "16+"},
-    {"18+", "18+"}
+  @h_content_buckets [
+    {"with", "With H"},
+    {"without", "No H"},
+    {"unknown", "Unknown"}
   ]
 
   def load_stats(user, profile, viewer) do
@@ -37,8 +36,8 @@ defmodule KaguyaWeb.ProfileLive.StatsData do
     length_dist =
       Library.library_length_dist(user.id, %{status: :read}, allowed_categories: allowed)
 
-    age_dist =
-      Library.library_age_rating_dist(user.id, %{status: :read}, allowed_categories: allowed)
+    h_content_dist =
+      Library.library_h_content_dist(user.id, %{status: :read}, allowed_categories: allowed)
 
     most_read_tags = tags_from_stats(Map.get(snapshot, :most_read_vn_tags, []), :count)
     highest_rated_tags = tags_from_stats(Map.get(snapshot, :highest_rated_vn_tags, []), :rating)
@@ -50,7 +49,7 @@ defmodule KaguyaWeb.ProfileLive.StatsData do
       producers_from_stats(Map.get(snapshot, :highest_rated_producers, []), :rating)
 
     language_items = language_items(Map.get(snapshot, :most_read_languages, []))
-    age_items = bucket_items(age_dist, @age_buckets)
+    h_content_items = bucket_items(h_content_dist, @h_content_buckets)
 
     curated_progress =
       user.id
@@ -84,7 +83,7 @@ defmodule KaguyaWeb.ProfileLive.StatsData do
           "readYear"
         ),
       length_items: length_items(length_dist),
-      age_items: age_items,
+      h_content_items: h_content_items,
       language_items: language_items,
       most_read_tags: most_read_tags,
       highest_rated_tags: highest_rated_tags,
@@ -103,7 +102,7 @@ defmodule KaguyaWeb.ProfileLive.StatsData do
       stats.release_year_chart.has_data? or
       stats.read_year_chart.has_data? or
       stats.length_items != [] or
-      stats.age_items != [] or
+      stats.h_content_items != [] or
       stats.language_items != [] or
       stats.most_read_tags != [] or
       stats.highest_rated_tags != [] or

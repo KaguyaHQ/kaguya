@@ -8,6 +8,7 @@ import ClientTagFilter from "./client_tag_filter"
 import CommentContent from "./comment_content"
 import CommentThread from "./comment_thread"
 import CoverTooltip from "./cover_tooltip"
+import ChartHelp from "./chart_help"
 import Dialog from "./dialog"
 import DraftClear from "./draft_clear"
 import FadeReadPreference from "./fade_read_preference"
@@ -54,6 +55,7 @@ export default {
   CommentContent,
   CommentThread,
   CoverTooltip,
+  ChartHelp,
   Dialog,
   DraftClear,
   FadeReadPreference,

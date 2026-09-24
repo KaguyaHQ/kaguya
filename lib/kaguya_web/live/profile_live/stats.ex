@@ -86,7 +86,10 @@ defmodule KaguyaWeb.ProfileLive.Stats do
 
   def render(assigns) do
     ~H"""
-    <main class="min-h-screen bg-[rgb(var(--surface-base))] pb-[110px] text-[rgb(var(--foreground-primary))] sm:pb-32 lg:pb-[99px]">
+    <main
+      style="--surface-base: 20 20 22; --foreground-primary: 242 240 238; --foreground-secondary: 197 192 195; --foreground-quaternary: 151 144 151; --border-divider: 49 46 51"
+      class="min-h-screen bg-[rgb(var(--surface-base))] pb-[110px] text-[rgb(var(--foreground-primary))] sm:pb-32 lg:pb-[99px]"
+    >
       <div class="mx-auto w-full md:max-lg:max-w-[768px] md:max-lg:px-6 lg:px-8 2xl:max-w-screen-2xl">
         <.stats_hero profile={@profile} stats={@stats} />
 
@@ -94,7 +97,7 @@ defmodule KaguyaWeb.ProfileLive.Stats do
           <div class="space-y-10 lg:space-y-20">
             <.year_chart
               title="Release Year"
-              color="#06D6A0"
+              color="#568DE5"
               username={@profile.username}
               year_param="releaseYear"
               chart_key="release_year"
@@ -103,7 +106,7 @@ defmodule KaguyaWeb.ProfileLive.Stats do
             />
             <.year_chart
               title="Read Year"
-              color="#00BBF9"
+              color="#DC598B"
               username={@profile.username}
               year_param="readYear"
               chart_key="read_year"
@@ -125,7 +128,7 @@ defmodule KaguyaWeb.ProfileLive.Stats do
               title="VNs by Tags"
               items={@stats.most_read_tags}
               value_key={:count}
-              color="#06D6A0"
+              color="#568DE5"
               username={@profile.username}
               filter_key="tag"
             />
@@ -133,7 +136,7 @@ defmodule KaguyaWeb.ProfileLive.Stats do
               title="Highest Rated Tags"
               items={@stats.highest_rated_tags}
               value_key={:rating}
-              color="#00BBF9"
+              color="#DC598B"
               username={@profile.username}
               filter_key="tag"
               rating
@@ -145,7 +148,7 @@ defmodule KaguyaWeb.ProfileLive.Stats do
               title="Most Read Developers"
               items={@stats.most_read_producers}
               value_key={:count}
-              color="#06D6A0"
+              color="#568DE5"
               username={@profile.username}
               filter_key="producer"
               limit={8}
@@ -154,7 +157,7 @@ defmodule KaguyaWeb.ProfileLive.Stats do
               title="Highest Rated Developers"
               items={@stats.highest_rated_producers}
               value_key={:rating}
-              color="#00BBF9"
+              color="#DC598B"
               username={@profile.username}
               filter_key="producer"
               limit={8}
@@ -171,11 +174,12 @@ defmodule KaguyaWeb.ProfileLive.Stats do
               items={@stats.language_items}
             />
             <.donut_section
-              title="Age Rating"
+              title="The H factor"
+              help="With H: at least one edition includes H-scenes. Your edition may differ."
               username={@profile.username}
-              filter_key="ageRating"
+              filter_key="hContent"
               center_label="VNs"
-              items={@stats.age_items}
+              items={@stats.h_content_items}
             />
           </div>
 
