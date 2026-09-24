@@ -55,37 +55,9 @@ defmodule KaguyaWeb.VNLive.Show.StatusActions do
     end
   end
 
-  def change_dates(socket, %{"dates" => params}) do
-    if socket.assigns.reading_dates_form do
-      {:noreply,
-       assign(socket,
-         reading_dates_form:
-           to_form(Map.take(params, ["date_started", "date_finished"]), as: :dates),
-         reading_dates_error: nil
-       )}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def set_date_today(socket, %{"field" => field})
-      when field in ["date_started", "date_finished"] do
-    if form = socket.assigns.reading_dates_form do
-      change_dates(socket, %{
-        "dates" => Map.put(form.params, field, Date.to_iso8601(Date.utc_today()))
-      })
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def clear_date(socket, %{"field" => field}) when field in ["date_started", "date_finished"] do
-    if form = socket.assigns.reading_dates_form do
-      change_dates(socket, %{"dates" => Map.put(form.params, field, "")})
-    else
-      {:noreply, socket}
-    end
-  end
+  defdelegate change_dates(socket, params), to: KaguyaWeb.SharedComponents.ReadingDates
+  defdelegate set_date_today(socket, params), to: KaguyaWeb.SharedComponents.ReadingDates
+  defdelegate clear_date(socket, params), to: KaguyaWeb.SharedComponents.ReadingDates
 
   def save_dates(socket, %{"dates" => params}) do
     with %{id: _} = user <- socket.assigns.current_user,
@@ -97,9 +69,8 @@ defmodule KaguyaWeb.VNLive.Show.StatusActions do
             to_form(Map.take(params, ["date_started", "date_finished"]), as: :dates)
         )
 
-      with {:ok, started} <- parse_date(params["date_started"]),
-           {:ok, finished} <- parse_date(params["date_finished"]),
-           :ok <- validate_dates(started, finished),
+      with {:ok, %{date_started: started, date_finished: finished}} <-
+             KaguyaWeb.SharedComponents.ReadingDates.parse_dates(params),
            {:ok, fresh} <-
              PageData.set_reading_status(socket.assigns.slug, user, status, %{
                date_started: started,
@@ -124,29 +95,6 @@ defmodule KaguyaWeb.VNLive.Show.StatusActions do
 
   defp date_string(nil), do: ""
   defp date_string(%Date{} = date), do: Date.to_iso8601(date)
-  defp parse_date(value) when value in [nil, ""], do: {:ok, nil}
-
-  defp parse_date(value) when is_binary(value) do
-    case Date.from_iso8601(value) do
-      {:ok, date} -> {:ok, date}
-      _ -> {:error, "Enter a valid date."}
-    end
-  end
-
-  defp parse_date(_), do: {:error, "Enter a valid date."}
-
-  defp validate_dates(started, finished) do
-    cond do
-      Enum.any?([started, finished], &(&1 && Date.compare(&1, Date.utc_today()) == :gt)) ->
-        {:error, "Reading dates cannot be in the future."}
-
-      started && finished && Date.compare(started, finished) == :gt ->
-        {:error, "Finished must be on or after Started."}
-
-      true ->
-        :ok
-    end
-  end
 
   def clear_status(socket, _params) do
     {:noreply, open_clear_status_dialog(socket)}

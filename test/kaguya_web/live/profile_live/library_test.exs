@@ -54,7 +54,7 @@ defmodule KaguyaWeb.ProfileLive.LibraryTest do
     assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-01-02']")
   end
 
-  test "owner can save a date through the list row's existing picker", %{conn: conn} do
+  test "owner edits dates in a dialog without expanding the list row", %{conn: conn} do
     owner = UserFixtures.insert_user!()
     vn = insert_vn!("Editable list dates")
     insert_status!(owner, vn, :currently_reading, %{date_started: ~D[2020-01-02]})
@@ -62,11 +62,29 @@ defmodule KaguyaWeb.ProfileLive.LibraryTest do
     {:ok, view, _} = live(conn, "/@#{owner.username}/library")
     render_click(view, "set_library_view", %{"value" => "list"})
     view |> element("#library-edit-dates-#{vn.id}") |> render_click()
-    assert has_element?(view, "#library-row-dates-#{vn.id}")
+    assert has_element?(view, "#reading-dates-dialog")
+    refute has_element?(view, "#library-row-dates-#{vn.id}")
+    params = %{"date_started" => "2020-01-02", "date_finished" => "2020-01-05"}
+    view |> form("#reading-dates-form", dates: params) |> render_change()
+
+    assert is_nil(
+             Repo.get_by!(ReadingStatus, user_id: owner.id, visual_novel_id: vn.id).date_finished
+           )
+
+    render_click(view, "close_reading_dates")
+    view |> element("#library-edit-dates-#{vn.id}") |> render_click()
+    assert has_element?(view, "#dates_date_finished")
+    refute has_element?(view, "button[aria-label='Clear finished']")
 
     view
-    |> element("#library-date-#{vn.id} button[phx-value-date='2020-01-05']")
-    |> render_click()
+    |> form("#reading-dates-form",
+      dates: %{"date_started" => "2020-02-01", "date_finished" => "2020-01-01"}
+    )
+    |> render_submit()
+
+    assert has_element?(view, "#reading-dates-error", "Finished must be on or after Started")
+    view |> form("#reading-dates-form", dates: params) |> render_submit()
+    refute has_element?(view, "#reading-dates-dialog")
 
     assert has_element?(view, "#library-item-#{vn.id} time[datetime='2020-01-05']")
 

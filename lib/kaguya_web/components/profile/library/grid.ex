@@ -12,8 +12,7 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
   `toggle_library_action`, `close_library_action`, `toggle_item_shelf`,
   `start_add_label`, `cancel_add_label`, `update_new_label_name`,
   `create_label_for_vn`, `load_more`, plus `set_item_status` /
-  `clear_item_status` via `StatusChangeList`. The date submenu sends a
-  `:library_date_picked` info message via the live component.
+  `clear_item_status` via `StatusChangeList`. Date actions open the shared reading dates dialog.
   """
 
   use KaguyaWeb, :html
@@ -88,7 +87,6 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
             :if={@view == "list"}
             item={item}
             profile={@profile}
-            editing?={Map.get(@open_actions, item.vn.id) == :dates}
             eager={MapSet.member?(@priority_cover_ids, item.vn.id)}
             faded={@show_fade_for_viewer and Map.get(item, :viewer_status) == :read}
           />
@@ -136,7 +134,6 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
 
   attr :item, :map, required: true
   attr :profile, :map, required: true
-  attr :editing?, :boolean, required: true
   attr :eager, :boolean, default: false
   attr :faded, :boolean, default: false
 
@@ -206,32 +203,11 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
         phx-value-vn-id={@item.vn.id}
         phx-value-action="dates"
         aria-label={"Edit dates for " <> @item.vn.title}
-        aria-expanded={to_string(@editing?)}
+        aria-haspopup="dialog"
         class="hover:text-foreground-primary text-foreground-secondary inline-flex size-9 items-center justify-center rounded-md hover:bg-white/5 max-md:col-start-3 max-md:row-start-1 max-md:self-start"
       >
         <Lucide.calendar_days class="size-4" aria-hidden />
       </button>
-      <div
-        :if={@profile.viewer.is_mine and @editing?}
-        id={"library-row-dates-#{@item.vn.id}"}
-        class="col-span-full flex flex-col items-start gap-2 overflow-x-auto py-2 md:items-end"
-      >
-        <button
-          type="button"
-          phx-click="toggle_library_action"
-          phx-value-vn-id={@item.vn.id}
-          phx-value-action="dates"
-          class="text-foreground-secondary text-style-body2Regular rounded px-2 py-1 hover:bg-white/5"
-        >Close date editor</button>
-        <.live_component
-          module={KaguyaWeb.SharedComponents.DateRangePicker}
-          id={"library-date-#{@item.vn.id}"}
-          status={picker_status(@item)}
-          date_started={@item.date_started}
-          date_finished={@item.date_finished}
-          notify={:library_date_picked}
-        />
-      </div>
     </div>
     """
   end
@@ -319,8 +295,6 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
             label="Edit dates"
             active?={@open_action == :dates}
           />
-
-          <.dates_submenu :if={@open_action == :dates} item={@item} vn_id={@vn_id} />
         </div>
       </div>
     </div>
@@ -478,24 +452,6 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
   end
 
   attr :item, :map, required: true
-  attr :vn_id, :string, required: true
-
-  defp dates_submenu(assigns) do
-    ~H"""
-    <div class="border-border-divider dark:bg-surface-elevated absolute top-0 left-full z-60 ml-1 w-fit rounded-[12px] border bg-white p-0 shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
-      <.live_component
-        module={KaguyaWeb.SharedComponents.DateRangePicker}
-        id={"library-date-#{@vn_id}"}
-        status={picker_status(@item)}
-        date_started={@item.date_started}
-        date_finished={@item.date_finished}
-        notify={:library_date_picked}
-      />
-    </div>
-    """
-  end
-
-  attr :item, :map, required: true
   attr :profile, :map, required: true
   attr :show_dates, :boolean, required: true
   attr :is_read_shelf, :boolean, required: true
@@ -567,12 +523,6 @@ defmodule KaguyaWeb.Components.Profile.Library.Grid do
     </div>
     """
   end
-
-  defp picker_status(%{status: status}) when is_atom(status),
-    do: status |> Atom.to_string() |> String.upcase()
-
-  defp picker_status(%{status: status}) when is_binary(status), do: String.upcase(status)
-  defp picker_status(_), do: "READ"
 
   defp format_date_short(nil, _today_year), do: ""
 

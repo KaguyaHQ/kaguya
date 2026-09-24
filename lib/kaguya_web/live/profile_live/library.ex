@@ -28,6 +28,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
   use KaguyaWeb.ProfileLive, tab: :library, title_suffix: "Library"
 
+  alias KaguyaWeb.SharedComponents.ReadingDates
   alias Kaguya.Shelves
   alias KaguyaWeb.Components.Profile.Library.{ControlBar, Grid, Toolbar}
   alias KaguyaWeb.Components.Profile.Placeholder
@@ -48,6 +49,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
      |> assign(:show_dates, false)
      |> assign(:library_view, "grid")
      |> assign(:mobile_search_open, false)
+     |> assign(reading_dates_form: nil, reading_dates_error: nil, reading_dates_vn_id: nil)
      |> assign(:open_actions, %{})
      |> assign(:new_label_name, "")
      |> assign(:open_dropdown, nil)
@@ -71,6 +73,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
         {:noreply,
          socket
+         |> assign(reading_dates_form: nil, reading_dates_error: nil, reading_dates_vn_id: nil)
          |> assign(:state, :ready)
          |> assign(:profile, profile)
          |> assign(:permissions, Data.viewer_permissions(viewer))
@@ -204,7 +207,7 @@ defmodule KaguyaWeb.ProfileLive.Library do
          {:ok, new_status} <- status_from_value(status),
          %{} = item <- socket.assigns.items_state[vn_id] do
       previous_status = item.status
-      updated = autofill_item_dates(%{item | status: new_status})
+      updated = autofill_item_dates(%{item | status: new_status}, previous_status)
 
       # Optimistic: stream-insert the patched item (or drop it if the row no
       # longer belongs to the active shelf), then shift count badges to match.
@@ -280,6 +283,85 @@ defmodule KaguyaWeb.ProfileLive.Library do
      |> assign(:open_dropdown, nil)
      |> assign(:open_actions, %{})
      |> restream_item(previous)}
+  end
+
+  def handle_event("toggle_library_action", %{"vn-id" => vn_id, "action" => "dates"}, socket) do
+    with true <- owner?(socket),
+         %{} = item <- socket.assigns.items_state[vn_id] do
+      params =
+        Map.new([:date_started, :date_finished], fn field ->
+          {Atom.to_string(field), if(item[field], do: Date.to_iso8601(item[field]), else: "")}
+        end)
+
+      {:noreply,
+       socket
+       |> close_library_dropdown_state()
+       |> assign(
+         reading_dates_vn_id: vn_id,
+         reading_dates_form: to_form(params, as: :dates),
+         reading_dates_error: nil
+       )}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_reading_dates", _, socket),
+    do:
+      {:noreply,
+       assign(socket, reading_dates_form: nil, reading_dates_error: nil, reading_dates_vn_id: nil)}
+
+  def handle_event("change_reading_dates", params, socket),
+    do: ReadingDates.change_dates(socket, params)
+
+  def handle_event("set_reading_date_today", params, socket),
+    do: ReadingDates.set_date_today(socket, params)
+
+  def handle_event("clear_reading_date", params, socket),
+    do: ReadingDates.clear_date(socket, params)
+
+  def handle_event("save_reading_dates", %{"dates" => params}, socket) do
+    with true <- owner?(socket),
+         %Phoenix.HTML.Form{} <- socket.assigns.reading_dates_form,
+         %{} = item <- socket.assigns.items_state[socket.assigns.reading_dates_vn_id] do
+      socket =
+        assign(socket,
+          reading_dates_form:
+            to_form(Map.take(params, ["date_started", "date_finished"]), as: :dates)
+        )
+
+      with {:ok, dates} <- ReadingDates.parse_dates(params),
+           {:ok, _} <-
+             Shelves.set_reading_status(
+               socket.assigns.profile.id,
+               item.vn.id,
+               Map.put(dates, :status, item.status || :read)
+             ),
+           {:ok, saved} <- Shelves.get_reading_status(socket.assigns.profile.id, item.vn.id) do
+        updated = %{
+          item
+          | status: saved.status,
+            date_started: saved.date_started,
+            date_finished: saved.date_finished
+        }
+
+        {:noreply,
+         socket
+         |> apply_item_update(updated)
+         |> shift_status_counts(item.status, saved.status)
+         |> maybe_drop_from_visible_shelf(updated)
+         |> assign(reading_dates_form: nil, reading_dates_error: nil, reading_dates_vn_id: nil)}
+      else
+        {:error, message} when is_binary(message) ->
+          {:noreply, assign(socket, reading_dates_error: message)}
+
+        _ ->
+          {:noreply,
+           assign(socket, reading_dates_error: "Could not save reading dates. Please try again.")}
+      end
+    else
+      _ -> {:noreply, socket}
+    end
   end
 
   def handle_event("toggle_library_action", %{"vn-id" => vn_id, "action" => action}, socket) do
@@ -378,32 +460,6 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
   # Shared events (toggle_follow, open_mod_panel) fall through to the parent
   # via the macro-injected handlers.
-
-  @impl Phoenix.LiveView
-  def handle_info({:library_date_picked, picker_id, change}, socket) do
-    with true <- owner?(socket),
-         "library-date-" <> vn_id <- picker_id,
-         %{} = item <- socket.assigns.items_state[vn_id] do
-      status = item.status || :read
-      next_started = parse_date(change.date_started)
-      next_finished = parse_date(change.date_finished)
-
-      # Pass `%Date{}` structs through to the context — `Repo.insert_all` skips
-      # the cast pipeline and would balk at raw ISO strings for `:date` fields.
-      attrs = %{status: status, date_started: next_started, date_finished: next_finished}
-
-      case Shelves.set_reading_status(socket.assigns.profile.id, vn_id, attrs) do
-        {:ok, _} ->
-          updated = %{item | date_started: next_started, date_finished: next_finished}
-          {:noreply, apply_item_update(socket, updated)}
-
-        _ ->
-          {:noreply, put_flash(socket, :error, "Could not save reading dates.")}
-      end
-    else
-      _ -> {:noreply, socket}
-    end
-  end
 
   # ---------------------------------------------------------------------------
   # Stream + shadow-index helpers
@@ -543,30 +599,13 @@ defmodule KaguyaWeb.ProfileLive.Library do
 
   # Mirrors the auto-fill in `Shelves.set_reading_status/3` so the optimistic
   # row shows the stamped date immediately. Fills a blank only.
-  defp autofill_item_dates(%{status: :read, date_finished: nil} = item),
+  defp autofill_item_dates(%{status: :read, date_finished: nil} = item, :currently_reading),
     do: %{item | date_finished: Date.utc_today()}
 
-  defp autofill_item_dates(%{status: :currently_reading, date_started: nil} = item),
+  defp autofill_item_dates(%{status: :currently_reading, date_started: nil} = item, _previous),
     do: %{item | date_started: Date.utc_today()}
 
-  defp autofill_item_dates(item), do: item
-
-  defp parse_date(nil), do: nil
-  defp parse_date(""), do: nil
-
-  defp parse_date(value) when is_binary(value) do
-    case Date.from_iso8601(value) do
-      {:ok, date} -> date
-      _ -> nil
-    end
-  end
-
-  defp parse_date(%Date{} = date), do: date
-  defp parse_date(_), do: nil
-
-  # ---------------------------------------------------------------------------
-  # Misc helpers
-  # ---------------------------------------------------------------------------
+  defp autofill_item_dates(item, _previous), do: item
 
   defp parse_library_action("labels"), do: :labels
   defp parse_library_action("status"), do: :status
@@ -806,6 +845,11 @@ defmodule KaguyaWeb.ProfileLive.Library do
           </section>
         </div>
       </div>
+      <ReadingDates.reading_dates_dialog
+        :if={@reading_dates_form}
+        form={@reading_dates_form}
+        error={@reading_dates_error}
+      />
     </main>
     """
   end

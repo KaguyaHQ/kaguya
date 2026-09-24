@@ -585,7 +585,7 @@ defmodule KaguyaWeb.VNLive.Show do
         :if={@review_delete_dialog_open?}
         draft_key={review_draft_key(@current_user, @display_vn)}
       />
-      <Sidebar.reading_dates_dialog
+      <KaguyaWeb.SharedComponents.ReadingDates.reading_dates_dialog
         :if={@reading_dates_form}
         form={@reading_dates_form}
         error={@reading_dates_error}
