@@ -45,12 +45,28 @@ defmodule KaguyaWeb.VN.Community do
             ({@vn.reviews_count})
           </span>
         </h2>
+        <.auth_button
+          :if={@reviews.items == []}
+          event="open_review_dialog"
+          is_logged_in={@is_logged_in}
+          modal_id="vn-auth-prompt"
+          auth_message="Sign in to write a review"
+          class="btn btn-neutral btn-small shrink-0 [--btn-h:28px] [--btn-px:0.625rem] [--btn-radius:6px]"
+        >
+          Write a review
+        </.auth_button>
         <.sort_control :if={@vn.reviews_count > 3} slug={@vn.slug} sort={@sort} />
       </div>
-      <div class="mt-3 mb-[30px] hidden h-px bg-[rgb(var(--border-divider))] lg:block"></div>
+      <div class={[
+        "bg-border-divider mt-3 hidden h-px lg:block",
+        @reviews.items != [] && "mb-[30px]"
+      ]}>
+      </div>
 
       <%= if @reviews.items == [] do %>
-        <.empty_reviews is_logged_in={@is_logged_in} />
+        <p class="text-foreground-tertiary text-style-body2Regular px-4 pt-3 pb-2 md:px-8 lg:px-0">
+          No reviews yet.
+        </p>
       <% else %>
         <div class="relative lg:space-y-5">
           <div
@@ -126,25 +142,6 @@ defmodule KaguyaWeb.VN.Community do
         </.link>
       </div>
     </.menu>
-    """
-  end
-
-  attr :is_logged_in, :boolean, required: true
-
-  defp empty_reviews(assigns) do
-    ~H"""
-    <div class="flex items-center justify-center px-5 py-10 text-center max-lg:mt-2 max-lg:mb-6 max-lg:h-full md:px-0 lg:rounded-[10px]">
-      <span class="text-sm text-[rgb(var(--foreground-tertiary))]">No reviews yet.</span>
-      <.auth_button
-        event="open_review_dialog"
-        is_logged_in={@is_logged_in}
-        modal_id="vn-auth-prompt"
-        auth_message="Sign in to write a review"
-        class="ml-1 inline text-sm font-medium text-[rgb(var(--foreground-secondary))] underline-offset-2 transition-colors hover:text-[rgb(var(--foreground-primary))] hover:underline"
-      >
-        Write one?
-      </.auth_button>
-    </div>
     """
   end
 

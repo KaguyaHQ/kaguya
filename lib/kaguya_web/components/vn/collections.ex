@@ -265,7 +265,7 @@ defmodule KaguyaWeb.VN.Collections do
       |> assign(:similar_href, "/vn/#{assigns.slug}/similar")
 
     ~H"""
-    <section class="px-4 lg:rounded-[12px] lg:px-8 lg:py-6">
+    <section id="recommendations" class="px-4 md:px-8 lg:rounded-[12px] lg:py-6">
       <div class="flex items-center justify-between gap-4">
         <.link
           navigate={@similar_href}
@@ -289,23 +289,23 @@ defmodule KaguyaWeb.VN.Collections do
             :if={@user_can_edit}
             type="button"
             phx-click="open_recommendation_dialog"
-            class="flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-[rgb(var(--button-border-secondary))] bg-[rgb(var(--button-background-neutral-default))] px-2.5 py-1.5 text-[rgb(var(--button-text-on-neutral))] transition-colors hover:bg-[rgb(var(--button-background-neutral-hover))] active:bg-[rgb(var(--button-background-neutral-pressed))]"
+            class="btn btn-neutral btn-small shrink-0 [--btn-h:28px] [--btn-px:0.625rem] [--btn-radius:6px]"
           >
-            <Lucide.plus class="size-2.5" aria-hidden />
-            <span class="text-[13px] leading-none font-medium">Add</span>
+            Suggest a VN
           </button>
         </div>
       </div>
-      <div class="mt-3 mb-5 hidden h-px bg-[rgb(var(--border-divider))] md:block"></div>
-      <div
-        :if={@recommendations == []}
-        class="flex flex-col items-center justify-center py-10 max-lg:mt-2"
-      >
-        <p class="text-foreground-secondary text-sm">Nothing recommended yet</p>
-        <p class="text-foreground-tertiary mt-1 text-xs">
-          Know one that fits? Use Add to suggest a match.
-        </p>
+      <div class={[
+        "bg-border-divider mt-3 hidden h-px md:block",
+        @recommendations != [] && "mb-5"
+      ]}>
       </div>
+      <p
+        :if={@recommendations == []}
+        class="text-foreground-tertiary text-style-body2Regular pt-3 pb-2"
+      >
+        No recommendations yet.
+      </p>
       <div :if={@recommendations != []} class="mt-4 grid grid-cols-4 gap-1 md:grid-cols-6 md:gap-2">
         <.recommendation_card
           :for={{entry, idx} <- Enum.with_index(@visible_recommendations)}

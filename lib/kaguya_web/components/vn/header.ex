@@ -17,6 +17,7 @@ defmodule KaguyaWeb.VN.Header do
   alias KaguyaWeb.VN.Panels
 
   import KaguyaWeb.Components.Shared.RatingsChart, only: [ratings_chart: 1]
+  import KaguyaWeb.UI.Menu
   import KaguyaWeb.VN.Formatters
   import KaguyaWeb.VN.PanelHelpers
   import KaguyaWeb.VN.Sidebar, only: [mobile_action_trigger: 1]
@@ -244,15 +245,6 @@ defmodule KaguyaWeb.VN.Header do
       >
         <Lucide.history class="size-3" aria-hidden /> History
       </.link>
-      <.link
-        :if={@vn.vndb_url}
-        href={@vn.vndb_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="flex h-[25px] items-center rounded-[4px] border border-[rgb(var(--chip-border-default))] px-2 text-[10px] font-normal tracking-[0.06em] text-[rgb(var(--foreground-secondary))] transition hover:border-[rgb(var(--chip-border-hover))]"
-      >
-        VNDB
-      </.link>
       <button
         type="button"
         data-share-button
@@ -262,6 +254,26 @@ defmodule KaguyaWeb.VN.Header do
       >
         <Lucide.link_2 class="size-3.5" aria-hidden />
       </button>
+      <.menu
+        :if={@vn.vndb_url}
+        id="vn-header-more"
+        align="end"
+        class="border-chip-border-default hover:border-chip-border-hover hover:text-foreground-primary text-foreground-secondary flex h-[25px] items-center rounded-[4px] border px-2 transition"
+      >
+        <:trigger aria-label="More visual novel actions">
+          <Lucide.ellipsis class="size-3.5" aria-hidden />
+        </:trigger>
+        <div class="bg-surface-elevated border-border-divider min-w-44 rounded-lg border p-1 shadow-lg">
+          <.menu_link
+            href={@vn.vndb_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:bg-surface-menu-item-hover hover:text-foreground-primary text-foreground-secondary text-style-body2Regular flex items-center gap-3 rounded-md px-3 py-2 tracking-normal"
+          >
+            View on VNDB <Lucide.external_link class="size-4" aria-hidden />
+          </.menu_link>
+        </div>
+      </.menu>
     </div>
     """
   end
