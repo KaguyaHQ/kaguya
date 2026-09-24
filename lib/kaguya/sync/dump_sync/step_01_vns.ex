@@ -812,6 +812,9 @@ defmodule Kaguya.Sync.DumpSync.VNs do
 
   defp load_release_stats_for(_vndb, []), do: %{}
 
+  # TODO: This dump path uses MIN release age; VndbEnrichment uses MAX.
+  # Define VN-level min_age semantics before aligning them. It is not an
+  # H-content classification; use has_ero for that distinction.
   defp load_release_stats_for(vndb, vn_ids) do
     placeholders = Enum.map_join(1..length(vn_ids), ", ", &"$#{&1}")
 

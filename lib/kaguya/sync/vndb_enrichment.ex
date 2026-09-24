@@ -611,6 +611,9 @@ defmodule Kaguya.Sync.VndbEnrichment do
       if vn_uuid && rels != [] do
         has_ero = Enum.any?(rels, & &1["has_ero"])
 
+        # TODO: DumpSync.VNs uses MIN release age; this API path uses MAX.
+        # Define VN-level min_age semantics before aligning them. It is not an
+        # H-content classification; use has_ero for that distinction.
         min_age =
           rels
           |> Enum.map(& &1["minage"])
