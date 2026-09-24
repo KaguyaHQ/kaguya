@@ -38,10 +38,13 @@ defmodule KaguyaWeb.VNLive.Edit do
        relation_query: "",
        relation_results: [],
        create_step: :form,
+       create_form_started: false,
+       staged_uploads: %{},
        create_mode: nil,
        create_mode_options: create_mode_options(),
        dup_query: "",
        dup_results: [],
+       dup_search_failed: false,
        development_status_options: development_status_options(),
        length_options: length_options(),
        language_options: language_options(),
@@ -77,9 +80,12 @@ defmodule KaguyaWeb.VNLive.Edit do
       relation_query: "",
       relation_results: [],
       create_step: :fork,
+      create_form_started: false,
+      staged_uploads: %{},
       create_mode: nil,
       dup_query: "",
       dup_results: [],
+      dup_search_failed: false,
       page_title: "Create visual novel"
     ]
 
@@ -212,21 +218,19 @@ defmodule KaguyaWeb.VNLive.Edit do
     mode = parse_mode(mode)
     query = String.trim(socket.assigns.dup_query)
 
-    results = if mode && String.length(query) >= 2, do: relation_results(query), else: []
+    {results, failed?} = duplicate_results(mode, query)
 
-    {:noreply, assign(socket, create_mode: mode, dup_results: results)}
+    {:noreply,
+     assign(socket, create_mode: mode, dup_results: results, dup_search_failed: failed?)}
   end
 
   @impl true
   def handle_event("fork_title", %{"title" => title}, socket) do
     query = String.trim(title)
 
-    results =
-      if socket.assigns.create_mode && String.length(query) >= 2,
-        do: relation_results(query),
-        else: []
+    {results, failed?} = duplicate_results(socket.assigns.create_mode, query)
 
-    {:noreply, assign(socket, dup_query: title, dup_results: results)}
+    {:noreply, assign(socket, dup_query: title, dup_results: results, dup_search_failed: failed?)}
   end
 
   @impl true
@@ -242,11 +246,20 @@ defmodule KaguyaWeb.VNLive.Edit do
       |> String.trim()
 
     if mode != nil and title != "" do
-      form = form_for_mode(mode, title) |> Map.put("releases", [ReleaseForm.new()])
+      form =
+        if socket.assigns.create_form_started do
+          socket.assigns.form
+          |> Map.update!("titles", fn [first | rest] ->
+            [Map.put(first, "title", title) | rest]
+          end)
+          |> Map.put("is_avn", mode == :avn)
+        else
+          form_for_mode(mode, title) |> Map.put("releases", [ReleaseForm.new()])
+        end
 
       {:noreply,
        socket
-       |> assign(create_step: :form, dup_query: title)
+       |> assign(create_step: :form, create_form_started: true, dup_query: title)
        |> assign_form(form)}
     else
       {:noreply, socket}
@@ -255,7 +268,16 @@ defmodule KaguyaWeb.VNLive.Edit do
 
   @impl true
   def handle_event("back_to_fork", _params, socket) do
-    {:noreply, assign(socket, :create_step, :fork)}
+    title = socket.assigns.form["titles"] |> List.first() |> Map.get("title", "")
+    {results, failed?} = duplicate_results(socket.assigns.create_mode, title)
+
+    {:noreply,
+     assign(socket,
+       create_step: :fork,
+       dup_query: title,
+       dup_results: results,
+       dup_search_failed: failed?
+     )}
   end
 
   @impl true
@@ -387,7 +409,22 @@ defmodule KaguyaWeb.VNLive.Edit do
       end
 
     if upload_name do
-      {:noreply, cancel_upload(socket, upload_name, ref)}
+      socket =
+        socket
+        |> cancel_upload(upload_name, ref)
+        |> assign(:staged_uploads, Map.delete(socket.assigns.staged_uploads, {upload_name, ref}))
+
+      pending_key =
+        if upload_name == :new_covers, do: "pending_covers", else: "pending_screenshots"
+
+      form = Map.update(socket.assigns.form, pending_key, %{}, &Map.delete(&1, ref))
+
+      form =
+        if form["primary_cover_id"] == "upload:#{ref}",
+          do: Map.put(form, "primary_cover_id", ""),
+          else: form
+
+      {:noreply, assign_form(socket, Form.normalize_primary_cover(form))}
     else
       {:noreply, socket}
     end
@@ -419,69 +456,80 @@ defmodule KaguyaWeb.VNLive.Edit do
   end
 
   defp save_new(socket, form) do
-    with {:ok, current_user} <- require_creator(socket),
-         {:ok, _titles, summary} <- Form.validate(form) do
-      attrs = Form.to_create_attrs(form)
+    case require_creator(socket) do
+      {:ok, _user} -> save_contribution(socket, form)
+      {:error, message} -> {:noreply, socket |> assign_form(form) |> put_flash(:error, message)}
+    end
+  end
 
-      case Contributions.create(attrs, ReleaseForm.edits(form["releases"]), summary, current_user) do
+  defp save_edit(socket, form) do
+    case require_editable(socket) do
+      :ok -> save_contribution(socket, form)
+      {:error, message} -> {:noreply, socket |> assign_form(form) |> put_flash(:error, message)}
+    end
+  end
+
+  defp save_contribution(socket, form) do
+    with {:ok, _titles, summary} <- Form.validate(form),
+         {:ok, staged_socket, uploaded_form, media} <- Uploads.stage(socket, form) do
+      result = submit_contribution(staged_socket, uploaded_form, media, summary)
+
+      case result do
         {:ok, %{entity: vn}} ->
+          message =
+            if socket.assigns.live_action == :new,
+              do: "Visual novel created.",
+              else: "Visual novel updated."
+
           {:noreply,
-           socket
-           |> put_flash(:info, "Visual novel created.")
+           staged_socket
+           |> Uploads.complete()
+           |> assign_form(uploaded_form)
+           |> put_flash(:info, message)
            |> push_navigate(to: "/vn/#{vn.slug}")}
 
         {:error, reason} ->
-          {:noreply,
-           socket |> assign_form(form) |> put_flash(:error, format_revision_error(reason))}
+          message =
+            if reason == :edit_conflict,
+              do:
+                "This VN or one of its releases was updated by someone else. Copy your edits, then reload to review the latest version.",
+              else: format_revision_error(reason)
+
+          {:noreply, staged_socket |> assign_form(form) |> put_flash(:error, message)}
       end
     else
+      {:error, staged_socket, message} ->
+        {:noreply, staged_socket |> assign_form(form) |> put_flash(:error, message)}
+
       {:error, message} ->
         {:noreply, socket |> assign_form(form) |> put_flash(:error, message)}
     end
   end
 
-  defp save_edit(socket, form) do
-    with :ok <- require_editable(socket),
-         {:ok, _titles, summary} <- Form.validate(form),
-         {:ok, uploaded_form} <- Uploads.finalize_pending_uploads(socket, form),
-         changes <- Form.build_changes(socket.assigns.original_form, uploaded_form),
-         :ok <- ensure_changes_present(changes, ReleaseForm.edits(uploaded_form["releases"])) do
-      case Contributions.update(
-             socket.assigns.vn.id,
-             changes,
-             ReleaseForm.edits(uploaded_form["releases"]),
-             summary,
-             socket.assigns.current_user,
-             socket.assigns.base_revision
-           ) do
-        {:ok, _change} ->
-          {:noreply,
-           socket
-           |> assign_form(uploaded_form)
-           |> put_flash(:info, "Visual novel updated.")
-           |> push_navigate(to: "/vn/#{socket.assigns.slug}")}
+  defp submit_contribution(%{assigns: %{live_action: :new}} = socket, form, media, summary) do
+    Contributions.create(
+      Form.to_create_attrs(form),
+      ReleaseForm.edits(form["releases"]),
+      summary,
+      socket.assigns.current_user,
+      media
+    )
+  end
 
-        {:error, :edit_conflict} ->
-          {:noreply,
-           socket
-           |> assign_form(uploaded_form)
-           |> put_flash(
-             :error,
-             "This VN or one of its releases was updated by someone else. Copy your edits, then reload to review the latest version."
-           )}
+  defp submit_contribution(socket, form, media, summary) do
+    changes = Form.build_changes(socket.assigns.original_form, form)
+    releases = ReleaseForm.edits(form["releases"])
 
-        {:error, reason} ->
-          {:noreply,
-           socket
-           |> assign_form(uploaded_form)
-           |> put_flash(:error, format_revision_error(reason))}
-      end
-    else
-      {:error, {:upload_failed, uploaded_form, message}} ->
-        {:noreply, socket |> assign_form(uploaded_form) |> put_flash(:error, message)}
-
-      {:error, message} ->
-        {:noreply, socket |> assign_form(form) |> put_flash(:error, message)}
+    with :ok <- ensure_changes_present(changes, releases) do
+      Contributions.update(
+        socket.assigns.vn.id,
+        changes,
+        releases,
+        summary,
+        socket.assigns.current_user,
+        socket.assigns.base_revision,
+        media
+      )
     end
   end
 
@@ -633,7 +681,12 @@ defmodule KaguyaWeb.VNLive.Edit do
           </div>
         </div>
 
-        <form class="space-y-4" phx-change="fork_title" phx-submit="continue_to_form">
+        <form
+          id="vn-create-start"
+          class="space-y-4"
+          phx-change="fork_title"
+          phx-submit="continue_to_form"
+        >
           <h2 class="border-border-divider text-foreground-primary text-style-heading3Medium border-b pb-2">
             Title
           </h2>
@@ -650,7 +703,7 @@ defmodule KaguyaWeb.VNLive.Edit do
           />
 
           <p class="text-foreground-tertiary text-xs">
-            {fork_hint(@create_mode, @dup_query, @dup_results)}
+            {fork_hint(@create_mode, @dup_query, @dup_results, @dup_search_failed)}
           </p>
 
           <div :if={@dup_results != []} class="flex flex-col gap-1.5">
@@ -695,11 +748,11 @@ defmodule KaguyaWeb.VNLive.Edit do
       </section>
 
       <form
-        :if={@state == :editing or (@state == :creating and @create_step == :form)}
+        :if={@state == :editing or (@state == :creating and @create_form_started)}
         id="vn-edit-form"
         phx-hook="UnsavedChanges"
-        data-dirty={to_string(@dirty_count > 0)}
-        class="mt-8 space-y-10"
+        data-dirty={to_string(@dirty_count > 0 or pending_uploads?(@uploads))}
+        class={["mt-8 space-y-10", (@state == :creating and @create_step == :fork) && "hidden"]}
         phx-change="validate"
         phx-submit="save"
       >
@@ -764,9 +817,9 @@ defmodule KaguyaWeb.VNLive.Edit do
               relation_type_options={relation_type_options()}
             />
 
-            <Sections.screenshots_section :if={@state == :editing} form={@form} uploads={@uploads} />
+            <Sections.screenshots_section form={@form} uploads={@uploads} />
 
-            <Sections.covers_section :if={@state == :editing} form={@form} uploads={@uploads} />
+            <Sections.covers_section form={@form} uploads={@uploads} />
 
             <fieldset
               :if={@can_moderate and @state == :editing}
@@ -834,6 +887,8 @@ defmodule KaguyaWeb.VNLive.Edit do
                   <%= cond do %>
                     <% @live_action == :new -> %>
                       Add a title, then create the entry.
+                    <% pending_uploads?(@uploads) -> %>
+                      Images pending
                     <% @dirty_count > 0 -> %>
                       {@dirty_count} changed field{if @dirty_count == 1, do: "", else: "s"}: {Enum.join(
                         @dirty_fields,
@@ -847,10 +902,10 @@ defmodule KaguyaWeb.VNLive.Edit do
                 <div class="flex items-center gap-3">
                   <button
                     type="submit"
-                    disabled={@dirty_count == 0}
+                    disabled={@dirty_count == 0 and not pending_uploads?(@uploads)}
                     class={[
                       "rounded-[6px] border px-3 py-2 text-sm transition-colors",
-                      if(@dirty_count > 0,
+                      if(@dirty_count > 0 or pending_uploads?(@uploads),
                         do:
                           "border-[rgb(var(--chip-border-default))] text-[rgb(var(--foreground-primary))] hover:border-[rgb(var(--chip-border-hover))]",
                         else:
@@ -925,6 +980,10 @@ defmodule KaguyaWeb.VNLive.Edit do
     )
   end
 
+  defp pending_uploads?(uploads) do
+    uploads.new_covers.entries != [] or uploads.new_screenshots.entries != []
+  end
+
   defp assign_form(socket, form) do
     dirty_fields = Form.dirty_fields(socket.assigns.original_form, form)
 
@@ -938,10 +997,30 @@ defmodule KaguyaWeb.VNLive.Edit do
   defp relation_results(""), do: []
 
   defp relation_results(query) do
-    case VisualNovels.search_visual_novels(query, 1, 6, include_nukige: true) do
+    case search_relations(query) do
       {:ok, %{items: items}} -> items
       %{} = result -> Map.get(result, :items, [])
       _ -> []
+    end
+  end
+
+  defp duplicate_results(mode, query) when is_nil(mode) or byte_size(query) < 2,
+    do: {[], false}
+
+  defp duplicate_results(_mode, query) do
+    case search_relations(query) do
+      {:ok, %{items: items}} -> {items, false}
+      _ -> {[], true}
+    end
+  end
+
+  defp search_relations(query) do
+    case Application.get_env(:kaguya, :meilisearch, [])[:base_url] do
+      url when is_binary(url) and url != "" ->
+        VisualNovels.search_visual_novels(query, 1, 6, include_nukige: true)
+
+      _ ->
+        {:error, :search_unavailable}
     end
   end
 
@@ -977,12 +1056,9 @@ defmodule KaguyaWeb.VNLive.Edit do
   defp parse_mode("other"), do: :other
   defp parse_mode(_), do: nil
 
-  # Translate the chosen category into starting form defaults. Japanese VNs
-  # default to a Japanese original language; AVNs default to English, flag
-  # is_avn, and start in-development. "Other" gets
-  # the neutral English default.
+  # Category guides development defaults, never title language or official status.
   defp form_for_mode(mode, title) do
-    initial_lang = if mode == :jvn, do: "ja", else: "en"
+    initial_lang = ""
     is_avn = mode == :avn
 
     Form.empty_form()
@@ -991,7 +1067,7 @@ defmodule KaguyaWeb.VNLive.Edit do
     |> Map.put("is_avn", is_avn)
     |> Map.put("development_status", if(is_avn, do: "in_development", else: ""))
     |> Map.put("titles", [
-      %{"lang" => initial_lang, "title" => title, "latin" => "", "official" => is_avn}
+      %{"lang" => initial_lang, "title" => title, "latin" => "", "official" => false}
     ])
   end
 
@@ -999,13 +1075,14 @@ defmodule KaguyaWeb.VNLive.Edit do
   defp fork_title_placeholder(:avn), do: "Eternum, Being a DIK, Pale Carnations..."
   defp fork_title_placeholder(_mode), do: "Title"
 
-  defp fork_hint(nil, _query, _results), do: "Pick a category above to continue."
+  defp fork_hint(nil, _query, _results, _failed?), do: "Pick a category above to continue."
 
-  defp fork_hint(_mode, query, results) do
+  defp fork_hint(_mode, query, results, failed?) do
     cond do
       String.length(String.trim(query)) < 2 -> "We'll check the catalog as you type."
-      results == [] -> "Nothing similar in the catalog — looks new."
-      true -> "Already in the catalog. Open an entry below instead of creating a duplicate."
+      failed? -> "Duplicate check unavailable. Check the catalog before creating an entry."
+      results == [] -> "No matches found. Check alternate titles before creating a new entry."
+      true -> "Possible matches. Check these entries before creating a new one."
     end
   end
 
@@ -1050,17 +1127,6 @@ defmodule KaguyaWeb.VNLive.Edit do
     do: action |> to_string() |> String.replace("_", " ")
 
   defp history_summary(_revision), do: "edit"
-
-  # Create mode omits Screenshots/Covers — images are added from the edit
-  # screen after the entry exists (see `Form.to_create_attrs/1`).
-  defp section_links(:creating) do
-    [
-      {"Titles", "vn-edit-title"},
-      {"General", "vn-edit-general"},
-      {"Releases and producers", "vn-edit-releases"},
-      {"Relations", "vn-edit-relations"}
-    ]
-  end
 
   defp section_links(_state) do
     [

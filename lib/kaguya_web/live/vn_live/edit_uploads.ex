@@ -1,98 +1,105 @@
 defmodule KaguyaWeb.VNLive.Edit.Uploads do
   @moduledoc false
-
-  alias Kaguya.Covers
-  alias Kaguya.Screenshots
   alias Kaguya.Uploads, as: StageUploads
   alias Kaguya.VisualNovels
   alias KaguyaWeb.VNLive.Edit.Form
+  import Phoenix.LiveView, only: [consume_uploaded_entries: 3, uploaded_entries: 2]
+  import Phoenix.Component, only: [assign: 3]
 
-  def consume_screenshot_uploads(socket, form) do
+  @uploads [new_covers: :cover, new_screenshots: :screenshot]
+
+  # Keep LiveView files until the DB transaction succeeds. Successful staging is
+  # cached on the socket so validation failures can be retried without reuploading.
+  def stage(socket, form) do
+    if Enum.any?(@uploads, fn {name, _} -> elem(uploaded_entries(socket, name), 1) != [] end) do
+      {:error, socket, "Wait for the images to finish uploading."}
+    else
+      stage_complete(socket, form)
+    end
+  end
+
+  defp stage_complete(socket, form) do
     results =
-      Phoenix.LiveView.consume_uploaded_entries(socket, :new_screenshots, fn %{path: path},
-                                                                             _entry ->
-        with {:ok, upload_id} <- StageUploads.stage_local_file(path),
-             {:ok, screenshot} <-
-               Screenshots.upload_screenshot(
-                 socket.assigns.vn.id,
-                 upload_id,
-                 socket.assigns.current_user.id
-               ) do
-          {:ok,
-           %{
-             "id" => screenshot.id,
-             "thumbnail_url" => VisualNovels.build_screenshot_urls(screenshot.id)[:medium],
-             "is_nsfw" => screenshot.is_nsfw == true,
-             "is_brutal" => screenshot.is_brutal == true,
-             "removed" => false
-           }}
-        else
-          {:error, reason} ->
-            {:postpone, Form.normalize_upload_error(reason)}
-        end
+      Enum.flat_map(@uploads, fn {name, type} ->
+        consume_uploaded_entries(socket, name, fn %{path: path}, entry ->
+          key = {name, entry.ref}
+
+          result =
+            case Map.get(socket.assigns.staged_uploads, key) do
+              nil -> StageUploads.stage_local_file(path)
+              id -> {:ok, id}
+            end
+
+          {:postpone, {key, type, result}}
+        end)
       end)
 
-    merge_uploaded_rows(form, "screenshots", results)
-  end
-
-  def consume_cover_uploads(socket, form) do
-    results =
-      Phoenix.LiveView.consume_uploaded_entries(socket, :new_covers, fn %{path: path}, _entry ->
-        with {:ok, upload_id} <- StageUploads.stage_local_file(path),
-             {:ok, cover} <-
-               Covers.upload_cover(
-                 socket.assigns.vn.id,
-                 upload_id,
-                 socket.assigns.current_user.id
-               ) do
-          {:ok,
-           %{
-             "id" => cover.id,
-             "thumbnail_url" => VisualNovels.build_image_urls(cover.id)[:large],
-             "is_image_nsfw" => cover.is_image_nsfw == true,
-             "removed" => false
-           }}
-        else
-          {:error, reason} ->
-            {:postpone, Form.normalize_upload_error(reason)}
-        end
+    staged =
+      Enum.reduce(results, socket.assigns.staged_uploads, fn
+        {key, _, {:ok, id}}, cache -> Map.put(cache, key, id)
+        _, cache -> cache
       end)
 
-    form
-    |> merge_uploaded_rows("covers", results)
-    |> case do
-      {:ok, updated_form} ->
-        {:ok, Form.normalize_primary_cover(updated_form)}
+    socket = assign(socket, :staged_uploads, staged)
 
-      {:error, {:upload_failed, updated_form, message}} ->
-        {:error, {:upload_failed, Form.normalize_primary_cover(updated_form), message}}
+    case Enum.find(results, fn {_, _, result} -> match?({:error, _}, result) end) do
+      {_, _, {:error, reason}} ->
+        {:error, socket, Form.normalize_upload_error(reason)}
+
+      nil ->
+        media =
+          Enum.map(results, fn {{name, ref}, type, {:ok, id}} ->
+            flags = flags(form, name, ref)
+            %{id: id, ref: ref, type: type, flags: flags}
+          end)
+
+        {:ok, socket, merge_media(form, media), media}
     end
   end
 
-  def finalize_pending_uploads(socket, form) do
-    with {:ok, form} <- consume_screenshot_uploads(socket, form) do
-      consume_cover_uploads(socket, form)
-    end
+  defp flags(form, :new_covers, ref) do
+    %{is_image_nsfw: get_in(form, ["pending_covers", ref, "is_image_nsfw"]) == true}
   end
 
-  def merge_uploaded_rows(form, key, results) do
-    {rows, errors} =
-      Enum.reduce(results, {[], []}, fn
-        %{} = row, {rows, errors} -> {rows ++ [row], errors}
-        reason, {rows, errors} when is_binary(reason) -> {rows, errors ++ [reason]}
-        _other, acc -> acc
-      end)
+  defp flags(form, :new_screenshots, ref) do
+    %{
+      is_nsfw: get_in(form, ["pending_screenshots", ref, "is_nsfw"]) == true,
+      is_brutal: get_in(form, ["pending_screenshots", ref, "is_brutal"]) == true
+    }
+  end
 
-    updated_form =
-      if rows == [] do
-        form
-      else
-        Map.update!(form, key, &(&1 ++ rows))
-      end
+  defp merge_media(form, media) do
+    Enum.reduce(media, form, fn item, acc ->
+      key = if item.type == :cover, do: "covers", else: "screenshots"
 
-    case errors do
-      [] -> {:ok, updated_form}
-      [message | _] -> {:error, {:upload_failed, updated_form, message}}
-    end
+      urls =
+        if item.type == :cover,
+          do: VisualNovels.build_image_urls(item.id),
+          else: VisualNovels.build_screenshot_urls(item.id)
+
+      row =
+        item.flags
+        |> Map.new(fn {k, v} -> {Atom.to_string(k), v} end)
+        |> Map.merge(%{
+          "id" => item.id,
+          "thumbnail_url" => urls[:medium] || urls[:large],
+          "removed" => false
+        })
+
+      acc = Map.update!(acc, key, &(&1 ++ [row]))
+
+      if item.type == :cover and acc["primary_cover_id"] == "upload:#{item.ref}",
+        do: Map.put(acc, "primary_cover_id", item.id),
+        else: acc
+    end)
+    |> Form.normalize_primary_cover()
+  end
+
+  def complete(socket) do
+    Enum.each(@uploads, fn {name, _} ->
+      consume_uploaded_entries(socket, name, fn _, _ -> {:ok, :done} end)
+    end)
+
+    socket
   end
 end

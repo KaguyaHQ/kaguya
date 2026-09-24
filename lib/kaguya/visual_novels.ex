@@ -849,10 +849,12 @@ defmodule Kaguya.VisualNovels do
     attrs = maybe_derive_title(attrs)
 
     with {:ok, vn} <- %VisualNovel{} |> VisualNovel.changeset(attrs) |> Repo.insert(),
+         :ok <- Kaguya.VisualNovels.ContributionMedia.attach(vn, attrs),
          :ok <- sync_titles(vn, attrs),
          :ok <- sync_relations(vn, attrs),
          :ok <- sync_external_links(vn, attrs),
-         :ok <- sync_vn_producers(vn, attrs) do
+         :ok <- sync_vn_producers(vn, attrs),
+         :ok <- set_primary_cover_from_edit(vn, attrs) do
       reindex_search(vn.id)
       {:ok, vn}
     end
@@ -880,6 +882,7 @@ defmodule Kaguya.VisualNovels do
   """
   def apply_edit(vn, changes) do
     with {:ok, vn} <- update_vn_fields(vn, changes),
+         :ok <- Kaguya.VisualNovels.ContributionMedia.attach(vn, changes),
          :ok <- sync_titles(vn, changes),
          :ok <- sync_relations(vn, changes),
          :ok <- sync_screenshots(vn, changes),

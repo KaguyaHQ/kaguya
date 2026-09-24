@@ -19,6 +19,8 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       "is_avn" => false,
       "title_category" => "vn",
       "primary_cover_id" => "",
+      "pending_covers" => %{},
+      "pending_screenshots" => %{},
       "summary" => "",
       "titles" => [empty_title()],
       "relations" => [],
@@ -120,6 +122,10 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       "primary_cover_id" =>
         normalize_text(Map.get(attrs, "primary_cover_id", current_form["primary_cover_id"])),
       "summary" => normalize_text(Map.get(attrs, "summary", current_form["summary"])),
+      "pending_covers" =>
+        normalize_pending(attrs, current_form, "pending_covers", ["is_image_nsfw"]),
+      "pending_screenshots" =>
+        normalize_pending(attrs, current_form, "pending_screenshots", ["is_nsfw", "is_brutal"]),
       "titles" => normalize_titles(Map.get(attrs, "titles"), current_form["titles"]),
       "releases" =>
         KaguyaWeb.VNLive.Edit.ReleaseForm.normalize(
@@ -170,9 +176,8 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
   normalized form. Unlike `build_changes/2` (which diffs against an
   original), this emits every create-relevant field outright.
 
-  Covers/screenshots are intentionally omitted — `VisualNovels.create_from_edit/1`
-  does not attach images; they're added afterwards via the edit screen. The
-  `:title` is derived by the context from `titles`/`original_language`.
+  Staged media is attached by the contribution context. The selected primary
+  cover is included here; `:title` is derived from `titles`/`original_language`.
   """
   def to_create_attrs(form) do
     %{
@@ -187,7 +192,8 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       is_avn: form["is_avn"] == true,
       title_category: parse_title_category(form["title_category"]),
       titles: parse_titles(form["titles"]),
-      relations: relation_changes(form["relations"])
+      relations: relation_changes(form["relations"]),
+      primary_cover_id: blank_nil(primary_cover_id(form))
     }
   end
 
@@ -513,9 +519,10 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
   defp primary_cover_id(form) do
     selected = normalize_text(form["primary_cover_id"])
 
-    if selected != "" and Enum.any?(visible_covers(form), &(&1["id"] == selected)),
-      do: selected,
-      else: ""
+    if String.starts_with?(selected, "upload:") or
+         (selected != "" and Enum.any?(visible_covers(form), &(&1["id"] == selected))),
+       do: selected,
+       else: ""
   end
 
   defp maybe_add_changed_label(labels, _label, current, current), do: labels
@@ -599,6 +606,13 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
     else
       {:error, "Summary must be at least 2 characters."}
     end
+  end
+
+  defp normalize_pending(attrs, current, key, flags) do
+    Map.get(attrs, key, Map.get(current, key, %{}))
+    |> Map.new(fn {ref, values} ->
+      {ref, Map.new(flags, &{&1, truthy?(Map.get(values, &1))})}
+    end)
   end
 
   defp normalize_text(nil), do: ""

@@ -29,7 +29,15 @@ defmodule KaguyaWeb.VNLive.ReleaseCreditsTest do
     assert {:error, {:live_redirect, %{to: "/vn/ongoing-avn"}}} =
              view
              |> element("#vn-edit-form")
-             |> render_submit(%{"vn" => %{"summary" => "Create ongoing work"}})
+             |> render_submit(%{
+               "vn" => %{
+                 "summary" => "Create ongoing work",
+                 "original_language" => "en",
+                 "titles" => %{
+                   "0" => %{"title" => "Ongoing AVN", "lang" => "en", "official" => "true"}
+                 }
+               }
+             })
 
     vn = Repo.get_by!(VisualNovel, slug: "ongoing-avn")
     assert vn.is_avn

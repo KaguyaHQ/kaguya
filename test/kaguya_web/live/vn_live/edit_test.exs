@@ -285,6 +285,12 @@ defmodule KaguyaWeb.VNLive.EditTest do
              )
 
     assert Repo.get!(VisualNovel, vn.id).primary_image_id
+    [revision | _] = Revisions.list_revisions(:visual_novel, vn.id)
+    assert {:ok, payload} = Revisions.diff_revisions(revision.id)
+    assert payload.previous.covers == []
+    assert payload.previous.screenshots == []
+    assert length(payload.current.covers) == 1
+    assert length(payload.current.screenshots) == 1
   end
 
   test "shows no-op message when no changes are detected", %{conn: conn} do
@@ -517,11 +523,12 @@ defmodule KaguyaWeb.VNLive.EditTest do
       |> render_submit(%{"title" => "Eternum Test"})
 
     # The form step now renders, pre-filled from the AVN branch: title
-    # carried over, is_avn flagged, English original language.
+    # carried over and is_avn flagged; language and official status remain explicit.
     assert has_element?(view, "form#vn-edit-form")
     assert html =~ "Eternum Test"
     assert has_element?(view, ~s(input[name="vn[is_avn]"][checked]))
-    assert has_element?(view, ~s(option[value="en"][selected]))
+    assert has_element?(view, ~s(select[name="vn[titles][0][lang]"] option[value=""][selected]))
+    refute has_element?(view, ~s(input[name="vn[titles][0][official]"][checked]))
   end
 
   test "creates a visual novel through the fork and form", %{conn: conn} do
@@ -690,5 +697,211 @@ defmodule KaguyaWeb.VNLive.EditTest do
     Base.decode64!(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WnQw1sAAAAASUVORK5CYII="
     )
+  end
+
+  test "image-only edits enable Save and cancellation disables it again", %{conn: conn} do
+    vn = insert_vn!("Pending Cover", "pending-cover")
+    insert_title!(vn, "ja", "Pending Cover")
+    {:ok, view, _} = conn |> log_in(insert_user!()) |> live(~p"/vn/#{vn.slug}/edit")
+    assert has_element?(view, "#vn-edit-form button[type=submit][disabled]")
+
+    upload =
+      file_input(view, "#vn-edit-form", :new_covers, [
+        %{last_modified: 1, name: "cover.png", content: png_binary(), type: "image/png"}
+      ])
+
+    render_upload(upload, "cover.png")
+    view |> element("#vn-edit-form") |> render_change(%{"vn" => %{"summary" => "Add cover"}})
+    refute has_element?(view, "#vn-edit-form button[type=submit][disabled]")
+    assert has_element?(view, "#vn-edit-covers input[type=radio][value^='upload:']")
+    view |> element("button[aria-label='Remove cover upload']") |> render_click()
+    assert has_element?(view, "#vn-edit-form button[type=submit][disabled]")
+  end
+
+  test "returning from type selection preserves the draft and language", %{conn: conn} do
+    {:ok, view, _} = conn |> log_in(insert_user!()) |> live(~p"/contribute/vn")
+    view |> element("button[phx-value-mode=other]") |> render_click()
+    view |> element("#vn-create-start") |> render_submit(%{"title" => "Draft VN"})
+
+    view
+    |> element("#vn-edit-form")
+    |> render_change(%{
+      "vn" => %{
+        "description" => "Keep my draft",
+        "original_language" => "ko",
+        "titles" => %{"0" => %{"title" => "Updated title", "lang" => "ko", "official" => "true"}}
+      }
+    })
+
+    view |> element("button[phx-click=back_to_fork]") |> render_click()
+    assert has_element?(view, "#vn-edit-form.hidden")
+    assert has_element?(view, "#vn-create-start input[value='Updated title']")
+    view |> element("button[phx-value-mode=jvn]") |> render_click()
+    assert has_element?(view, "#vn-create-start", "Duplicate check unavailable")
+    view |> element("#vn-create-start") |> render_submit(%{"title" => "Updated title"})
+    assert has_element?(view, "textarea[name='vn[description]']", "Keep my draft")
+    assert has_element?(view, "select[name='vn[titles][0][lang]'] option[value=ko][selected]")
+    assert has_element?(view, "input[name='vn[titles][0][official]'][checked]")
+  end
+
+  test "a rejected stale edit does not attach images, select a cover or queue jobs", %{conn: conn} do
+    vn = insert_vn!("Stale Media", "stale-media")
+    insert_title!(vn, "ja", "Stale Media")
+    user = insert_user!()
+    {:ok, view, _} = conn |> log_in(user) |> live(~p"/vn/#{vn.slug}/edit")
+
+    {:ok, _} =
+      Revisions.submit_edit(
+        :visual_novel,
+        vn.id,
+        %{description: "Concurrent"},
+        "External change",
+        user
+      )
+
+    before_revision = Revisions.latest_revision_number(:visual_novel, vn.id)
+
+    upload =
+      file_input(view, "#vn-edit-form", :new_covers, [
+        %{last_modified: 1, name: "cover.png", content: png_binary(), type: "image/png"}
+      ])
+
+    render_upload(upload, "cover.png")
+
+    view
+    |> element("#vn-edit-form")
+    |> render_submit(%{"vn" => %{"summary" => "Add cover", "description" => "My stale edit"}})
+
+    assert has_element?(view, "#flash-error", "updated by someone else")
+    assert Repo.aggregate(from(i in Image, where: i.visual_novel_id == ^vn.id), :count) == 0
+    assert Repo.get!(VisualNovel, vn.id).primary_image_id == nil
+    assert Revisions.latest_revision_number(:visual_novel, vn.id) == before_revision
+    refute Repo.exists?(from(j in Oban.Job, where: fragment("?->>'vn_id' = ?", j.args, ^vn.id)))
+    assert has_element?(view, "button[aria-label='Remove cover upload']")
+  end
+
+  test "create saves pending cover flags, chosen primary and screenshots in the initial revision",
+       %{conn: conn} do
+    {:ok, view, _} = conn |> log_in(insert_user!()) |> live(~p"/contribute/vn")
+    view |> element("button[phx-value-mode=other]") |> render_click()
+    view |> element("#vn-create-start") |> render_submit(%{"title" => "Created With Media"})
+
+    cover =
+      file_input(view, "#vn-edit-form", :new_covers, [
+        %{last_modified: 1, name: "cover.png", content: png_binary(), type: "image/png"}
+      ])
+
+    render_upload(cover, "cover.png")
+
+    primary =
+      file_input(view, "#vn-edit-form", :new_covers, [
+        %{last_modified: 1, name: "primary.png", content: png_binary(), type: "image/png"}
+      ])
+
+    render_upload(primary, "primary.png")
+    [%{"ref" => ref}] = primary.entries
+
+    screenshot =
+      file_input(view, "#vn-edit-form", :new_screenshots, [
+        %{last_modified: 1, name: "shot.png", content: png_binary(), type: "image/png"}
+      ])
+
+    render_upload(screenshot, "shot.png")
+    [%{"ref" => shot_ref}] = screenshot.entries
+
+    assert {:error, {:live_redirect, _}} =
+             view
+             |> element("#vn-edit-form")
+             |> render_submit(%{
+               "vn" => %{
+                 "titles" => %{
+                   "0" => %{"lang" => "en", "title" => "Created With Media", "official" => "true"}
+                 },
+                 "original_language" => "en",
+                 "primary_cover_id" => "upload:#{ref}",
+                 "pending_covers" => %{ref => %{"is_image_nsfw" => "true"}},
+                 "pending_screenshots" => %{
+                   shot_ref => %{"is_nsfw" => "true", "is_brutal" => "true"}
+                 },
+                 "summary" => "Create with images"
+               }
+             })
+
+    vn = Repo.get_by!(VisualNovel, slug: "created-with-media")
+    cover = Repo.get!(Image, vn.primary_image_id)
+    shot = Repo.get_by!(Screenshot, visual_novel_id: vn.id)
+    assert vn.primary_image_id == cover.id
+    assert cover.is_image_nsfw and vn.is_image_nsfw
+    assert shot.is_nsfw and shot.is_brutal
+    [revision] = Revisions.list_revisions(:visual_novel, vn.id)
+    assert {:ok, payload} = Revisions.diff_revisions(revision.id)
+    assert payload.current.hist.primary_image_id == cover.id
+    assert length(payload.current.covers) == 2
+    assert length(payload.current.screenshots) == 1
+  end
+
+  test "a failed release rolls back staged media and retry reuses the upload", %{conn: conn} do
+    owner = self()
+
+    Req.Test.stub(:upload_staging, fn conn ->
+      send(owner, :staged_image)
+      Plug.Conn.send_resp(conn, 200, "")
+    end)
+
+    {:ok, view, _} = conn |> log_in(insert_user!()) |> live(~p"/contribute/vn")
+    view |> element("button[phx-value-mode=other]") |> render_click()
+    view |> element("#vn-create-start") |> render_submit(%{"title" => "Retry Media"})
+
+    [release_id] =
+      render(view)
+      |> LazyHTML.from_document()
+      |> LazyHTML.query("[id^=vn-release-]")
+      |> LazyHTML.attribute("id")
+
+    key = String.replace_prefix(release_id, "vn-release-", "")
+
+    upload =
+      file_input(view, "#vn-edit-form", :new_covers, [
+        %{last_modified: 1, name: "cover.png", content: png_binary(), type: "image/png"}
+      ])
+
+    render_upload(upload, "cover.png")
+
+    view
+    |> element("#vn-edit-form")
+    |> render_submit(%{
+      "vn" => %{
+        "titles" => %{"0" => %{"title" => "Retry Media", "lang" => "en"}},
+        "original_language" => "en",
+        "summary" => "Create with cover",
+        "releases" => %{key => %{"release_date" => "invalid"}}
+      }
+    })
+
+    assert_receive :staged_image
+    assert has_element?(view, "#flash-error")
+    refute Repo.get_by(VisualNovel, slug: "retry-media")
+    assert Repo.aggregate(Image, :count) == 0
+    assert Repo.aggregate(Kaguya.Revisions.Change, :count) == 0
+
+    refute Repo.exists?(
+             from j in Oban.Job, where: j.worker == "Kaguya.Uploads.ImageVariantWorker"
+           )
+
+    assert has_element?(view, "button[aria-label='Remove cover upload']")
+
+    assert {:error, {:live_redirect, %{to: "/vn/retry-media"}}} =
+             view
+             |> element("#vn-edit-form")
+             |> render_submit(%{
+               "vn" => %{
+                 "releases" => %{key => %{"release_date" => "2026-01-01"}}
+               }
+             })
+
+    refute_received :staged_image
+    vn = Repo.get_by!(VisualNovel, slug: "retry-media")
+    assert Repo.get_by!(Image, visual_novel_id: vn.id).id == vn.primary_image_id
+    assert Revisions.latest_revision_number(:visual_novel, vn.id) == 1
   end
 end

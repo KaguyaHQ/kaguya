@@ -5,8 +5,10 @@ defmodule Kaguya.VisualNovels.Contributions do
   alias Kaguya.Releases.Release
   alias Kaguya.Producers.Producer
 
-  def create(attrs, release_edits, summary, user) do
+  def create(attrs, release_edits, summary, user, media \\ []) do
     with :ok <- editable_user(user) do
+      attrs = with_media(attrs, media, user)
+
       result =
         Repo.transact(fn ->
           with {:ok, result} <- Revisions.create_entity(:visual_novel, attrs, summary, user),
@@ -19,8 +21,10 @@ defmodule Kaguya.VisualNovels.Contributions do
     end
   end
 
-  def update(vn_id, changes, release_edits, summary, user, base_revision) do
+  def update(vn_id, changes, release_edits, summary, user, base_revision, media \\ []) do
     with :ok <- editable_user(user) do
+      changes = with_media(changes, media, user)
+
       result =
         Repo.transact(fn ->
           lock_entity(:visual_novel, vn_id)
@@ -46,6 +50,11 @@ defmodule Kaguya.VisualNovels.Contributions do
       refresh(result)
     end
   end
+
+  defp with_media(attrs, [], _user), do: Map.delete(attrs, :staged_media)
+
+  defp with_media(attrs, media, user),
+    do: Map.put(attrs, :staged_media, %{items: media, user_id: user.id})
 
   defp update_vn(_, changes, _, _, _) when map_size(changes) == 0, do: :ok
 

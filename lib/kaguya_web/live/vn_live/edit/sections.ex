@@ -584,6 +584,26 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
             <span class="text-foreground-tertiary text-xs">{entry.progress}%</span>
           </div>
 
+          <div class="text-foreground-secondary flex flex-wrap items-center gap-3 text-xs">
+            <label
+              :for={{key, label} <- [{"is_nsfw", "NSFW"}, {"is_brutal", "Violence"}]}
+              class="flex items-center gap-1.5"
+            >
+              <input
+                type="hidden"
+                name={"vn[pending_screenshots][#{entry.ref}][#{key}]"}
+                value="false"
+              />
+              <input
+                type="checkbox"
+                id={"pending-screenshot-#{entry.ref}-#{key}"}
+                name={"vn[pending_screenshots][#{entry.ref}][#{key}]"}
+                value="true"
+                checked={get_in(@form, ["pending_screenshots", entry.ref, key]) == true}
+              /> {label}
+            </label>
+          </div>
+
           <p
             :for={error <- upload_errors(@uploads.new_screenshots, entry)}
             class="text-semantic-error text-xs"
@@ -688,7 +708,7 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
       </div>
 
       <p :if={Form.visible_covers(@form) == []} class="text-foreground-tertiary text-sm">
-        No covers yet.
+        No saved covers yet.
       </p>
 
       <div
@@ -700,7 +720,7 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
             <div class="bg-surface-elevated aspect-2/3 overflow-hidden rounded-md">
               <.live_img_preview
                 entry={entry}
-                class="size-full object-cover transition-opacity"
+                class="size-full object-contain transition-opacity"
               />
             </div>
             <button
@@ -720,6 +740,36 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
               {entry.client_name}
             </span>
             <span class="text-foreground-tertiary text-xs">{entry.progress}%</span>
+          </div>
+
+          <div class="text-foreground-secondary flex flex-wrap items-center gap-3 text-xs">
+            <label class="flex items-center gap-1.5">
+              <input
+                type="hidden"
+                name={"vn[pending_covers][#{entry.ref}][is_image_nsfw]"}
+                value="false"
+              />
+              <input
+                type="checkbox"
+                id={"pending-cover-#{entry.ref}-nsfw"}
+                name={"vn[pending_covers][#{entry.ref}][is_image_nsfw]"}
+                value="true"
+                checked={get_in(@form, ["pending_covers", entry.ref, "is_image_nsfw"]) == true}
+              /> NSFW
+            </label>
+            <label class="flex items-center gap-1.5">
+              <input
+                type="radio"
+                id={"pending-cover-#{entry.ref}-primary"}
+                name="vn[primary_cover_id]"
+                value={"upload:#{entry.ref}"}
+                checked={
+                  @form["primary_cover_id"] == "upload:#{entry.ref}" or
+                    (@form["primary_cover_id"] == "" and Form.visible_covers(@form) == [] and
+                       entry.ref == hd(@uploads.new_covers.entries).ref)
+                }
+              /> Primary
+            </label>
           </div>
 
           <p
