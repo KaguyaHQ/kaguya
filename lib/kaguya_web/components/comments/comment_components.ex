@@ -256,12 +256,6 @@ defmodule KaguyaWeb.Components.Comments do
           >
             {display_name(@comment.user)}
           </.link>
-          <span
-            :if={@comment.user && Map.get(@comment.user, :is_discussion_moderator, false)}
-            class="inline-flex h-3.5 shrink-0 items-center rounded-[3px] bg-[rgb(var(--primitives-palette-green-base)/0.15)] px-1 text-[9px] leading-none font-semibold text-[rgb(var(--primitives-palette-green-base))]"
-          >
-            MOD
-          </span>
           <Lucide.pin
             :if={Map.get(@comment, :is_pinned, false)}
             class="size-3 shrink-0 text-[rgb(var(--foreground-tertiary))]"
