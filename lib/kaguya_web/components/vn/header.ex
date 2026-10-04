@@ -638,7 +638,7 @@ defmodule KaguyaWeb.VN.Header do
             mobile={@mobile}
           />
         <% {:ok, items} when @active_tab == :quotes -> %>
-          <Panels.Quotes.panel items={items} />
+          <Panels.Quotes.panel items={items} current_user={@current_user} id_prefix={@id_prefix} />
       <% end %>
     </div>
     """

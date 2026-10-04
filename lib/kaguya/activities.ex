@@ -15,6 +15,7 @@ defmodule Kaguya.Activities do
   alias Kaguya.CursorPagination
   alias Kaguya.Users.User
   alias Kaguya.Reviews.Review
+  alias Kaguya.Utils.TextPreview
   alias Kaguya.VisualNovels.VisualNovel
 
   # Home feed buffer sizing. We fetch more raw rows than the requested
@@ -24,6 +25,22 @@ defmodule Kaguya.Activities do
   @home_buffer_max 256
   @home_buffer_floor_extra 32
   @home_buffer_multiplier 3
+
+  @doc "Updates displayed quote details while preserving activity timestamps and other metadata."
+  def refresh_quote_metadata(quote_id, text, character_id) do
+    metadata = %{
+      "quote_text_preview" => TextPreview.truncate_on_words(text),
+      "character_id" => character_id
+    }
+
+    from(a in UserActivity,
+      where:
+        a.entity_type == "quote" and a.entity_id == ^quote_id and
+          a.action in [:added_quote, :liked_quote],
+      update: [set: [metadata: fragment("? || ?::jsonb", a.metadata, ^metadata)]]
+    )
+    |> Repo.update_all([])
+  end
 
   @doc """
   Records a user activity. Logs a warning on failure but does not raise.

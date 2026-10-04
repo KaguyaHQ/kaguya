@@ -11,6 +11,9 @@ defmodule KaguyaWeb.VN.Panels.Quotes do
 
   attr :items, :list, required: true
 
+  attr :id_prefix, :string, default: "vn"
+  attr :current_user, :map, default: nil
+
   def panel(assigns) do
     visible_limit = 8
     visible = Enum.take(assigns.items, visible_limit)
@@ -19,14 +22,24 @@ defmodule KaguyaWeb.VN.Panels.Quotes do
 
     ~H"""
     <div class="flex flex-col divide-y divide-[rgb(var(--border-divider))]/50">
-      <.quote_block :for={quote <- @visible} quote={quote} />
+      <.quote_block
+        :for={quote <- @visible}
+        quote={quote}
+        current_user={@current_user}
+        id_prefix={@id_prefix}
+      />
 
       <details :if={@overflow != []} class="group/quotes-more">
         <summary class={show_more_button_class(["pt-3", "group-open/quotes-more:hidden"])}>
           Show more
         </summary>
         <div class="flex flex-col divide-y divide-[rgb(var(--border-divider))]/50">
-          <.quote_block :for={quote <- @overflow} quote={quote} />
+          <.quote_block
+            :for={quote <- @overflow}
+            quote={quote}
+            current_user={@current_user}
+            id_prefix={@id_prefix}
+          />
         </div>
       </details>
     </div>
@@ -49,9 +62,15 @@ defmodule KaguyaWeb.VN.Panels.Quotes do
 
   attr :quote, :map, required: true
 
+  attr :id_prefix, :string, default: "vn"
+  attr :current_user, :map, default: nil
+
   defp quote_block(assigns) do
     ~H"""
-    <blockquote class="group/quote-row flex items-start gap-3 py-4 first:pt-0">
+    <blockquote
+      id={"#{@id_prefix}-quote-#{@quote.id}"}
+      class="group/quote-row flex items-start gap-3 py-4 first:pt-0"
+    >
       <div class="min-w-0 flex-1">
         <p
           class="text-[15px] leading-relaxed text-[rgb(var(--foreground-secondary))]"
@@ -74,6 +93,17 @@ defmodule KaguyaWeb.VN.Panels.Quotes do
         </div>
       </div>
       <div class="relative flex shrink-0 items-center gap-1">
+        <button
+          :if={@current_user && Map.get(@quote, :created_by) == @current_user.id}
+          id={"#{@id_prefix}-edit-quote-#{@quote.id}"}
+          type="button"
+          phx-click="edit_quote"
+          phx-value-quote-id={@quote.id}
+          aria-label="Edit quote"
+          class="hover:text-foreground-primary text-foreground-secondary flex size-8 items-center justify-center rounded-full hover:bg-white/4"
+        >
+          <Lucide.pencil class="size-4" aria-hidden />
+        </button>
         <button
           type="button"
           phx-click="toggle_quote_like"

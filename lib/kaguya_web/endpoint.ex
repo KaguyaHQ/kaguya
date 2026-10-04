@@ -77,6 +77,7 @@ defmodule KaguyaWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+  plug KaguyaWeb.Plugs.LiveViewReloadCookie
 
   plug KaguyaWeb.Router
   # --- define the server_timing plug below —

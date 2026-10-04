@@ -76,6 +76,48 @@ defmodule Kaguya.Characters.Quotes do
     end
   end
 
+  @doc """
+  Updates the text and character attribution of a quote owned by the user.
+  The author, visual novel, imported IDs, scores, and reactions cannot be changed.
+  """
+  def update_quote(quote_id, user_id, attrs) when is_binary(user_id) do
+    with {:ok, id} <- Ecto.Type.cast(Quote.__schema__(:type, :id), quote_id),
+         %Quote{} = quote <- Repo.get_by(Quote, id: id, created_by: user_id) do
+      changeset =
+        quote
+        |> Quote.changeset(Map.take(attrs, [:quote, :character_id, "quote", "character_id"]))
+        |> Ecto.Changeset.validate_change(:character_id, &validate_character_id/2)
+
+      Repo.transact(fn -> persist_quote_update(changeset, user_id) end)
+    else
+      _ -> {:error, "Quote not found"}
+    end
+  end
+
+  def update_quote(_quote_id, _user_id, _attrs), do: {:error, "Quote not found"}
+
+  defp validate_character_id(:character_id, id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, _} -> []
+      :error -> [character_id: "is invalid"]
+    end
+  end
+
+  defp persist_quote_update(changeset, user_id) do
+    with {:ok, candidate} <- Ecto.Changeset.apply_action(changeset, :update),
+         :ok <- validate_character_in_vn(candidate),
+         {:ok, updated} <- Repo.update(changeset) do
+      Activities.refresh_quote_metadata(updated.id, updated.quote, updated.character_id)
+
+      {:ok,
+       Quote
+       |> where([q], q.id == ^updated.id)
+       |> join_viewer_state(user_id)
+       |> preload([:character, :visual_novel, :creator])
+       |> Repo.one()}
+    end
+  end
+
   defp record_added_quote_activity(quote) do
     Activities.record_activity(%{
       user_id: quote.created_by,

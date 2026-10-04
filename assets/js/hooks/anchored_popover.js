@@ -1,17 +1,16 @@
-// Positioning-only hook for the native Popover API panel rendered by the
-// `<.menu>` primitive (lib/kaguya_web/components/ui/menu.ex).
+// Positions native popovers and supplies disclosure behavior on browsers
+// without the Popover API (or its :popover-open selector).
 //
-// The panel is a real `popover` element rendered inline in the LiveView
-// template; the browser promotes it to the top layer. This hook NEVER moves
-// the node out of the DOM — it only:
+// The panel is rendered inline in the LiveView template; native popovers are
+// promoted to the top layer. This hook NEVER moves the node out of the DOM. It:
 //   * positions the panel relative to its trigger (anchor) on open, with
 //     flip/shift to stay in the viewport,
 //   * repositions on scroll/resize while open,
 //   * syncs `aria-expanded`/`data-state` on the trigger,
 //   * dismisses the panel when a `[data-menu-dismiss]` item is clicked.
 //
-// Native light-dismiss (click-outside + Esc) and focus return to the trigger
-// come for free from the Popover API.
+// Native light-dismiss and focus return come from the Popover API. The fallback
+// handles these itself while leaving the panel in LiveView's DOM.
 
 function placePanel(panel, anchor, opts) {
   const {placement, align, sideOffset, alignOffset} = opts
@@ -88,20 +87,64 @@ function placePanel(panel, anchor, opts) {
   panel.dataset.side = side
 }
 
+function supportsNativePopover(panel) {
+  if (typeof panel.showPopover !== "function" || typeof panel.hidePopover !== "function") return false
+  try {
+    panel.matches(":popover-open")
+    return true
+  } catch {
+    return false
+  }
+}
+
 const AnchoredPopover = {
   mounted() {
     this.anchor = document.getElementById(this.el.dataset.anchor)
     this._readOptions()
+    this.fallback = !supportsNativePopover(this.el)
+    this.fallbackOpen = false
+
+    this._isOpen = () => this.fallback ? this.fallbackOpen : this.el.matches(":popover-open")
+    this._emitFallbackToggle = (type, newState) => {
+      const event = new Event(type)
+      event.newState = newState
+      this.el.dispatchEvent(event)
+    }
+    this._show = () => {
+      if (this._isOpen()) return
+      if (this.fallback) {
+        this._emitFallbackToggle("beforetoggle", "open")
+        this.fallbackOpen = true
+        this._syncState()
+        this._emitFallbackToggle("toggle", "open")
+      } else {
+        this.el.showPopover()
+      }
+    }
+    this._hide = (restoreFocus = false) => {
+      if (!this._isOpen()) return
+      if (this.fallback) {
+        this._emitFallbackToggle("beforetoggle", "closed")
+        this.fallbackOpen = false
+        this._syncState()
+        this._emitFallbackToggle("toggle", "closed")
+        if (restoreFocus) this.anchor?.focus()
+      } else {
+        this.el.hidePopover()
+      }
+    }
 
     this._reposition = () => {
-      if (!this.anchor || !this.el.matches(":popover-open")) return
+      if (!this.anchor || !this._isOpen()) return
       if (this.opts.matchWidth) this.el.style.width = `${this.anchor.offsetWidth}px`
       placePanel(this.el, this.anchor, this.opts)
     }
     this.resizeObserver = new ResizeObserver(this._reposition)
 
     this._syncState = () => {
-      const open = this.el.matches(":popover-open")
+      const open = this._isOpen()
+      if (this.fallback) this.el.style.display = open ? "block" : "none"
+      this.el.dataset.state = open ? "open" : "closed"
       if (this.anchor) {
         this.anchor.setAttribute("aria-expanded", open ? "true" : "false")
         this.anchor.dataset.state = open ? "open" : "closed"
@@ -124,16 +167,35 @@ const AnchoredPopover = {
       }
     }
     this._onToggle = () => this._syncState()
+    this._onTriggerClick = () => this._isOpen() ? this._hide() : this._show()
+    this._onDocumentClick = (event) => {
+      if (!this.el.contains(event.target) && !this.anchor?.contains(event.target)) this._hide()
+    }
+    this._onKeydown = (event) => {
+      if (event.key === "Escape" && this._isOpen()) {
+        event.preventDefault()
+        this._hide(true)
+      }
+    }
+    this._onRequestedShow = () => this._show()
+    this._onRequestedHide = () => this._hide()
 
     this._onClick = (event) => {
       const item = event.target.closest("[data-menu-dismiss]")
-      if (item && !item.matches(":disabled, [aria-disabled=true]") && this.el.matches(":popover-open")) {
-        this.el.hidePopover()
+      if (item && !item.matches(":disabled, [aria-disabled=true]") && this._isOpen()) {
+        this._hide(true)
       }
     }
 
     this.el.addEventListener("toggle", this._onToggle)
     this.el.addEventListener("click", this._onClick)
+    this.el.addEventListener("anchored-popover:show", this._onRequestedShow)
+    this.el.addEventListener("anchored-popover:hide", this._onRequestedHide)
+    if (this.fallback) {
+      this._configureFallback()
+      document.addEventListener("click", this._onDocumentClick)
+      document.addEventListener("keydown", this._onKeydown)
+    }
     this._syncState()
   },
 
@@ -141,10 +203,31 @@ const AnchoredPopover = {
     // LiveView patches the menu content and can restore its initial hidden
     // style without changing the browser's open state (or firing toggle).
     this.resizeObserver.disconnect()
+    if (this.fallback) this._unbindTrigger()
     this.anchor = document.getElementById(this.el.dataset.anchor)
     this._readOptions()
+    if (this.fallback) this._configureFallback()
     if (!this.opts.matchWidth) this.el.style.width = ""
     this._syncState()
+  },
+
+  _configureFallback() {
+    // LiveView can restore these attributes during a patch. Remove the native
+    // trigger behavior so it cannot toggle alongside the fallback handler.
+    this.anchor?.removeAttribute("popovertarget")
+    this.el.removeAttribute("popover")
+    this.el.dataset.popoverFallback = ""
+    this.el.style.position = "fixed"
+    this.el.style.inset = "auto"
+    this.el.style.margin = "0"
+    this.el.style.zIndex = "9999"
+    if (this.el.getAttribute("role") !== "tooltip") {
+      this.anchor?.addEventListener("click", this._onTriggerClick)
+    }
+  },
+
+  _unbindTrigger() {
+    this.anchor?.removeEventListener("click", this._onTriggerClick)
   },
 
   _readOptions() {
@@ -159,8 +242,15 @@ const AnchoredPopover = {
 
   destroyed() {
     this.resizeObserver.disconnect()
+    if (this.fallback) {
+      this._unbindTrigger()
+      document.removeEventListener("click", this._onDocumentClick)
+      document.removeEventListener("keydown", this._onKeydown)
+    }
     this.el.removeEventListener("toggle", this._onToggle)
     this.el.removeEventListener("click", this._onClick)
+    this.el.removeEventListener("anchored-popover:show", this._onRequestedShow)
+    this.el.removeEventListener("anchored-popover:hide", this._onRequestedHide)
     window.removeEventListener("scroll", this._reposition, true)
     window.removeEventListener("resize", this._reposition)
   },

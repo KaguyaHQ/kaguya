@@ -473,6 +473,26 @@ defmodule KaguyaWeb.VNLive.PageData do
     end
   end
 
+  def update_quote(slug, %{id: user_id}, quote_id, text, character_id) do
+    alias Kaguya.Characters.Quote
+    alias Kaguya.Characters.Quotes
+
+    with {:ok, vn} <- require_vn(slug),
+         {:ok, id} <- Ecto.Type.cast(Quote.__schema__(:type, :id), quote_id),
+         true <- Repo.exists?(from q in Quote, where: q.id == ^id and q.visual_novel_id == ^vn.id),
+         {:ok, quote} <-
+           Quotes.update_quote(id, user_id, %{
+             quote: String.trim(text),
+             character_id: blank_to_nil(character_id)
+           }) do
+      {:ok, Normalizer.normalize_quote(quote)}
+    else
+      false -> {:error, "Quote not found"}
+      :error -> {:error, "Quote not found"}
+      error -> error
+    end
+  end
+
   # The public VN page core. Cached because it carries no per-user state:
   # tag/recommendation vote highlights are *not* baked in — they hydrate via
   # the `:vn_viewer` async bundle (`my_votes`, built by `build_my_votes/2`).

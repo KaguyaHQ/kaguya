@@ -1,12 +1,12 @@
 export default {
   mounted() {
     const trigger = this.el.querySelector("button")
-    const tooltip = this.el.querySelector("[popover]")
+    const tooltip = this.el.querySelector('[role="tooltip"]')
     const show = () => {
-      if (!tooltip.matches(":popover-open")) tooltip.showPopover()
+      tooltip.dispatchEvent(new Event("anchored-popover:show"))
     }
     const hide = () => {
-      if (tooltip.matches(":popover-open")) tooltip.hidePopover()
+      tooltip.dispatchEvent(new Event("anchored-popover:hide"))
     }
     this.onEnter = event => { if (event.pointerType !== "touch") show() }
     this.onLeave = () => { if (document.activeElement !== trigger) hide() }

@@ -818,8 +818,21 @@ defmodule KaguyaWeb.VNLive.Show.Components do
   end
 
   attr :characters, :list, default: []
+  attr :form, Phoenix.HTML.Form, required: true
+  attr :editing?, :boolean, default: false
+  attr :error, :string, default: nil
 
   def quote_dialog(assigns) do
+    query = quote_search_text(assigns.form[:character_query].value || "") |> String.split()
+
+    characters =
+      Enum.filter(assigns.characters, fn character ->
+        name = quote_search_text(character_name(character))
+        Enum.all?(query, &String.contains?(name, &1))
+      end)
+
+    assigns = assign(assigns, :filtered_characters, characters)
+
     ~H"""
     <KaguyaWeb.UI.Dialog.dialog
       id="quote-dialog"
@@ -828,112 +841,159 @@ defmodule KaguyaWeb.VNLive.Show.Components do
       on_close={Phoenix.LiveView.JS.push("close_quote_dialog")}
       aria-labelledby="quote-dialog-title"
     >
-      <div class="relative z-10 w-full max-w-[560px] rounded-t-[16px] bg-[rgb(var(--surface-base))] p-0 shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:rounded-[16px]">
-        <div class="flex items-center justify-between gap-4">
-          <h2
-            id="quote-dialog-title"
-            class="px-6 pt-5 text-lg font-semibold text-[rgb(var(--foreground-primary))]"
-          >
-            Add quote
+      <div class="bg-surface-base relative z-10 max-h-[90dvh] w-full max-w-[560px] overflow-y-auto rounded-t-2xl shadow-xl sm:rounded-2xl">
+        <div class="flex items-center justify-between gap-4 px-6 pt-5">
+          <h2 id="quote-dialog-title" class="text-foreground-primary text-style-heading3">
+            {if @editing?, do: "Edit quote", else: "Add quote"}
           </h2>
-          <button
-            type="button"
+          <KaguyaWeb.UI.Button.button
+            id="close-quote-dialog"
+            variant="ghost"
+            size="icon"
             data-dialog-close
-            class="mt-4 mr-5 flex size-8 items-center justify-center rounded-full text-[rgb(var(--foreground-secondary))] transition hover:bg-white/6 hover:text-[rgb(var(--foreground-primary))]"
             aria-label="Close quote dialog"
           >
             <Lucide.x class="size-4" aria-hidden="true" />
-          </button>
+          </KaguyaWeb.UI.Button.button>
         </div>
-        <.form for={%{}} as={:quote} phx-submit="save_quote" class="flex flex-col">
+        <.form
+          for={@form}
+          id="quote-form"
+          phx-change="validate_quote"
+          phx-submit="save_quote"
+          class="flex flex-col"
+        >
           <div class="flex flex-col gap-4 px-6 pt-4 pb-6">
-            <div class="overflow-hidden rounded-lg border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))]/30 transition-colors focus-within:border-[rgb(var(--text-field-border-focus))]">
+            <div class="flex flex-col gap-2">
+              <label for="quote-text" class="text-foreground-primary text-style-body2Medium">Quote</label>
               <textarea
-                name="quote[text]"
-                rows="5"
+                id="quote-text"
+                name={@form[:text].name}
+                rows="4"
                 required
+                minlength="2"
+                maxlength="2000"
                 data-dialog-initial-focus
                 placeholder="Paste the quote here..."
-                class="w-full resize-none rounded-none border-0 bg-transparent px-4 py-3.5 text-[16px] leading-[1.65] text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-quaternary))]/70 placeholder:italic focus:outline-none"
-                style="font-family: var(--font-source-serif)"
-              ></textarea>
+                class="bg-surface-elevated border-border-divider focus:border-text-field-border-focus text-foreground-primary text-style-body1Regular w-full resize-y rounded-lg border px-4 py-3 focus:outline-none"
+              >{@form[:text].value}</textarea>
             </div>
-            <details :if={@characters != []} class="group">
-              <summary class="w-fit cursor-pointer list-none text-left text-xs text-[rgb(var(--foreground-tertiary))] transition marker:hidden hover:text-[rgb(var(--foreground-secondary))] [&::-webkit-details-marker]:hidden">
-                + Attribute to a character
-              </summary>
-              <div class="mt-3 flex flex-col gap-1">
-                <div class="relative">
-                  <.search_icon
-                    class="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-[rgb(var(--foreground-tertiary))]"
+            <div class="flex flex-col gap-2">
+              <label
+                for="quote-character-search"
+                class="text-foreground-primary text-style-body2Medium"
+              >
+                Character <span class="text-foreground-tertiary">(optional)</span>
+              </label>
+              <input
+                id="quote-character-id"
+                type="hidden"
+                name={@form[:character_id].name}
+                value={@form[:character_id].value}
+              />
+              <KaguyaWeb.UI.Input.input
+                field={@form[:character_query]}
+                id="quote-character-search"
+                type="search"
+                phx-debounce="150"
+                placeholder="Search characters..."
+                aria-label="Search characters"
+              />
+              <div
+                id="quote-character-results"
+                class="border-border-divider max-h-44 overflow-y-auto rounded-lg border p-1"
+              >
+                <button
+                  id="quote-character-none"
+                  type="button"
+                  phx-click={
+                    Phoenix.LiveView.JS.set_attribute({"value", ""}, to: "#quote-character-id")
+                    |> Phoenix.LiveView.JS.push("select_quote_character",
+                      value: %{"character-id" => ""}
+                    )
+                  }
+                  aria-pressed={if @form[:character_id].value in [nil, ""], do: "true", else: "false"}
+                  class="text-foreground-primary text-style-body2Regular flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-white/4 aria-pressed:bg-white/8"
+                >
+                  <Lucide.user_round class="size-7 shrink-0 p-1" aria-hidden="true" />
+                  <span class="grow">No character attribution</span>
+                  <Lucide.check
+                    :if={@form[:character_id].value in [nil, ""]}
+                    class="size-4 shrink-0"
                     aria-hidden="true"
                   />
-                  <input
-                    type="search"
-                    placeholder="Search characters..."
-                    aria-label="Search characters"
-                    class="h-9 w-full rounded-[8px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] pr-3 pl-9 text-sm text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-tertiary))] focus:outline-none"
+                </button>
+                <button
+                  :for={character <- @filtered_characters}
+                  id={"quote-character-#{character.id}"}
+                  type="button"
+                  phx-click={
+                    Phoenix.LiveView.JS.set_attribute({"value", to_string(character.id)},
+                      to: "#quote-character-id"
+                    )
+                    |> Phoenix.LiveView.JS.push("select_quote_character",
+                      value: %{"character-id" => to_string(character.id)}
+                    )
+                  }
+                  aria-pressed={
+                    if to_string(@form[:character_id].value) == to_string(character.id),
+                      do: "true",
+                      else: "false"
+                  }
+                  class="text-foreground-primary text-style-body2Regular flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-white/4 aria-pressed:bg-white/8"
+                >
+                  <KaguyaWeb.SharedComponents.CharacterImage.character_image
+                    character={character}
+                    sizes="28px"
+                    class="size-7 shrink-0 object-cover"
+                    fallback_class="bg-surface-elevated size-7 shrink-0"
+                    rounded="rounded-full"
                   />
-                </div>
-                <div class="-mx-1 max-h-[200px] overflow-auto px-1">
-                  <label class="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition hover:bg-white/4">
-                    <input
-                      type="radio"
-                      name="quote[character_id]"
-                      value=""
-                      checked={true}
-                      class="size-4 shrink-0"
-                    />
-                    <span class="size-7 shrink-0 rounded-full bg-[rgb(var(--surface-elevated))]"></span>
-                    <span class="truncate text-sm text-[rgb(var(--foreground-primary))]">
-                      No character attribution
-                    </span>
-                  </label>
-                  <label
-                    :for={character <- @characters}
-                    class="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition hover:bg-white/4"
-                  >
-                    <input
-                      type="radio"
-                      name="quote[character_id]"
-                      value={character.id}
-                      class="size-4 shrink-0"
-                    />
-                    <KaguyaWeb.SharedComponents.CharacterImage.character_image
-                      character={character}
-                      sizes="28px"
-                      class="size-7 shrink-0 object-cover"
-                      fallback_class="size-7 shrink-0 bg-[rgb(var(--surface-elevated))]"
-                      rounded="rounded-full"
-                    />
-                    <span class="truncate text-sm text-[rgb(var(--foreground-primary))]">
-                      {character_name(character)}
-                    </span>
-                  </label>
-                </div>
+                  <span class="grow">{character_name(character)}</span>
+                  <Lucide.check
+                    :if={to_string(@form[:character_id].value) == to_string(character.id)}
+                    class="size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                </button>
+                <p
+                  :if={@filtered_characters == []}
+                  class="text-foreground-tertiary text-style-body2Regular px-3 py-2"
+                >
+                  {if @characters == [],
+                    do: "No characters listed for this visual novel yet.",
+                    else: "No matching characters."}
+                </p>
               </div>
-            </details>
+            </div>
+            <p :if={@error} id="quote-error" role="alert" class="text-error text-style-body2Regular">
+              {@error}
+            </p>
           </div>
-
           <div class="flex justify-end gap-2 px-6 pb-5">
-            <button
-              type="button"
+            <KaguyaWeb.UI.Button.button
+              id="cancel-quote"
+              variant="neutral"
+              size="small"
               data-dialog-close
-              class="h-9 rounded-[4px] bg-white/6 px-4 text-sm font-medium text-[rgb(var(--foreground-primary))] transition hover:bg-white/10"
-            >
-              Cancel
-            </button>
-            <button
+            >Cancel</KaguyaWeb.UI.Button.button>
+            <KaguyaWeb.UI.Button.button
+              id="save-quote"
               type="submit"
-              class="h-9 rounded-[4px] bg-[rgb(var(--foreground-primary))] px-5 text-sm font-medium text-[rgb(var(--surface-base))] transition hover:opacity-90"
+              size="small"
+              phx-disable-with="Saving..."
             >
-              Add quote
-            </button>
+              {if @editing?, do: "Save changes", else: "Add quote"}
+            </KaguyaWeb.UI.Button.button>
           </div>
         </.form>
       </div>
     </KaguyaWeb.UI.Dialog.dialog>
     """
+  end
+
+  defp quote_search_text(text) do
+    text |> String.downcase() |> String.normalize(:nfd) |> String.replace(~r/\p{Mn}/u, "")
   end
 
   attr :media, :map, required: true

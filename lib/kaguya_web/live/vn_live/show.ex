@@ -64,7 +64,10 @@ defmodule KaguyaWeb.VNLive.Show do
        recommendation_dialog_open: false,
        recommendation_slug: "",
        quote_dialog_open: false,
-       quote_text: "",
+       quote_form:
+         to_form(%{"text" => "", "character_id" => "", "character_query" => ""}, as: :quote),
+       quote_editing_id: nil,
+       quote_error: nil,
        media_lightbox: nil,
        action_drawer_open: false,
        reviews_sort: "MOST_LIKED",
@@ -151,7 +154,10 @@ defmodule KaguyaWeb.VNLive.Show do
             create_list_error: nil,
             recommendation_dialog_open: false,
             quote_dialog_open: false,
-            quote_text: "",
+            quote_form:
+              to_form(%{"text" => "", "character_id" => "", "character_query" => ""}, as: :quote),
+            quote_editing_id: nil,
+            quote_error: nil,
             media_lightbox: nil,
             action_drawer_open: false,
             reviews_sort: sort,
@@ -359,6 +365,14 @@ defmodule KaguyaWeb.VNLive.Show do
 
   def handle_event("close_quote_dialog", params, socket),
     do: QuoteActions.close_quote_dialog(socket, params)
+
+  def handle_event("edit_quote", params, socket), do: QuoteActions.edit_quote(socket, params)
+
+  def handle_event("validate_quote", params, socket),
+    do: QuoteActions.validate_quote(socket, params)
+
+  def handle_event("select_quote_character", params, socket),
+    do: QuoteActions.select_quote_character(socket, params)
 
   def handle_event("save_quote", params, socket), do: QuoteActions.save_quote(socket, params)
 
@@ -607,7 +621,13 @@ defmodule KaguyaWeb.VNLive.Show do
         results={@tag_results}
         error={@tag_search_error}
       />
-      <Components.quote_dialog :if={@quote_dialog_open} characters={@characters} />
+      <Components.quote_dialog
+        :if={@quote_dialog_open}
+        characters={@characters}
+        form={@quote_form}
+        editing?={@quote_editing_id != nil}
+        error={@quote_error}
+      />
       <Components.media_lightbox :if={@media_lightbox} media={@media_lightbox} />
       <Sidebar.mobile_action_drawer
         :if={@action_drawer_open}

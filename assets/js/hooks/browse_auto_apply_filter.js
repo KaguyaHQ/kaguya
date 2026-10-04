@@ -2,7 +2,7 @@ import {lvNavigate} from "../lib/lv_navigate"
 
 const BrowseAutoApplyFilter = {
   mounted() {
-    this.popover = this.el.closest("[popover]")
+    this.popover = this.el.closest("[popover], [data-popover-fallback]")
     this.snapshot = this._signature()
 
     this._onBeforeToggle = event => {
@@ -18,7 +18,7 @@ const BrowseAutoApplyFilter = {
       event.preventDefault()
       if (this.el.contains(document.activeElement)) document.activeElement.blur()
       this._applyChanges()
-      if (this.popover?.matches(":popover-open")) this.popover.hidePopover()
+      if (this._isOpen()) this.popover.dispatchEvent(new Event("anchored-popover:hide"))
     }
     this._onKeydown = event => {
       if (event.key === "Enter" && !event.isComposing && event.target.matches("input:not([type=range])")) {
@@ -38,7 +38,7 @@ const BrowseAutoApplyFilter = {
   },
 
   updated() {
-    if (!this.popover?.matches(":popover-open")) this.snapshot = this._signature()
+    if (!this._isOpen()) this.snapshot = this._signature()
   },
 
   destroyed() {
@@ -53,6 +53,10 @@ const BrowseAutoApplyFilter = {
   _cancelPending() {
     cancelAnimationFrame(this.pendingApply)
     this.pendingApply = null
+  },
+
+  _isOpen() {
+    return this.popover?.dataset.state === "open"
   },
 
   _applyChanges() {

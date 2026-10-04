@@ -88,6 +88,7 @@ defmodule KaguyaWeb.VNLive.PageData.Normalizer do
   def normalize_quote(q),
     do: %{
       id: q.id,
+      created_by: q.created_by,
       quote: q.quote,
       likes_count: q.likes_count || 0,
       favorites_count: q.favorites_count || 0,

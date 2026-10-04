@@ -12,6 +12,22 @@ defmodule KaguyaWeb.ChangesLive.ShowTest do
   alias Kaguya.Users.User
   alias Kaguya.VisualNovels.{Image, VNTitle, VisualNovel}
 
+  test "invalid revision IDs show the missing page instead of crashing", %{conn: conn} do
+    assert {:error, :not_found} = Revisions.get_change("1")
+
+    for path <- ["/history/1", "/vn/example/history/1"] do
+      {:ok, view, _html} = live(conn, path)
+      assert has_element?(view, "#not-found-root")
+    end
+  end
+
+  test "an invalid LiveView reload cookie does not turn the page into a 500", %{conn: conn} do
+    conn = put_req_header(conn, "cookie", "__phoenix_reload_status__=invalid")
+
+    {:ok, view, _html} = live(conn, "/history/1")
+    assert has_element?(view, "#not-found-root")
+  end
+
   test "renders revision header, author, summary, links, and scalar diff", %{conn: conn} do
     user = insert_user!(username: "show_author", display_name: "Show Author")
     conn = Plug.Test.init_test_session(conn, %{"current_user_id" => user.id})

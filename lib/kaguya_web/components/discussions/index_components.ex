@@ -84,19 +84,19 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
   defp browse_shell(assigns) do
     ~H"""
     <div class="mx-auto mt-6 max-w-[768px] px-4 pb-20 lg:mt-10">
-      <div class="mb-5 flex items-center justify-between gap-4">
-        <h1 class="font-newsreader text-foreground-primary text-2xl font-medium tracking-[-0.01em]">
-          Conversations
+      <div class="mb-5 flex flex-wrap items-center gap-3">
+        <h1 class="font-newsreader text-foreground-primary mr-auto text-2xl font-medium tracking-[-0.01em]">
+          Posts
         </h1>
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="order-last w-full sm:order-0 sm:w-auto">
           <.sort_links active_slug={@active_slug} sort={@sort} />
-          <.new_post_button
-            :if={can_post_in_active_category?(@categories, @active_slug, @can_moderate_discussions)}
-            current_user={@current_user}
-            can_discuss={@can_discuss}
-            mobile
-          />
         </div>
+        <.new_post_button
+          :if={can_post_in_active_category?(@categories, @active_slug, @can_moderate_discussions)}
+          current_user={@current_user}
+          can_discuss={@can_discuss}
+          mobile
+        />
       </div>
 
       <div class="border-border-divider/50 mb-5 border-b pb-3">
@@ -153,7 +153,7 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
       modal_id="discussions-auth-prompt"
       auth_message="Sign in to start a discussion"
       class={[
-        "bg-button-background-brand-default hover:bg-button-background-brand-default/90 flex h-8 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium text-white transition-colors",
+        "bg-button-background-brand-default hover:bg-button-background-brand-default/90 flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium whitespace-nowrap text-white transition-colors",
         @mobile && "px-3",
         !@mobile && "mb-5 w-full"
       ]}

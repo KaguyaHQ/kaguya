@@ -27,6 +27,78 @@ defmodule KaguyaWeb.VNLive.ShowTest do
     :ok
   end
 
+  test "quote search, attribution, and author editing preserve the quote", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+
+    vn =
+      Repo.insert!(
+        VisualNovel.changeset(%VisualNovel{}, %{title: "Quote flow", slug: "quote-flow"})
+      )
+
+    character = Repo.insert!(Character.changeset(%Character{}, %{name: "Makise Kurisu"}))
+
+    Repo.insert!(
+      VNCharacter.changeset(%VNCharacter{}, %{
+        visual_novel_id: vn.id,
+        character_id: character.id,
+        role: :main
+      })
+    )
+
+    conn = Plug.Test.init_test_session(conn, %{current_user_id: user.id})
+    {:ok, view, _} = live_and_wait(conn, ~p"/vn/#{vn.slug}/quotes")
+    render_click(view, "open_quote_dialog")
+
+    view
+    |> form("#quote-form",
+      quote: %{text: "A quote to remember", character_id: "", character_query: "KURISU mak"}
+    )
+    |> render_change()
+
+    assert has_element?(view, "#quote-character-#{character.id}")
+
+    view
+    |> form("#quote-form",
+      quote: %{text: "A quote to remember", character_id: "", character_query: "nobody"}
+    )
+    |> render_change()
+
+    refute has_element?(view, "#quote-character-#{character.id}")
+    assert has_element?(view, "#quote-text", "A quote to remember")
+
+    view
+    |> form("#quote-form", quote: %{text: "A quote to remember", character_id: ""})
+    |> render_submit()
+
+    quote = Repo.get_by!(Kaguya.Characters.Quote, visual_novel_id: vn.id)
+    view |> element("#desktop-edit-quote-#{quote.id}") |> render_click()
+    assert has_element?(view, "#quote-dialog-title", "Edit quote")
+    assert has_element?(view, "#quote-text", "A quote to remember")
+    view |> element("#quote-character-#{character.id}") |> render_click()
+    assert has_element?(view, "#quote-character-id[value='#{character.id}']")
+
+    view
+    |> form("#quote-form", quote: %{text: "An edited quote", character_id: character.id})
+    |> render_submit()
+
+    refute has_element?(view, "#quote-dialog")
+    assert has_element?(view, "[id$='quote-#{quote.id}']", "An edited quote")
+    assert has_element?(view, "[id$='quote-#{quote.id}']", "Makise Kurisu")
+    assert Repo.get!(Kaguya.Characters.Quote, quote.id).created_by == user.id
+
+    other = UserFixtures.insert_user!()
+
+    {:ok, other_view, _} =
+      live_and_wait(
+        Plug.Test.init_test_session(build_conn(), %{current_user_id: other.id}),
+        ~p"/vn/#{vn.slug}/quotes"
+      )
+
+    refute has_element?(other_view, "[id$='edit-quote-#{quote.id}']")
+    render_click(other_view, "edit_quote", %{"quote-id" => to_string(quote.id)})
+    refute has_element?(other_view, "#quote-dialog")
+  end
+
   test "status summary shows saved dates and edits them without a review", %{conn: conn} do
     user = UserFixtures.insert_user!()
 

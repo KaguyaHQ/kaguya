@@ -562,9 +562,15 @@ defmodule Kaguya.Revisions do
   # ============================================================================
 
   def get_change(id) do
-    case Repo.one(from c in Change, where: c.id == ^id) do
-      nil -> {:error, :not_found}
-      change -> {:ok, change}
+    case UUIDv7.cast(id) do
+      {:ok, id} ->
+        case Repo.one(from c in Change, where: c.id == ^id) do
+          nil -> {:error, :not_found}
+          change -> {:ok, change}
+        end
+
+      :error ->
+        {:error, :not_found}
     end
   end
 
