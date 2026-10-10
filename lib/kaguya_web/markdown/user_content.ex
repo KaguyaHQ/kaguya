@@ -257,16 +257,15 @@ defmodule KaguyaWeb.Markdown.UserContent do
   - Drop lone-backslash lines (a Discord quirk where users add `\\` to force
     a newline).
   - Convert escaped trailing newlines (`\\\n`) to plain newlines.
-  - Pad runs of blank lines with NBSP so they render as `<br>` spacing
-    instead of paragraph breaks (preserves visual rhythm in tight comment
-    typography).
+
+  Blank lines remain empty so Markdown can separate paragraphs, quotes,
+  lists, and code blocks. Paragraph spacing lives in `.comment-content` CSS.
   """
   def comment_preprocess(content) when is_binary(content) do
     content
     |> normalize_newlines()
     |> drop_lone_backslash_lines()
     |> unescape_trailing_newlines()
-    |> pad_blank_lines()
   end
 
   @doc """

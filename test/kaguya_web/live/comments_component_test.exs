@@ -84,6 +84,42 @@ defmodule KaguyaWeb.CommentsComponentTest do
     assert html =~ "A nested reply"
   end
 
+  test "quotes end at blank lines after creating and editing comments", %{conn: conn} do
+    user = UserFixtures.insert_user!(username: "quote_author")
+    list = insert_list!(user, "Quoted comments")
+
+    {:ok, view, _html} =
+      live_isolated(conn, TestLive,
+        session: %{"list_id" => list.id, "current_user_id" => user.id}
+      )
+
+    render_submit(element(view, "#comments-top-form"), %{
+      "content" => "intro\n\n> quoted\n\nlmao"
+    })
+
+    comment = Repo.one!(from(c in ListComment, where: c.list_id == ^list.id))
+    body = "#comment-#{comment.id} .comment-content"
+
+    assert has_element?(view, "#{body} blockquote", "quoted")
+    refute has_element?(view, "#{body} blockquote", "lmao")
+    assert has_element?(view, "#{body} blockquote + p", "lmao")
+
+    Phoenix.LiveView.send_update(view.pid, KaguyaWeb.CommentsComponent,
+      id: "comments",
+      editing_id: comment.id
+    )
+
+    render(view)
+
+    render_submit(element(view, "#comment-#{comment.id}-edit-form"), %{
+      "content" => "> updated quote\n\nafter editing"
+    })
+
+    assert has_element?(view, "#{body} blockquote", "updated quote")
+    refute has_element?(view, "#{body} blockquote", "after editing")
+    assert has_element?(view, "#{body} blockquote + p", "after editing")
+  end
+
   test "failed comment submit leaves the textarea content alone (no clear event)", %{conn: conn} do
     # Unauthenticated session ⇒ adapter returns :unauthenticated.
     user = UserFixtures.insert_user!(username: "unauth_failtest")

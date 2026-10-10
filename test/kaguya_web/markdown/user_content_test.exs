@@ -197,19 +197,56 @@ defmodule KaguyaWeb.Markdown.UserContentTest do
   end
 
   describe "comment preset" do
-    test "preserves blank-line visual spacing as soft breaks (NBSP trick)" do
-      # Two paragraphs separated by a blank line. Without the comment preprocess
-      # this would render as two <p> blocks; with it, we get a single paragraph
-      # with the blank position filled by NBSP so MDEx's hardbreaks: true makes it
-      # a soft break instead of a paragraph boundary.
-      html = render("first\n\nsecond", preset: :comment)
+    test "blank lines separate paragraphs while single newlines stay visible" do
+      html = render("first\nline\n\nsecond", preset: :comment) |> Floki.parse_fragment!()
 
-      paragraph_count = Regex.scan(~r/<p>/, html) |> length()
-      assert paragraph_count == 1
-      assert html =~ "first"
-      assert html =~ "second"
-      # NBSP between them (U+00A0 → C2 A0 in UTF-8)
-      assert String.contains?(html, <<0xC2, 0xA0>>)
+      assert Floki.find(html, "p") |> Enum.map(&Floki.text(&1)) == ["first\n\nline", "second"]
+      assert length(Floki.find(html, "p:first-child br")) == 1
+    end
+
+    test "unquoted text after a blank line is outside the blockquote" do
+      html = render("intro\n\n> quoted\n\nlmao", preset: :comment) |> Floki.parse_fragment!()
+
+      assert Floki.find(html, "blockquote") |> Floki.text() == "quoted"
+      assert Floki.find(html, "blockquote + p") |> Floki.text() == "lmao"
+    end
+
+    test "blank lines separate quotes from lists and lists from normal text" do
+      html =
+        render("> quoted\n\n- one\n- two\n\nafter", preset: :comment) |> Floki.parse_fragment!()
+
+      assert Floki.find(html, "blockquote + ul li") |> Enum.map(&Floki.text(&1)) == [
+               "one",
+               "two"
+             ]
+
+      assert Floki.find(html, "ul + p") |> Floki.text() == "after"
+      assert Floki.find(html, "blockquote ul") == []
+    end
+
+    test "blank lines separate ordered lists from normal text" do
+      html = render("1. one\n2. two\n\nafter", preset: :comment) |> Floki.parse_fragment!()
+
+      assert Floki.find(html, "ol li") |> Enum.map(&Floki.text(&1)) == ["one", "two"]
+      assert Floki.find(html, "ol + p") |> Floki.text() == "after"
+    end
+
+    test "blank lines inside fenced code remain empty" do
+      html =
+        render("before\n\n```\nfirst\n\nsecond\n```\n\nafter", preset: :comment)
+        |> Floki.parse_fragment!()
+
+      assert Floki.find(html, "pre code") |> Floki.text() == "first\n\nsecond\n"
+      assert Floki.find(html, "pre + p") |> Floki.text() == "after"
+    end
+
+    test "blank lines inside indented code remain empty" do
+      html =
+        render("before\n\n    first\n\n    second\n\nafter", preset: :comment)
+        |> Floki.parse_fragment!()
+
+      assert Floki.find(html, "pre code") |> Floki.text() == "first\n\nsecond\n"
+      assert Floki.find(html, "pre + p") |> Floki.text() == "after"
     end
 
     test "drops lone-backslash lines" do
