@@ -3,6 +3,8 @@
 Phoenix + LiveView application for Kaguya, a visual novel discovery,
 tracking, recommendation, and community-editing platform. Kaguya is free.
 
+![Kaguya's Steins;Gate page showing its cover, rating, description, screenshots, and reading status](docs/images/vn-page.webp)
+
 It owns VN metadata, reviews, shelves, recommendations, VNDB imports,
 image processing, search indexing, stats, notifications, and revision
 history, and serves the browser surfaces directly via LiveView.

@@ -99,9 +99,9 @@ defmodule KaguyaWeb.HomeLive.Landing do
 
   @stats [
     %{value: "105K", label: "logged"},
-    %{value: "60K", label: "visual novels"},
-    %{value: "25K", label: "ratings"},
-    %{value: "730", label: "reviews"}
+    %{value: "4.2K", label: "users"},
+    %{value: "28K", label: "ratings"},
+    %{value: "826", label: "reviews"}
   ]
 
   @showcases [
