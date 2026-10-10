@@ -78,6 +78,10 @@
   margin-top: 0.75em;
 }
 
+.comment-content blockquote {
+  margin: 0.75rem 0;
+}
+
 /*
  * Review body — mirrors frontend `ReviewReadMore`'s `prose-p:my-3`,
  * `prose-p:leading-[26px] sm:prose-p:leading-[28px]`, `prose-ul:my-0`,
