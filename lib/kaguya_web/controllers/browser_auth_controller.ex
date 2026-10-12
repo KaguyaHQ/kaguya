@@ -2,7 +2,7 @@ defmodule KaguyaWeb.BrowserAuthController do
   use KaguyaWeb, :controller
 
   alias Kaguya.Auth
-  alias Kaguya.Auth.{Google, OAuthState}
+  alias Kaguya.Auth.{EmailRateLimit, Google, OAuthState, Turnstile}
   alias Kaguya.Users
   alias KaguyaWeb.Plugs.ClientIP
   alias KaguyaWeb.UserAuth
@@ -16,43 +16,53 @@ defmodule KaguyaWeb.BrowserAuthController do
   def sign_in(conn, %{"email" => email} = params) do
     return_to = safe_return_to(params["return_to"] || params["redirectTo"])
 
-    conn
-    |> request_magic_link(email, return_to)
-    |> put_flash(:info, @magic_link_message)
-    |> redirect(to: login_email_sent_path(email, return_to))
+    send_browser_link(
+      conn,
+      email,
+      return_to,
+      params,
+      login_email_sent_path(email, return_to),
+      ~p"/login?email=#{email}&return_to=#{return_to}"
+    )
   end
 
   def sign_up(conn, %{"email" => email} = params) do
     return_to = safe_return_to(params["return_to"] || params["redirectTo"])
 
     conn
-    |> request_magic_link(email, return_to)
     |> put_session(@signup_email_key, email)
     |> put_session(@signup_return_to_key, return_to)
-    |> put_flash(:info, @magic_link_message)
-    |> redirect(to: ~p"/signup?action=confirm_email")
+    |> send_browser_link(email, return_to, params, ~p"/signup?action=confirm_email", ~p"/signup")
   end
 
   def verify_email(conn, %{"email" => email} = params) do
     return_to = safe_return_to(params["return_to"] || get_session(conn, @signup_return_to_key))
 
     conn
-    |> request_magic_link(email, return_to)
     |> put_session(@signup_email_key, email)
     |> put_session(@signup_return_to_key, return_to)
-    |> put_flash(:info, @magic_link_message)
-    |> redirect(to: ~p"/signup?action=confirm_email")
+    |> send_browser_link(
+      email,
+      return_to,
+      params,
+      ~p"/signup?action=confirm_email",
+      ~p"/signup?action=confirm_email"
+    )
   end
 
   def resend_confirmation(conn, %{"email" => email} = params) do
     verify_email(conn, Map.put(params, "email", email))
   end
 
-  def reset_password(conn, %{"email" => email}) do
-    conn
-    |> request_magic_link(email, "/")
-    |> put_flash(:info, @magic_link_message)
-    |> redirect(to: ~p"/login?reset_password=true&action=email_sent")
+  def reset_password(conn, %{"email" => email} = params) do
+    send_browser_link(
+      conn,
+      email,
+      "/",
+      params,
+      ~p"/login?reset_password=true&action=email_sent",
+      ~p"/login?reset_password=true&email=#{email}"
+    )
   end
 
   def update_recovery_password(conn, _params) do
@@ -246,22 +256,80 @@ defmodule KaguyaWeb.BrowserAuthController do
 
   def confirm(conn, _params), do: redirect(conn, to: ~p"/login")
 
-  defp request_magic_link(conn, email, return_to) do
-    with :ok <- rate_limit_auth(conn, "magic_link", 8),
-         {:ok, user} <- Auth.ensure_user_by_email(email),
-         {:ok, _email} <-
-           Auth.deliver_login_instructions(
-             user,
-             fn token ->
-               request_origin(conn) <> ~p"/auth/confirm?token=#{token}&return_to=#{return_to}"
-             end
-           ) do
-      conn
-    else
-      reason ->
-        Logger.warning("magic link request failed: #{inspect(reason)}")
+  defp send_browser_link(conn, email, return_to, params, sent_path, retry_path) do
+    case request_magic_link(conn, email, return_to, params["cf-turnstile-response"]) do
+      :ok ->
         conn
+        |> put_flash(:info, @magic_link_message)
+        |> redirect(to: sent_path)
+
+      {:error, reason} ->
+        message =
+          case reason do
+            {:email_cooldown, remaining_ms} ->
+              seconds = div(remaining_ms + 999, 1000)
+
+              "Please wait #{seconds} seconds before requesting another link. Check your spam folder."
+
+            :rate_limited ->
+              "Too many requests. Please wait before trying again."
+
+            :email_failed ->
+              "We couldn't send a sign-in link. Please try again."
+
+            _ ->
+              "Verification failed or expired. Please try the security check again."
+          end
+
+        conn
+        |> put_flash(:auth_error, message)
+        |> redirect(to: retry_path)
     end
+  end
+
+  defp request_magic_link(conn, email, return_to, token) do
+    result =
+      with :ok <- rate_limit_auth(conn, "magic_link", 8),
+           :ok <- Turnstile.verify(token, ClientIP.get(conn)),
+           :ok <- EmailRateLimit.reserve(email),
+           {:ok, user} <- Auth.ensure_user_by_email(email),
+           {:ok, _email} <-
+             Auth.deliver_login_instructions(user, fn token ->
+               request_origin(conn) <> ~p"/auth/confirm?token=#{token}&return_to=#{return_to}"
+             end) do
+        :ok
+      else
+        {:error, {:email_cooldown, _}} = error -> error
+        {:error, reason} when is_atom(reason) -> {:error, reason}
+        _ -> {:error, :email_failed}
+      end
+
+    reason =
+      case result do
+        :ok -> :sent
+        {:error, {:email_cooldown, _}} -> :email_cooldown
+        {:error, reason} -> reason
+      end
+
+    metadata = [
+      event_type: "AUTH_EMAIL",
+      operation: "request_magic_link",
+      request_path: conn.request_path,
+      result: if(result == :ok, do: :sent, else: :rejected),
+      reason: reason
+    ]
+
+    :telemetry.execute(
+      [:kaguya, :auth, :email, :request],
+      %{count: 1},
+      %{result: metadata[:result], reason: reason}
+    )
+
+    if result == :ok,
+      do: Logger.info("login email request", metadata),
+      else: Logger.warning("login email request", metadata)
+
+    result
   end
 
   defp validate_new_email(current_email, new_email) when is_binary(new_email) do

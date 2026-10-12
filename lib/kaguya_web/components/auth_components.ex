@@ -2,6 +2,7 @@ defmodule KaguyaWeb.AuthComponents do
   @moduledoc false
 
   use KaguyaWeb, :html
+  alias Kaguya.Auth.Turnstile
   alias KaguyaWeb.UI.{Field, Input}
 
   attr :title, :string, required: true
@@ -140,6 +141,7 @@ defmodule KaguyaWeb.AuthComponents do
   end
 
   attr :label, :string, required: true
+  attr :id, :string, default: nil
   attr :disabled, :boolean, default: false
   attr :variant, :string, default: "inverse"
 
@@ -155,6 +157,7 @@ defmodule KaguyaWeb.AuthComponents do
 
     ~H"""
     <button
+      id={@id}
       type="submit"
       disabled={@disabled}
       class={[
@@ -164,6 +167,42 @@ defmodule KaguyaWeb.AuthComponents do
     >
       {@label}
     </button>
+    """
+  end
+
+  attr :id, :string, required: true
+
+  def turnstile(assigns) do
+    assigns = assign(assigns, :site_key, Turnstile.site_key())
+    assigns = assign(assigns, :action, Turnstile.action())
+
+    ~H"""
+    <div
+      id={@id}
+      phx-hook="Turnstile"
+      phx-update="ignore"
+      data-turnstile-widget
+      data-site-key={@site_key}
+      data-action={@action}
+      data-verified="false"
+      class="mt-5"
+    >
+      <input type="hidden" name="cf-turnstile-response" value="" />
+      <div data-turnstile-container></div>
+      <p role="status" aria-live="polite" class="text-foreground-tertiary text-style-body2Regular">
+        Loading security check…
+      </p>
+      <button
+        id={@id <> "-retry"}
+        type="button"
+        data-turnstile-retry
+        hidden
+        class="text-foreground-secondary text-style-body2Regular mt-2 underline"
+      >
+        Retry security check
+      </button>
+      <noscript>Enable JavaScript to complete the security check and receive a sign-in link.</noscript>
+    </div>
     """
   end
 

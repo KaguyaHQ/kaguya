@@ -63,3 +63,11 @@ config :kaguya, :browse_cache_warm_on_boot, false
 config :kaguya, :browse_cache_warm_async, false
 
 config :kaguya, :google_req_options, plug: {Req.Test, :google_oauth}
+
+config :kaguya, :turnstile,
+  site_key: "1x00000000000000000000AA",
+  secret_key: "1x0000000000000000000000000000000AA",
+  hostnames: ["localhost"],
+  allow_test_keys: true
+
+config :kaguya, :turnstile_req_options, plug: {Req.Test, :turnstile}

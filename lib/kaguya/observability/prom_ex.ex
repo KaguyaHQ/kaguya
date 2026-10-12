@@ -18,6 +18,7 @@ defmodule Kaguya.Observability.PromEx do
   @impl true
   def plugins do
     [
+      Kaguya.Observability.AuthMetrics,
       # BEAM VM metrics - memory, processes, GC (system info/limits dropped by Alloy)
       Plugins.Beam,
 

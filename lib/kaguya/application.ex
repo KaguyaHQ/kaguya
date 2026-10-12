@@ -39,6 +39,7 @@ defmodule Kaguya.Application do
         {DNSCluster, query: Application.get_env(:kaguya, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Kaguya.PubSub},
         {Kaguya.RateLimit, [clean_period: :timer.minutes(10), key_older_than: :timer.hours(4)]},
+        {Kaguya.Auth.EmailRateLimit, name: Kaguya.Auth.EmailRateLimit},
         # Start the Finch HTTP client for Req
         {Finch, name: Kaguya.Finch, pools: pools},
         # Pre-generated top-25 recs + VNDB username index. Populates ETS

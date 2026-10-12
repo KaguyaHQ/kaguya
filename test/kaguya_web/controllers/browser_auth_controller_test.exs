@@ -3,20 +3,33 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
 
   import ExUnit.CaptureLog
 
+  alias Kaguya.Auth.OAuthState
   alias Kaguya.Repo
   alias Kaguya.Test.UserFixtures
-  alias Kaguya.Auth.OAuthState
   alias Kaguya.Users.{User, UserIdentity, UserToken}
   alias KaguyaWeb.UserAuth
 
   @session_max_age 60 * 60 * 24 * 90
+
+  setup do
+    :sys.replace_state(Kaguya.Auth.EmailRateLimit, fn table ->
+      :ets.delete_all_objects(table)
+      table
+    end)
+
+    Req.Test.stub(:turnstile, fn conn ->
+      json(conn, 200, %{"success" => true, "hostname" => "localhost", "action" => "email_login"})
+    end)
+
+    :ok
+  end
 
   test "signup creates a local user and login token" do
     conn =
       build_conn()
       |> Map.put(:host, "localhost")
       |> Map.put(:port, 4000)
-      |> post("/auth/sign-up", %{"email" => "reader@example.com"})
+      |> protected_post("/auth/sign-up", %{"email" => "reader@example.com"})
 
     assert redirected_to(conn) == "/signup?action=confirm_email"
     assert Plug.Conn.get_session(conn, "signup_email") == "reader@example.com"
@@ -30,7 +43,7 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
   test "signup stores safe setup return path while awaiting confirmation" do
     conn =
       build_conn()
-      |> post("/auth/sign-up", %{
+      |> protected_post("/auth/sign-up", %{
         "email" => "reader@example.com",
         "return_to" => "/vn/umineko"
       })
@@ -45,7 +58,7 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
   test "signup rejects unsafe return path while awaiting confirmation" do
     conn =
       build_conn()
-      |> post("/auth/sign-up", %{
+      |> protected_post("/auth/sign-up", %{
         "email" => "reader@example.com",
         "return_to" => "//example.com/phish"
       })
@@ -57,7 +70,7 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
   test "magic-link confirmation preserves setup return path from link params" do
     conn =
       build_conn()
-      |> post("/auth/sign-up", %{
+      |> protected_post("/auth/sign-up", %{
         "email" => "reader@example.com",
         "return_to" => "/vn/umineko"
       })
@@ -80,7 +93,7 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
       capture_log([level: :error], fn ->
         conn =
           build_conn()
-          |> post("/auth/sign-in", %{"email" => "reader@example.com"})
+          |> protected_post("/auth/sign-in", %{"email" => "reader@example.com"})
 
         assert redirected_to(conn) == "/login?action=email_sent"
       end)
@@ -96,7 +109,7 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
       build_conn()
       |> Map.put(:host, "127.0.0.1")
       |> Map.put(:port, 4000)
-      |> post("/auth/reset-password", %{"email" => "reader@example.com"})
+      |> protected_post("/auth/reset-password", %{"email" => "reader@example.com"})
 
     assert redirected_to(conn) == "/login?reset_password=true&action=email_sent"
 
@@ -309,6 +322,12 @@ defmodule KaguyaWeb.BrowserAuthControllerTest do
 
     assert redirected_to(conn) == "/login"
     refute Repo.get_by(UserIdentity, provider: "google", provider_uid: "google-second")
+  end
+
+  defp protected_post(conn, path, params) do
+    conn
+    |> put_req_header("cf-connecting-ip", "test-#{System.unique_integer([:positive])}")
+    |> post(path, Map.put_new(params, "cf-turnstile-response", "valid-test-token"))
   end
 
   defp assert_login_token_for(user, sent_to) do

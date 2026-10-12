@@ -41,6 +41,7 @@ import SpoilerScope from "./spoiler_scope"
 import StatusSegments from "./status_segments"
 import TagVotesAutoLoad from "./tag_votes_auto_load"
 import ToastRoot from "./toast_root"
+import Turnstile from "./turnstile"
 import UnsavedChanges from "./unsaved_changes"
 import VNSearch from "./vn_search"
 import VndbImportUploader from "./vndb_import_uploader"
@@ -92,6 +93,7 @@ export default {
   StatusSegments,
   TagVotesAutoLoad,
   ToastRoot,
+  Turnstile,
   UnsavedChanges,
   VNSearch,
   VndbImportUploader

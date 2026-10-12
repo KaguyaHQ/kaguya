@@ -7,6 +7,15 @@
 # General application configuration
 import Config
 
+config :phoenix, :filter_parameters, [
+  "password",
+  "secret",
+  "token",
+  "code",
+  "email",
+  "cf-turnstile-response"
+]
+
 config :kaguya,
   ecto_repos: [Kaguya.Repo],
   generators: [
@@ -219,14 +228,14 @@ config :phoenix, :json_library, Jason
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
+# Environment-specific mailer configuration must override the default.
+config :kaguya, Kaguya.Mailer, adapter: Swoosh.Adapters.Local
+
 import_config "#{config_env()}.exs"
 
 config :sentry,
   client: Kaguya.SentryFinchClient,
   before_send: {Kaguya.Observability.SentryFilter, :before_send}
-
-# Swoosh mailer config (adapter configured in runtime.exs)
-config :kaguya, Kaguya.Mailer, adapter: Swoosh.Adapters.Local
 
 # Swoosh API client (used by the Resend adapter)
 config :swoosh, :api_client, Swoosh.ApiClient.Req

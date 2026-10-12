@@ -5,6 +5,16 @@ if config_env() != :test do
   # Load the .env file if it exists (do not crash if missing/unreadable).
   _ = source([".env", System.get_env()])
 
+  config :kaguya, :turnstile,
+    site_key: env!("TURNSTILE_SITE_KEY", :string, nil),
+    secret_key: env!("TURNSTILE_SECRET_KEY", :string, nil),
+    hostnames:
+      env!("TURNSTILE_HOSTNAMES", :string, "kaguya.io")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == "")),
+    allow_test_keys: config_env() == :dev
+
   # Axiom log drain (ships warnings+ to Axiom for persistent, searchable logs)
   config :kaguya, :axiom,
     token: env!("AXIOM_TOKEN", :string, nil),

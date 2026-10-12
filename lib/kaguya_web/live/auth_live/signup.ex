@@ -4,6 +4,8 @@ defmodule KaguyaWeb.AuthLive.Signup do
 
   import KaguyaWeb.AuthComponents
 
+  alias Kaguya.Auth.EmailRateLimit
+
   @impl true
   def mount(params, session, socket) do
     params = normalize_params(params)
@@ -19,6 +21,7 @@ defmodule KaguyaWeb.AuthLive.Signup do
       |> assign(:hide_navbar, true)
       |> assign(:hide_footer, true)
       |> assign(:email, email)
+      |> assign(:email_cooldown_ms, EmailRateLimit.remaining_ms(email))
       |> assign(:email_error, nil)
       |> assign(:signup_error, Phoenix.Flash.get(socket.assigns.flash, :auth_error))
       |> assign(:action, action)
@@ -36,7 +39,12 @@ defmodule KaguyaWeb.AuthLive.Signup do
     ~H"""
     <.auth_shell title="Get started" subtitle="Create a new account">
       <%= if @action == "confirm_email" do %>
-        <.confirm_email email={@email} return_to={@return_to} signup_error={@signup_error} />
+        <.confirm_email
+          email={@email}
+          return_to={@return_to}
+          signup_error={@signup_error}
+          email_cooldown_ms={@email_cooldown_ms}
+        />
       <% else %>
         <.auth_header title="Get started" subtitle="Create a new account" />
 
@@ -45,7 +53,7 @@ defmodule KaguyaWeb.AuthLive.Signup do
           <.divider />
         </div>
 
-        <.form for={%{}} action={~p"/auth/sign-up"} method="post" class="mt-5 w-full">
+        <.form id="signup-form" for={%{}} action={~p"/auth/sign-up"} method="post" class="mt-5 w-full">
           <input type="hidden" name="return_to" value={@return_to} />
           <.auth_input
             name="email"
@@ -62,7 +70,8 @@ defmodule KaguyaWeb.AuthLive.Signup do
           >
             {@signup_error}
           </p>
-          <.auth_button label="Email me a sign-in link" />
+          <.turnstile id="signup-turnstile" />
+          <.auth_button id="signup-submit" label="Email me a sign-in link" disabled />
         </.form>
 
         <div class="mt-7 flex items-center justify-center gap-1 max-lg:mt-6">
@@ -85,6 +94,7 @@ defmodule KaguyaWeb.AuthLive.Signup do
   attr :email, :string, default: ""
   attr :return_to, :string, default: "/"
   attr :signup_error, :string, default: nil
+  attr :email_cooldown_ms, :integer, default: 0
 
   defp confirm_email(assigns) do
     ~H"""
@@ -95,11 +105,15 @@ defmodule KaguyaWeb.AuthLive.Signup do
       <p class="text-foreground-tertiary text-style-body2Medium">
         We sent a sign-in link to <span class="text-foreground-secondary">{@email}</span>
       </p>
+      <p class="text-foreground-tertiary text-style-body2Regular">
+        Check your spam folder if it hasn't arrived.
+      </p>
     </div>
     <div class="mt-11 space-y-4">
-      <.form for={%{}} action={~p"/auth/resend-confirmation"} method="post">
+      <.form id="signup-resend-form" for={%{}} action={~p"/auth/resend-confirmation"} method="post">
         <input type="hidden" name="email" value={@email} />
         <input type="hidden" name="return_to" value={@return_to} />
+        <.turnstile id="signup-resend-turnstile" />
         <p
           :if={@signup_error}
           class="mt-1.5 text-[13px] leading-[16px] font-light text-[#FF5E5E]"
@@ -111,7 +125,9 @@ defmodule KaguyaWeb.AuthLive.Signup do
           <button
             id="signup-resend"
             type="submit"
+            disabled
             phx-hook="ResendCountdown"
+            data-cooldown-ms={@email_cooldown_ms}
             phx-update="ignore"
             class="disabled:text-foreground-quaternary text-foreground-secondary text-style-body2Regular underline disabled:cursor-not-allowed disabled:no-underline"
           >

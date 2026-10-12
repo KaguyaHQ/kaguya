@@ -128,6 +128,30 @@ See `.env.example` for the full list. Runtime essentials:
 | `MEILI_MASTER_KEY`                | Meilisearch auth                          |
 | `SENTRY_DSN`                      | Error tracking (optional)                 |
 
+Email signup, login, resend, and the legacy password-reset form require
+Cloudflare Turnstile. Set `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and
+`TURNSTILE_HOSTNAMES` (comma-separated allowed hostnames, normally `kaguya.io`)
+in the server's `.env`. Keep the secret key out of source control and chat.
+Restrict the Cloudflare widget to those same production hostnames. Missing
+configuration or failed verification blocks email issuance; Google OAuth
+continues to work independently.
+
+All five login-email entrypoints share a normalized-recipient cooldown of
+60 seconds. Hammer's sliding-window checks run in a supervised process so
+concurrent requests cannot send twice and rejected retries do not extend the
+wait. The confirmation page shows the remaining time supplied by the server.
+The existing eight-requests-per-IP-per-15-minutes limit also applies.
+Recipient cooldowns live in memory and reset when the app restarts. There is
+no global email cap or database-backed limiter.
+
+For local browser testing, use Cloudflare's documented test site key
+`1x00000000000000000000AA`, test secret
+`1x0000000000000000000000000000000AA`, and `TURNSTILE_HOSTNAMES=localhost`.
+Test secret keys are rejected in production. Automated Elixir tests stub
+Siteverify with `Req.Test` and never call Cloudflare or send real email.
+The registered LiveView hook loads Cloudflare's hosted SDK on auth forms;
+the SDK cannot be bundled or self-hosted.
+
 ## Database backups
 
 `backup-postgres.sh` streams a custom-format Postgres dump directly into an

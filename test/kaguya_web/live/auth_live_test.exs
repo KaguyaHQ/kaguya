@@ -1,8 +1,40 @@
 defmodule KaguyaWeb.AuthLiveTest do
   use KaguyaWeb.ConnCase, async: false
 
+  alias Kaguya.Auth.EmailRateLimit
   alias Kaguya.Test.UserFixtures
   alias Kaguya.Users
+
+  test "the initial confirmation page shows the server's remaining resend cooldown" do
+    email = "cooldown-#{System.unique_integer([:positive])}@example.com"
+    assert :ok = EmailRateLimit.reserve(email)
+    conn = build_conn() |> Plug.Test.init_test_session(%{"signup_email" => email})
+    {:ok, view, _html} = live(conn, "/signup?action=confirm_email")
+
+    assert has_element?(view, "#signup-resend[data-cooldown-ms]")
+    assert has_element?(view, "p", "Check your spam folder")
+    remaining = view |> element("#signup-resend") |> render() |> LazyHTML.from_fragment()
+
+    value =
+      remaining |> LazyHTML.query("button") |> LazyHTML.attribute("data-cooldown-ms") |> hd()
+
+    assert String.to_integer(value) in 1..60_000
+  end
+
+  test "all email forms mount a Turnstile widget with an initially disabled submit button" do
+    for {path, id} <- [
+          {"/signup", "signup-turnstile"},
+          {"/login", "login-turnstile"},
+          {"/login?reset_password=true", "login-reset-turnstile"},
+          {"/signup?action=confirm_email", "signup-resend-turnstile"}
+        ] do
+      {:ok, view, _html} = live(build_conn(), path)
+      assert has_element?(view, "##{id}[phx-hook='Turnstile'][data-action='email_login']")
+      assert has_element?(view, "##{id} input[name='cf-turnstile-response']")
+      assert has_element?(view, "form button[type='submit'][disabled]")
+      refute has_element?(view, "script[src*='turnstile']")
+    end
+  end
 
   test "auth pages render one responsive form with a connected email label" do
     for path <- ["/login", "/signup", "/login?reset_password=true&action=forgot_password"] do

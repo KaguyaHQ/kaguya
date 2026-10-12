@@ -1,71 +1,50 @@
-// Disables the signup-confirmation resend button for 30s after submit, with
-// a live countdown ("Resend in 30s"). Cooldown timestamp is stored in
-// localStorage so it survives the redirect-back the form submission triggers.
-const STORAGE_KEY = "kaguya:resend-cooldown-until"
-const COOLDOWN_MS = 30_000
-
-const readUntil = () => {
-  const raw = window.localStorage.getItem(STORAGE_KEY)
-  const parsed = raw ? parseInt(raw, 10) : 0
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-const writeUntil = until => {
-  if (until > Date.now()) {
-    window.localStorage.setItem(STORAGE_KEY, String(until))
-  } else {
-    window.localStorage.removeItem(STORAGE_KEY)
-  }
-}
-
+// The server supplies the remaining recipient cooldown, including after the
+// first signup email, a refresh, or a request made from another browser.
 const ResendCountdown = {
   mounted() {
     this.button = this.el
     this.label = this.el.textContent.trim()
     this.form = this.el.closest("form")
+    this.cooldownMs = this.el.dataset.cooldownMs
+    this.startCountdown()
+  },
 
-    this.onSubmit = () => {
-      writeUntil(Date.now() + COOLDOWN_MS)
-    }
+  startCountdown() {
+    if (this.interval) clearInterval(this.interval)
+    const remainingMs = Math.max(0, Number(this.el.dataset.cooldownMs) || 0)
+    this.until = Date.now() + remainingMs
+    this.tick()
+    if (remainingMs > 0) this.interval = setInterval(() => this.tick(), 1000)
+  },
 
-    this.tick = () => {
-      const until = readUntil()
-      const remainingMs = until - Date.now()
-
-      if (remainingMs <= 0) {
-        this.restore()
-        return
-      }
-
-      const remainingSec = Math.ceil(remainingMs / 1000)
+  tick() {
+    const seconds = Math.ceil((this.until - Date.now()) / 1000)
+    if (seconds > 0) {
       this.button.disabled = true
-      this.button.textContent = `Resend in ${remainingSec}s`
       this.button.dataset.cooldown = "true"
+      this.button.textContent = `Resend available in ${seconds} seconds`
+    } else {
+      this.restore()
     }
+  },
 
-    this.restore = () => {
-      this.button.disabled = false
-      this.button.textContent = this.label
-      delete this.button.dataset.cooldown
-      writeUntil(0)
+  restore() {
+    const widget = this.form?.querySelector("[data-turnstile-widget]")
+    this.button.disabled = Boolean(widget && widget.dataset.verified !== "true")
+    this.button.textContent = this.label
+    delete this.button.dataset.cooldown
+    if (this.interval) clearInterval(this.interval)
+    this.interval = null
+  },
 
-      if (this.interval) {
-        clearInterval(this.interval)
-        this.interval = null
-      }
-    }
-
-    this.form?.addEventListener("submit", this.onSubmit)
-
-    // Resume an in-flight cooldown after the post-submit redirect re-renders the page.
-    if (readUntil() > Date.now()) {
-      this.tick()
-      this.interval = setInterval(this.tick, 1000)
+  updated() {
+    if (this.cooldownMs !== this.el.dataset.cooldownMs) {
+      this.cooldownMs = this.el.dataset.cooldownMs
+      this.startCountdown()
     }
   },
 
   destroyed() {
-    this.form?.removeEventListener("submit", this.onSubmit)
     if (this.interval) clearInterval(this.interval)
   }
 }

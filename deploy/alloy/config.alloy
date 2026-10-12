@@ -82,7 +82,7 @@ prometheus.relabel "backend_filter" {
 
   rule {
     source_labels = ["__name__"]
-    regex         = "kaguya_prom_ex_phoenix_http_request.*|kaguya_prom_ex_phoenix_http_response_size_bytes.*|kaguya_prom_ex_ecto_repo_query_execution_time_milliseconds.*|kaguya_prom_ex_ecto_repo_query_queue_time_milliseconds.*|kaguya_prom_ex_beam_memory_.*|kaguya_prom_ex_beam_stats_.*|kaguya_prom_ex_oban_queue_length_count"
+    regex         = "kaguya_prom_ex_auth_(turnstile|email)_.*|kaguya_prom_ex_phoenix_http_request.*|kaguya_prom_ex_phoenix_http_response_size_bytes.*|kaguya_prom_ex_ecto_repo_query_execution_time_milliseconds.*|kaguya_prom_ex_ecto_repo_query_queue_time_milliseconds.*|kaguya_prom_ex_beam_memory_.*|kaguya_prom_ex_beam_stats_.*|kaguya_prom_ex_oban_queue_length_count"
     action        = "keep"
   }
 }

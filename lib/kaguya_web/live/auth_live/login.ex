@@ -34,7 +34,7 @@ defmodule KaguyaWeb.AuthLive.Login do
         <% @action == "email_sent" -> %>
           <.email_sent />
         <% @reset_password? -> %>
-          <.password_reset action={@action} />
+          <.password_reset action={@action} email={@email} login_error={@login_error} />
         <% true -> %>
           <.auth_header title="Welcome back" subtitle="Log in to your Kaguya account" />
 
@@ -43,7 +43,13 @@ defmodule KaguyaWeb.AuthLive.Login do
             <.divider />
           </div>
 
-          <.form for={%{}} action={~p"/auth/sign-in"} method="post" class="mt-5 w-full">
+          <.form
+            id="login-form"
+            for={%{}}
+            action={~p"/auth/sign-in"}
+            method="post"
+            class="mt-5 w-full"
+          >
             <input type="hidden" name="return_to" value={@return_to} />
             <.auth_input
               name="email"
@@ -60,7 +66,8 @@ defmodule KaguyaWeb.AuthLive.Login do
             >
               {@login_error}
             </p>
-            <.auth_button label="Email me a sign-in link" />
+            <.turnstile id="login-turnstile" />
+            <.auth_button id="login-submit" label="Email me a sign-in link" disabled />
           </.form>
 
           <div class="mt-7 flex items-center justify-center gap-1 max-lg:mt-6">
@@ -105,16 +112,25 @@ defmodule KaguyaWeb.AuthLive.Login do
     <p class="text-foreground-tertiary mt-2 mb-7 text-sm leading-[150%] font-light lg:mt-3 lg:mb-6">
       Enter your email, and we'll send you a sign-in link.
     </p>
-    <.form for={%{}} action={~p"/auth/reset-password"} method="post" class="w-full">
+    <.form
+      id="login-reset-form"
+      for={%{}}
+      action={~p"/auth/reset-password"}
+      method="post"
+      class="w-full"
+    >
       <.auth_input
         name="email"
         label="Email"
         type="email"
         placeholder="towa@nitrochiral.com"
         autocomplete="email"
+        value={@email}
         autofocus
       />
-      <.auth_button label="Email me a sign-in link" variant="brand" />
+      <.error message={@login_error} />
+      <.turnstile id="login-reset-turnstile" />
+      <.auth_button id="login-reset-submit" label="Email me a sign-in link" variant="brand" disabled />
     </.form>
     """
   end
