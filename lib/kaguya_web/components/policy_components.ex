@@ -69,7 +69,10 @@ defmodule KaguyaWeb.PolicyComponents do
       </div>
 
       <div class="xl:mx-auto xl:flex xl:max-w-6xl xl:items-start xl:gap-12 xl:px-8">
-        <aside class="hidden xl:sticky xl:top-[calc(72px+4rem)] xl:block xl:shrink-0 xl:pb-32">
+        <aside
+          id="policy-sidebar"
+          class="hidden xl:sticky xl:top-24 xl:block xl:max-h-[calc(100dvh-6rem)] xl:shrink-0 xl:overflow-y-auto"
+        >
           <.policy_sidebar groups={@groups} current_path={@current_path} />
         </aside>
 
