@@ -36,7 +36,6 @@ defmodule KaguyaWeb.HomeLive.Index do
       hero_image={@hero_image}
       covers={@covers}
       stats={@stats}
-      showcases={@showcases}
     />
     """
   end

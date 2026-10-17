@@ -6,7 +6,8 @@ defmodule KaguyaWeb.HomeLive.Show do
       on the sides/top/bottom, and a vertical Letterboxd-style VN-title
       link on the right edge (xl breakpoint and up).
     * Static curated 4/6-cover row (mobile shows 4, sm+ shows 6).
-    * Four product-showcase sections alternating direction.
+    * A scroll story of four app windows and a closing cover wall
+      (`KaguyaWeb.HomeLive.LandingStory`).
 
   The hero overlays the navbar (`nav_transparent: true`), pulling itself
   under the transparent navbar with `lg:-mt-[72px]`.
@@ -37,7 +38,6 @@ defmodule KaguyaWeb.HomeLive.Show do
       hero_image={@hero_image}
       covers={@covers}
       stats={@stats}
-      showcases={@showcases}
     />
     """
   end
