@@ -1,6 +1,8 @@
 defmodule KaguyaWeb.HomeLive.Landing do
   use KaguyaWeb, :live_view
 
+  alias KaguyaWeb.HomeLive.LandingStory
+
   @hero_image "https://images.kaguya.io/ui/backdrop_cha_more.webp"
   @page_title "Kaguya • The social site for VN readers"
   @description "Track, rate, and review visual novels. Follow friends, make lists, and discover what to read next."
@@ -104,38 +106,6 @@ defmodule KaguyaWeb.HomeLive.Landing do
     %{value: "826", label: "reviews"}
   ]
 
-  @showcases [
-    %{
-      title: "Personal lists for everything",
-      body:
-        "Rank your favorites, plan your year, share the stuff you think more people should read.",
-      image: "https://images.kaguya.io/ui/home/lists-featured.webp",
-      alt: "A list on Kaguya titled 2026 goals",
-      reverse?: false
-    },
-    %{
-      title: "Show your taste",
-      body: "Pin your favorites, show your ratings, let people know what kind of reader you are.",
-      image: "https://images.kaguya.io/ui/home/featured-profile.webp",
-      alt: "A Kaguya profile showing favorite VNs, bio, and reading stats",
-      reverse?: true
-    },
-    %{
-      title: "Get your VN reading stats",
-      body: "See your reading history, hours logged, and how your taste has evolved over time.",
-      image: "https://images.kaguya.io/ui/home/stats-charts.webp",
-      alt: "Reading stats showing titles and hours read over time",
-      reverse?: false
-    },
-    %{
-      title: "Already on VNDB?",
-      body: "Import your list, keep your ratings, pick up right where you left off.",
-      image: "https://images.kaguya.io/ui/home/import-summary.webp",
-      alt: "VNDB import summary showing matched visual novels and reading status",
-      reverse?: true
-    }
-  ]
-
   def mount(_params, _session, %{assigns: %{current_user: current_user}} = socket)
       when not is_nil(current_user) do
     {:ok, redirect(socket, to: ~p"/lists")}
@@ -164,7 +134,6 @@ defmodule KaguyaWeb.HomeLive.Landing do
     |> assign(:hero_image, @hero_image)
     |> assign(:covers, @covers)
     |> assign(:stats, @stats)
-    |> assign(:showcases, @showcases)
   end
 
   def render(assigns) do
@@ -173,7 +142,6 @@ defmodule KaguyaWeb.HomeLive.Landing do
       hero_image={@hero_image}
       covers={@covers}
       stats={@stats}
-      showcases={@showcases}
     />
     """
   end
@@ -181,11 +149,10 @@ defmodule KaguyaWeb.HomeLive.Landing do
   attr :hero_image, :string, required: true
   attr :covers, :list, required: true
   attr :stats, :list, required: true
-  attr :showcases, :list, required: true
 
   def landing_page(assigns) do
     ~H"""
-    <div class="w-full pb-32 lg:-mt-[72px] lg:pb-40">
+    <div class="w-full lg:-mt-[72px]">
       <section class="relative w-full">
         <div
           class="pointer-events-none absolute inset-x-0 top-0 z-0 aspect-video overflow-hidden lg:hidden"
@@ -283,33 +250,8 @@ defmodule KaguyaWeb.HomeLive.Landing do
         </div>
       </section>
 
-      <div class="w-full px-6 md:px-8 lg:px-[136px]">
-        <div class="mx-auto max-w-[1168px]">
-          <section
-            :for={showcase <- @showcases}
-            class={[
-              "flex flex-col items-center gap-10 pt-24 lg:gap-20",
-              "lg:pt-40 first:lg:pt-36",
-              if(Map.get(showcase, :reverse?), do: "lg:flex-row-reverse", else: "lg:flex-row")
-            ]}
-          >
-            <div class="w-full shrink-0 lg:w-[42%]">
-              <h2
-                class="text-[32px] leading-[1.15] text-white lg:text-[44px]"
-                style="font-family: var(--font-fraunces)"
-              >
-                {showcase.title}
-              </h2>
-              <p class="text-foreground-secondary mt-5 text-[17px] leading-[1.7] lg:text-[18px]">
-                {showcase.body}
-              </p>
-            </div>
-            <div class="w-full lg:w-[58%]">
-              <img src={showcase.image} alt={showcase.alt} class="w-full rounded-lg" />
-            </div>
-          </section>
-        </div>
-      </div>
+      <LandingStory.story />
+      <LandingStory.cover_wall />
     </div>
     """
   end

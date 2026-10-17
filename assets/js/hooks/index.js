@@ -17,6 +17,7 @@ import FollowAutoLoad from "./follow_auto_load"
 import HomeActivityTopUp from "./home_activity_top_up"
 import HomeGreeting from "./home_greeting"
 import ImageCropper from "./image_cropper"
+import LandingStory from "./landing_story"
 import LibraryPrefs from "./library_prefs"
 import LikeButton from "./like_button"
 import ListLayoutIsland from "./list_layout_island"
@@ -66,6 +67,7 @@ export default {
   HomeActivityTopUp,
   HomeGreeting,
   ImageCropper,
+  LandingStory,
   LibraryPrefs,
   LikeButton,
   ListLayoutIsland,

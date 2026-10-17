@@ -4,6 +4,7 @@
 @import "./typography.css";
 @import "./markdown.css";
 @import "./toast.css";
+@import "./landing.css";
 @import "../node_modules/cropperjs/dist/cropper.css";
 
 @import "tailwindcss" source(none);

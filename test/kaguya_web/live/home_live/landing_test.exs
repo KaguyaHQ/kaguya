@@ -16,15 +16,39 @@ defmodule KaguyaWeb.HomeLive.LandingTest do
     assert html =~ "The social tracker for VN readers."
     assert html =~ ~s(href="/signup")
     assert html =~ "Get started"
-    assert html =~ "Personal lists for everything"
-    assert html =~ "https://images.kaguya.io/ui/home/lists-featured.webp"
-    assert html =~ "https://images.kaguya.io/ui/home/import-summary.webp"
     assert html =~ "https://images.kaguya.io/ui/backdrop_cha_more.webp"
     assert html =~ "Full Metal Daemon Muramasa"
     assert html =~ "Log in"
     assert html =~ "Sign up"
     refute html =~ "HomeActivityFeed"
     refute html =~ "Welcome back"
+  end
+
+  test "renders the landing story with a window under each chapter" do
+    {:ok, view, _html} = live(build_conn(), "/")
+
+    assert has_element?(view, ~s(#landing-story[phx-hook="LandingStory"][phx-update="ignore"]))
+
+    for chapter <- ~w(lists profile stats import) do
+      assert has_element?(view, ~s([data-chapter="#{chapter}"] [data-panel="#{chapter}"]))
+    end
+
+    assert has_element?(view, ~s([data-chapter="lists"] h2), "Rank them. Defend the ranking.")
+    assert has_element?(view, ~s([data-panel="lists"] a[href="/@eightpunch/list/2026-goals"]))
+    assert has_element?(view, ~s([data-panel="profile"] a[href="/@vas"]), "Vas")
+    assert has_element?(view, ~s([data-panel="stats"] [data-chart][data-hours]))
+
+    # The traveling cover has a slot in every window except import.
+    for slot <- ~w(lists profile stats) do
+      assert has_element?(
+               view,
+               ~s([data-panel="#{slot}"] [data-slot="#{slot}"][href="/vn/the-house-in-fata-morgana"])
+             )
+    end
+
+    refute has_element?(view, ~s([data-panel="import"] [data-slot]))
+    assert has_element?(view, "#landing-wall-title", "Your next favorite is in here somewhere.")
+    assert has_element?(view, ~s(.landing-wall-copy a[href="/signup"]), "Get started")
   end
 
   test "renders the signed-in home feed" do
