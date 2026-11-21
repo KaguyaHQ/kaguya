@@ -3,9 +3,9 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
 
   import Ecto.Query
 
-  alias Kaguya.Repo
   alias Kaguya.Discussions
-  alias Kaguya.Discussions.Post
+  alias Kaguya.Discussions.{Comment, Post}
+  alias Kaguya.Repo
   alias Kaguya.Test.UserFixtures
   alias Kaguya.VisualNovels.VisualNovel
 
@@ -237,6 +237,239 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
 
     assert html =~
              ~s(data-share-url="#{frontend_url}/discussions/p/#{post.short_id}/#{post.slug}/c/#{focused.short_id}")
+  end
+
+  test "discussion pages keep late replies with their parents and reveal a newly posted reply", %{
+    conn: conn
+  } do
+    author = UserFixtures.insert_user!()
+
+    {:ok, post} =
+      Discussions.create_post(author.id, %{
+        title: "Whole comment threads",
+        content: "Replies should stay with their parents.",
+        category_type: :general
+      })
+
+    roots =
+      for index <- 1..21 do
+        {:ok, comment} =
+          Discussions.create_comment(%{
+            post_id: post.id,
+            user_id: author.id,
+            content: "Root #{index}"
+          })
+
+        comment
+      end
+
+    parent =
+      Enum.reduce(1..3, hd(roots), fn depth, parent ->
+        {:ok, reply} =
+          Discussions.create_comment(%{
+            post_id: post.id,
+            user_id: author.id,
+            parent_comment_id: parent.id,
+            content: "Nested reply #{depth}"
+          })
+
+        reply
+      end)
+
+    children =
+      for index <- 1..3 do
+        {:ok, reply} =
+          Discussions.create_comment(%{
+            post_id: post.id,
+            user_id: author.id,
+            parent_comment_id: parent.id,
+            content: "Existing child #{index}"
+          })
+
+        reply
+      end
+
+    conn = Plug.Test.init_test_session(conn, %{"current_user_id" => author.id})
+    path = "/discussions/p/#{post.short_id}/#{post.slug}"
+    {:ok, view, _html} = live(conn, path)
+
+    assert has_element?(view, "#comment-#{parent.id}")
+    refute has_element?(view, "#comment-#{Enum.at(roots, -1).id}")
+    render_click(element(view, "#comment-thread-#{parent.id}-expand"))
+
+    for child <- children, do: assert(has_element?(view, "#comment-#{child.id}"))
+
+    render_click(element(view, "#comment-#{parent.id}-reply"))
+
+    render_submit(element(view, "#comment-#{parent.id}-reply-form"), %{
+      "content" => "Fourth child is visible immediately",
+      "parent_comment_id" => parent.id
+    })
+
+    newest =
+      Repo.get_by!(Kaguya.Discussions.Comment, content: "Fourth child is visible immediately")
+
+    assert has_element?(view, "#comment-#{newest.id}")
+
+    {:ok, refreshed, _html} = live(conn, path)
+    render_click(element(refreshed, "#comment-thread-#{parent.id}-expand"))
+
+    render_click(
+      element(
+        refreshed,
+        "#comment-thread-#{parent.id}-children > div > button",
+        "Show 1 more reply"
+      )
+    )
+
+    assert has_element?(refreshed, "#comment-#{newest.id}")
+
+    {:ok, second_page, _html} = live(conn, path <> "?page=2")
+    assert has_element?(second_page, "#comment-#{Enum.at(roots, -1).id}")
+    refute has_element?(second_page, "#comment-#{parent.id}")
+  end
+
+  test "comment sorts rank roots, preserve pins and reply order, and survive pagination", %{
+    conn: conn
+  } do
+    author = UserFixtures.insert_user!()
+
+    {:ok, post} =
+      Discussions.create_post(author.id, %{
+        title: "Sort comment threads",
+        content: "Independent answers with chronological replies.",
+        category_type: :general
+      })
+
+    roots =
+      for index <- 1..22 do
+        insert_sort_comment!(post, author, "Answer #{index}", %{
+          inserted_at: DateTime.add(~U[2026-01-01 00:00:00Z], index, :second),
+          likes_count: if(index == 21, do: 10, else: 0)
+        })
+      end
+
+    pinned = Enum.at(roots, 21)
+    {:ok, _} = Discussions.admin_moderate_comment(pinned.id, %{is_pinned: true})
+    winner = Enum.at(roots, 20)
+
+    early_reply =
+      insert_sort_comment!(post, author, "Earlier reply", %{
+        parent_comment_id: winner.id,
+        inserted_at: ~U[2026-01-02 00:00:00Z]
+      })
+
+    later_reply =
+      insert_sort_comment!(post, author, "Later popular reply", %{
+        parent_comment_id: winner.id,
+        inserted_at: ~U[2026-01-03 00:00:00Z],
+        likes_count: 100
+      })
+
+    path = "/discussions/p/#{post.short_id}/#{post.slug}"
+    {:ok, view, _html} = live(conn, path)
+    assert has_element?(view, "#discussion-comments-sort-top[aria-current=true]")
+    assert comment_root_ids(view) |> Enum.take(3) == [pinned.id, winner.id, hd(roots).id]
+
+    children = "#comment-thread-#{winner.id}-children"
+    assert has_element?(view, "#{children} > div:first-child #comment-#{early_reply.id}")
+    assert has_element?(view, "#{children} > div:last-child #comment-#{later_reply.id}")
+
+    # A vote changes the count without moving the answer while someone is reading.
+    conn_with_user = Plug.Test.init_test_session(conn, %{"current_user_id" => author.id})
+    {:ok, signed_in, _html} = live(conn_with_user, path)
+    before_vote = comment_root_ids(signed_in)
+    render_click(element(signed_in, "#comment-#{Enum.at(roots, 1).id}-like"))
+    assert comment_root_ids(signed_in) == before_vote
+
+    render_click(element(view, "#comment-thread-#{winner.id}-toggle"))
+    refute has_element?(view, "#comment-#{early_reply.id}")
+
+    for {sort, first_id} <- [{"newest", winner.id}, {"oldest", hd(roots).id}, {"top", winner.id}] do
+      assert has_element?(
+               view,
+               "#discussion-comments-sort-#{sort}[href='#{path}?comment_sort=#{sort}']"
+             )
+
+      render_click(element(view, "#discussion-comments-sort-#{sort}"))
+      assert_patch(view, path <> "?comment_sort=#{sort}")
+      assert comment_root_ids(view) |> Enum.take(2) == [pinned.id, first_id]
+      if sort != "oldest", do: assert(has_element?(view, "#comment-#{early_reply.id}"))
+
+      assert has_element?(
+               view,
+               "nav[aria-label='Comments pagination'] a[href='#{path}?comment_sort=#{sort}&page=2#comments']"
+             )
+    end
+
+    render_patch(view, path <> "?comment_sort=newest&page=2")
+    render_click(element(view, "#discussion-comments-sort-oldest"))
+    assert_patch(view, path <> "?comment_sort=oldest")
+    assert has_element?(view, "#comment-#{hd(roots).id}")
+
+    for sort <- ["newest", "oldest", "top", "invalid"] do
+      {:ok, refreshed, _html} = live(conn, path <> "?comment_sort=#{sort}")
+      selected = if sort == "invalid", do: "top", else: sort
+      assert has_element?(refreshed, "#discussion-comments-sort-#{selected}[aria-current=true]")
+    end
+
+    {:ok, focused, _html} = live(conn, path <> "/c/#{winner.short_id}?comment_sort=top")
+    refute has_element?(focused, "#discussion-comments-sort-trigger")
+    assert has_element?(focused, "#comment-#{early_reply.id}")
+    assert has_element?(focused, "#comment-#{later_reply.id}")
+  end
+
+  test "equal comment scores and timestamps use IDs to keep page boundaries stable" do
+    author = UserFixtures.insert_user!()
+
+    {:ok, post} =
+      Discussions.create_post(author.id, %{
+        title: "Stable sort ties",
+        content: "All answers have the same score and timestamp.",
+        category_type: :general
+      })
+
+    comments =
+      for index <- 1..3 do
+        insert_sort_comment!(post, author, "Tied answer #{index}", %{
+          inserted_at: ~U[2026-01-01 00:00:00Z]
+        })
+      end
+
+    ids = comments |> Enum.map(& &1.id) |> Enum.sort()
+
+    for sort <- [:most_liked, :oldest, :newest] do
+      expected = if sort == :newest, do: Enum.reverse(ids), else: ids
+
+      actual =
+        for page <- 1..3 do
+          {:ok, %{items: [comment]}} =
+            Discussions.list_comments_for_post(post.id, 3, %{
+              page: page,
+              page_size: 1,
+              sort_by: sort
+            })
+
+          comment.id
+        end
+
+      assert actual == expected
+    end
+  end
+
+  defp comment_root_ids(view) do
+    view
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query("#discussion-comments .comments-list > [data-comment-thread-id]")
+    |> LazyHTML.attribute("data-comment-thread-id")
+  end
+
+  defp insert_sort_comment!(post, user, content, attrs) do
+    %Comment{}
+    |> Comment.changeset(%{post_id: post.id, user_id: user.id, content: content})
+    |> Ecto.Changeset.change(attrs)
+    |> Repo.insert!()
   end
 
   test "focused child comments do not load ancestors", %{conn: conn} do

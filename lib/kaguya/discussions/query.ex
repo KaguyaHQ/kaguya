@@ -48,10 +48,16 @@ defmodule Kaguya.Discussions.Query do
   def maybe_filter_entity(query, entity_id),
     do: from(t in query, where: t.entity_id == ^entity_id)
 
-  def apply_comment_sorting(query, :newest), do: order_by(query, [c], desc: c.inserted_at)
-  def apply_comment_sorting(query, :oldest), do: order_by(query, [c], asc: c.inserted_at)
-  def apply_comment_sorting(query, :most_liked), do: order_by(query, [c], desc: c.likes_count)
-  def apply_comment_sorting(query, _), do: order_by(query, [c], desc: c.inserted_at)
+  def apply_comment_sorting(query, :newest),
+    do: order_by(query, [c], desc: c.inserted_at, desc: c.id)
+
+  def apply_comment_sorting(query, :oldest),
+    do: order_by(query, [c], asc: c.inserted_at, asc: c.id)
+
+  def apply_comment_sorting(query, :most_liked),
+    do: order_by(query, [c], desc: c.likes_count, asc: c.inserted_at, asc: c.id)
+
+  def apply_comment_sorting(query, _), do: apply_comment_sorting(query, :newest)
 
   def cursor_config(:recent_activity), do: {[:last_comment_at, :id], [:datetime, :string]}
   def cursor_config(:newest), do: {[:inserted_at, :id], [:datetime, :string]}

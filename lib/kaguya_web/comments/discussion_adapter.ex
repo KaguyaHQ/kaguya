@@ -27,7 +27,7 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
 
     with {:ok, post} <- Discussions.get_post_for_view(post_id, viewer_id, viewer || %{}),
          {:ok, result} <-
-           load_comments(post, focus_comment_id, viewer, viewer_id, page, page_size) do
+           load_comments(post, focus_comment_id, viewer, viewer_id, page, page_size, opts) do
       comments = Repo.preload(result.items, :user)
       liked_ids = liked_ids(comments, viewer_id)
       share_base_path = canonical_post_path(post)
@@ -43,19 +43,19 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
     end
   end
 
-  defp load_comments(post, nil, viewer, viewer_id, page, page_size) do
+  defp load_comments(post, nil, viewer, viewer_id, page, page_size, opts) do
     with {:ok, %{items: comments, pagination: pagination}} <-
            Discussions.list_comments_for_post(
              post.id,
              post.comments_count || 0,
-             %{page: page, page_size: page_size, sort_by: :oldest},
+             %{page: page, page_size: page_size, sort_by: Map.get(opts, :sort_by, :most_liked)},
              viewer || viewer_id
            ) do
       {:ok, %{items: comments, pagination: pagination, focused_comment_id: nil}}
     end
   end
 
-  defp load_comments(post, focus_comment_id, viewer, _viewer_id, _page, page_size) do
+  defp load_comments(post, focus_comment_id, viewer, _viewer_id, _page, page_size, _opts) do
     with {:ok, focused_comment} <-
            Discussions.get_comment_for_post(post.id, focus_comment_id, viewer),
          {:ok, %{items: descendants, pagination: pagination}} <-

@@ -843,6 +843,14 @@ html body[data-modal-scroll-locked] {
   animation: threadEnter 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Hovering a thread trunk lights its own elbows too, not nested threads'. */
+[data-comment-thread-id]:has(> [data-comment-trunk]:is(:hover, :focus-visible))
+  > [data-comment-children]
+  > div
+  > [data-thread-branch] {
+  color: rgb(var(--foreground-tertiary));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kaguya-donut-sweep,
   .kaguya-stats-cover-wall,

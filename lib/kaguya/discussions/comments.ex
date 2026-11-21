@@ -160,7 +160,7 @@ defmodule Kaguya.Discussions.Comments do
     end
   end
 
-  def list_comments_for_post(post_id, comments_count, params, viewer_id \\ nil) do
+  def list_comments_for_post(post_id, _comments_count, params, viewer_id \\ nil) do
     sort_by = Map.get(params, :sort_by, :newest)
     page = Map.get(params, :page, 1)
     page_size = Map.get(params, :page_size, 20)
@@ -183,12 +183,17 @@ defmodule Kaguya.Discussions.Comments do
 
     paginated_query =
       base
+      |> where([c], is_nil(c.parent_comment_id))
       |> exclude_pinned_parent_comments()
       |> Query.apply_comment_sorting(sort_by)
 
-    {rest, pagination} = Pagination.paginate(paginated_query, page, page_size, comments_count)
+    # Paginate roots, then load their replies together. Paginating individual
+    # comments can put a reply on another page with no way to open it in its thread.
+    {rest, pagination} = Pagination.paginate(paginated_query, page, page_size)
+    parents = pinned_parents ++ rest
+    replies = list_thread_replies(Enum.map(parents, & &1.id), base)
 
-    {:ok, %{items: pinned_parents ++ rest, pagination: pagination}}
+    {:ok, %{items: parents ++ replies, pagination: pagination}}
   end
 
   def list_comments_for_post_cursor(post_id, params) do
@@ -284,13 +289,13 @@ defmodule Kaguya.Discussions.Comments do
   defp list_thread_replies([], _query), do: []
 
   defp list_thread_replies(parent_ids, query) do
-    base = from(c in Comment, where: c.id in ^parent_ids, select: c.id)
+    base = from(c in query, where: c.id in ^parent_ids, select: %{id: c.id})
 
     recursive =
-      from c in Comment,
+      from c in query,
         join: ct in "comment_tree",
         on: c.parent_comment_id == ct.id,
-        select: c.id
+        select: %{id: c.id}
 
     comment_tree = base |> union_all(^recursive)
 

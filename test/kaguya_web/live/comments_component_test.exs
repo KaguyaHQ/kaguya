@@ -84,6 +84,66 @@ defmodule KaguyaWeb.CommentsComponentTest do
     assert html =~ "A nested reply"
   end
 
+  test "deep replies can expand, collapse, and stay expanded after patches", %{conn: conn} do
+    user = UserFixtures.insert_user!()
+    list = insert_list!(user, "Deep thread")
+
+    comments =
+      Enum.reduce(0..7, [], fn depth, comments ->
+        comment =
+          %ListComment{}
+          |> ListComment.changeset(%{
+            list_id: list.id,
+            user_id: user.id,
+            parent_comment_id: if(comments == [], do: nil, else: hd(comments).id),
+            content: "Reply at depth #{depth}"
+          })
+          |> Repo.insert!()
+
+        [comment | comments]
+      end)
+      |> Enum.reverse()
+
+    {:ok, view, _html} =
+      live_isolated(conn, TestLive, session: %{"list_id" => list.id})
+
+    for depth <- 3..6 do
+      parent = Enum.at(comments, depth)
+      child = Enum.at(comments, depth + 1)
+      thread = "#comment-thread-#{parent.id}"
+      toggle = "#{thread} > button[data-comment-trunk]"
+      label = "#comment-thread-#{parent.id}-last-branch > button"
+
+      assert has_element?(view, "#{toggle}[aria-label='Expand replies']")
+      refute has_element?(view, "#comment-#{child.id}")
+
+      render_click(element(view, label))
+      assert has_element?(view, "#comment-#{child.id}")
+      assert has_element?(view, "#{toggle}[aria-label='Collapse replies']")
+
+      render_click(element(view, toggle))
+      refute has_element?(view, "#comment-#{child.id}")
+
+      render_click(element(view, toggle))
+      assert has_element?(view, "#comment-#{child.id}")
+    end
+
+    root = hd(comments)
+    root_toggle = "#comment-thread-#{root.id} > button[data-comment-trunk]"
+    render_click(element(view, root_toggle))
+    refute has_element?(view, "#comment-#{Enum.at(comments, -1).id}")
+    render_click(element(view, root_toggle))
+    assert has_element?(view, "#comment-#{Enum.at(comments, -1).id}")
+
+    Phoenix.LiveView.send_update(view.pid, KaguyaWeb.CommentsComponent,
+      id: "comments",
+      locked: true
+    )
+
+    render(view)
+    assert has_element?(view, "#comment-#{Enum.at(comments, -1).id}")
+  end
+
   test "quotes end at blank lines after creating and editing comments", %{conn: conn} do
     user = UserFixtures.insert_user!(username: "quote_author")
     list = insert_list!(user, "Quoted comments")

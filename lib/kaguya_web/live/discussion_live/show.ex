@@ -23,6 +23,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
        meta_description: "Discussion on Kaguya",
        post: nil,
        comments_page: 1,
+       comment_sort: "top",
        focus_comment_id: nil,
        can_discuss: false,
        can_moderate_discussions: false,
@@ -55,6 +56,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
          assign(socket,
            post: payload.post,
            comments_page: page_param(params["page"]),
+           comment_sort: comment_sort_param(params["comment_sort"]),
            focus_comment_id:
              resolve_focus_comment(
                payload.post,
@@ -454,6 +456,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
                 post={@post}
                 current_user={@current_user}
                 comments_page={@comments_page}
+                comment_sort={@comment_sort}
                 focus_comment_id={@focus_comment_id}
               />
             <% true -> %>
@@ -466,6 +469,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
                 post={@post}
                 current_user={@current_user}
                 comments_page={@comments_page}
+                comment_sort={@comment_sort}
                 focus_comment_id={@focus_comment_id}
               />
           <% end %>
@@ -794,6 +798,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
   attr :post, :map, required: true
   attr :current_user, :map, default: nil
   attr :comments_page, :integer, default: 1
+  attr :comment_sort, :string, default: "top"
   attr :focus_comment_id, :string, default: nil
 
   defp comments_section(assigns) do
@@ -807,7 +812,9 @@ defmodule KaguyaWeb.DiscussionLive.Show do
         current_user={@current_user}
         page={@comments_page}
         page_size={20}
-        base_path={comments_base_path(@post, @focus_comment_id)}
+        base_path={comments_base_path(@post, @comment_sort)}
+        comment_sort={@comment_sort}
+        comment_sort_path={@post.url}
         focus_comment_id={@focus_comment_id}
         full_discussion_path={@post.url}
         locked={@post.is_locked || !!@post.deleted_at || hidden_tombstone?(@post)}
@@ -862,7 +869,11 @@ defmodule KaguyaWeb.DiscussionLive.Show do
   # Used by the comments pagination only. Focused-mode loads cap pagination
   # at a single page (no Next/Prev), so we always anchor pagination back to
   # the full discussion path.
-  defp comments_base_path(post, _focus_comment_id), do: post.url <> "#comments"
+  defp comments_base_path(post, sort),
+    do: post.url <> "?" <> URI.encode_query(%{"comment_sort" => sort}) <> "#comments"
+
+  defp comment_sort_param(sort) when sort in ~w(top newest oldest), do: sort
+  defp comment_sort_param(_sort), do: "top"
 
   defp fallback_href(%{entity_tag: %{href: href}}), do: href
   defp fallback_href(%{category: %{slug: slug}}), do: "/discussions/#{slug}"

@@ -17,15 +17,19 @@ defmodule KaguyaWeb.Components.Comments do
   attr :current_user, :map, default: nil
   attr :target, :any, required: true
   attr :show_disabled_composer, :boolean, default: true
+  slot :sort_control
 
   def header_and_composer(assigns) do
     ~H"""
-    <h3 class="mb-5 text-sm font-medium text-[rgb(var(--foreground-secondary))]">
-      <%= if @comments_count > 0 do %>
-        {format_count(@comments_count)}
-      <% end %>
-      {pluralize(@comments_count, "Comment", "Comments")}
-    </h3>
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <h3 class="text-sm font-medium text-[rgb(var(--foreground-secondary))]">
+        <%= if @comments_count > 0 do %>
+          {format_count(@comments_count)}
+        <% end %>
+        {pluralize(@comments_count, "Comment", "Comments")}
+      </h3>
+      {render_slot(@sort_control)}
+    </div>
 
     <.reply_input
       :if={@can_comment}
@@ -43,6 +47,48 @@ defmodule KaguyaWeb.Components.Comments do
       <div class="size-[26px] shrink-0 rounded-full bg-[rgb(var(--surface-banner))]/40 lg:size-[36px]" />
       <div class="h-[44px] flex-1 rounded-[4px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] lg:h-[72px]" />
     </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :sort, :string, required: true
+  attr :path, :string, required: true
+
+  def sort_menu(assigns) do
+    assigns =
+      assign(assigns, :options, [{"top", "Top"}, {"newest", "Newest"}, {"oldest", "Oldest"}])
+
+    ~H"""
+    <.menu
+      id={@id}
+      align="end"
+      class="text-foreground-primary text-style-body2Medium inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border border-white/7 bg-white/4 px-3.5 transition-colors duration-150 hover:border-white/12 hover:bg-white/7"
+    >
+      <:trigger aria-label="Sort comments">
+        <Lucide.arrow_down_wide_narrow class="text-foreground-tertiary size-4" aria-hidden />
+        <span>{Enum.find_value(@options, "Top", fn {value, label} -> value == @sort && label end)}</span>
+        <Lucide.chevron_down class="text-foreground-tertiary size-3.5" aria-hidden />
+      </:trigger>
+      <div class="bg-surface-base border-border-divider text-foreground-primary text-style-body2Medium w-[184px] rounded-xl border p-1 shadow-xl">
+        <.link
+          :for={{value, label} <- @options}
+          data-menu-dismiss
+          id={"#{@id}-#{value}"}
+          patch={@path <> "?" <> URI.encode_query(%{"comment_sort" => value})}
+          aria-current={if @sort == value, do: "true"}
+          rel="nofollow"
+          class={[
+            "focus-visible:outline-foreground-primary flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
+            @sort == value && "text-foreground-primary bg-white/5 font-medium",
+            @sort != value &&
+              "hover:text-foreground-primary text-foreground-secondary hover:bg-white/4"
+          ]}
+        >
+          <span class="flex-1">{label}</span>
+          <Lucide.check :if={@sort == value} class="size-4 shrink-0" aria-hidden />
+        </.link>
+      </div>
+    </.menu>
     """
   end
 
@@ -90,7 +136,7 @@ defmodule KaguyaWeb.Components.Comments do
   attr :current_user, :map, default: nil
   attr :active_reply_id, :string, default: nil
   attr :editing_id, :string, default: nil
-  attr :collapsed_ids, :any, required: true
+  attr :toggled_thread_ids, :any, required: true
   attr :show_all_ids, :any, required: true
   attr :can_moderate, :boolean, default: false
   attr :locked, :boolean, default: false
@@ -100,7 +146,7 @@ defmodule KaguyaWeb.Components.Comments do
       assigns
       |> assign(:comment, assigns.node.comment)
       |> assign(:has_children, assigns.node.children != [])
-      |> assign(:expanded, expanded?(assigns.node, assigns.collapsed_ids))
+      |> assign(:expanded, expanded?(assigns.node, assigns.toggled_thread_ids))
       |> assign(:visible_children, visible_children(assigns.node, assigns.show_all_ids))
       |> assign(:hidden_children_count, hidden_children_count(assigns.node, assigns.show_all_ids))
       |> assign(:descendant_count, descendant_count(assigns.node))
@@ -128,21 +174,23 @@ defmodule KaguyaWeb.Components.Comments do
 
       <button
         :if={@has_children}
+        id={"comment-thread-#{@comment.id}-toggle"}
         type="button"
         phx-click="toggle_thread"
         phx-value-id={@comment.id}
         phx-target={@target}
         data-comment-trunk
-        class="absolute top-[26px] bottom-0 left-0 z-20 w-[26px] cursor-pointer border-0 bg-transparent p-0 lg:top-[36px] lg:w-[36px]"
+        class="group/thread-toggle absolute top-[26px] bottom-0 left-0 z-20 w-[26px] cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-none lg:top-[36px] lg:w-[36px]"
         aria-label={if @expanded, do: "Collapse replies", else: "Expand replies"}
+        aria-expanded={to_string(@expanded)}
+        aria-controls={"comment-thread-#{@comment.id}-children"}
       >
-        <span class="absolute top-0 left-1/2 block h-full w-px bg-[rgb(var(--border-divider))]" />
-        <span class="absolute top-1/2 left-1/2 flex size-[15px] -translate-1/2 items-center justify-center rounded-full bg-[rgb(var(--surface-base))] text-[rgb(var(--foreground-secondary))] lg:size-[17px]">
-          <%= if @expanded do %>
-            <Lucide.circle_minus class="size-full" aria-hidden />
-          <% else %>
-            <Lucide.circle_plus class="size-full" aria-hidden />
-          <% end %>
+        <span class="absolute top-0 left-1/2 block h-full w-px bg-[rgb(var(--border-divider))] transition-colors duration-150 group-hover/thread-toggle:bg-[rgb(var(--foreground-tertiary))] group-focus-visible/thread-toggle:bg-[rgb(var(--foreground-tertiary))] motion-reduce:transition-none" />
+        <span
+          :if={@expanded}
+          class="absolute top-(--thread-toggle-y,50%) left-1/2 flex size-[15px] -translate-1/2 items-center justify-center rounded-full bg-[rgb(var(--surface-base))] text-[rgb(var(--foreground-secondary))] transition-[color,box-shadow] duration-150 group-hover/thread-toggle:text-[rgb(var(--foreground-primary))] group-hover/thread-toggle:ring-4 group-hover/thread-toggle:ring-[rgb(var(--surface-menu-item-hover))] group-focus-visible/thread-toggle:text-[rgb(var(--foreground-primary))] group-focus-visible/thread-toggle:ring-2 group-focus-visible/thread-toggle:ring-[rgb(var(--foreground-primary))] group-focus-visible/thread-toggle:ring-offset-2 group-focus-visible/thread-toggle:ring-offset-[rgb(var(--surface-base))] motion-reduce:transition-none lg:size-[17px]"
+        >
+          <Lucide.circle_minus class="size-full" aria-hidden />
         </span>
       </button>
 
@@ -159,12 +207,16 @@ defmodule KaguyaWeb.Components.Comments do
         >
           <.thread_branch />
           <button
+            id={"comment-thread-#{@comment.id}-expand"}
             type="button"
             phx-click="toggle_thread"
             phx-value-id={@comment.id}
             phx-target={@target}
-            class="mt-[4px] ml-1 cursor-pointer border-0 bg-transparent p-0 text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))] lg:mt-[9px]"
+            aria-expanded="false"
+            aria-controls={"comment-thread-#{@comment.id}-children"}
+            class="mt-[4px] ml-1 flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))] lg:mt-[9px]"
           >
+            <Lucide.circle_plus class="size-[15px] shrink-0 lg:size-[17px]" aria-hidden />
             {@descendant_count} {pluralize(@descendant_count, "reply", "replies")}
           </button>
         </div>
@@ -189,7 +241,7 @@ defmodule KaguyaWeb.Components.Comments do
             current_user={@current_user}
             active_reply_id={@active_reply_id}
             editing_id={@editing_id}
-            collapsed_ids={@collapsed_ids}
+            toggled_thread_ids={@toggled_thread_ids}
             show_all_ids={@show_all_ids}
             can_moderate={@can_moderate}
             locked={@locked}
@@ -208,8 +260,9 @@ defmodule KaguyaWeb.Components.Comments do
             phx-click="show_all_replies"
             phx-value-id={@comment.id}
             phx-target={@target}
-            class="cursor-pointer border-0 bg-transparent p-0 text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))]"
+            class="ml-1 flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))]"
           >
+            <Lucide.circle_plus class="size-[15px] shrink-0 lg:size-[17px]" aria-hidden />
             Show {@hidden_children_count} more {pluralize(@hidden_children_count, "reply", "replies")}
           </button>
         </div>
@@ -252,7 +305,7 @@ defmodule KaguyaWeb.Components.Comments do
           <.link
             :if={@comment.user}
             navigate={profile_path(@comment.user)}
-            class="max-w-[120px] truncate text-xs leading-[22px] font-semibold text-[rgb(var(--foreground-secondary))] lg:max-w-none lg:text-sm"
+            class="max-w-[120px] truncate text-xs leading-[22px] font-semibold text-[rgb(var(--foreground-primary))] lg:max-w-none lg:text-sm"
           >
             {display_name(@comment.user)}
           </.link>
@@ -263,14 +316,14 @@ defmodule KaguyaWeb.Components.Comments do
           />
           <span class="text-[7px] text-[rgb(var(--foreground-primary))]/40">•</span>
           <time
-            class="text-xs font-light text-[rgb(var(--foreground-primary))]"
+            class="text-xs font-light text-[rgb(var(--foreground-tertiary))]"
             title={SharedTime.datetime_title(@comment.inserted_at)}
           >
             {SharedTime.calendar_custom(@comment.inserted_at)}
           </time>
           <span
             :if={@comment.is_edited}
-            class="text-xs font-light text-[rgb(var(--foreground-primary))]"
+            class="text-xs font-light text-[rgb(var(--foreground-tertiary))]"
           >
             (edited)
           </span>
@@ -303,7 +356,11 @@ defmodule KaguyaWeb.Components.Comments do
           class="mt-1 text-sm font-normal text-[rgb(var(--foreground-primary))] lg:text-base"
         />
 
-        <div :if={@editing_id != @comment.id} class="mt-3 flex h-9 items-center gap-4 lg:h-8">
+        <div
+          :if={@editing_id != @comment.id}
+          data-comment-actions
+          class="mt-3 flex h-9 items-center gap-4 lg:h-8"
+        >
           <LikeButton.like_button
             id={"comment-#{@comment.id}-like"}
             click="toggle_like"
@@ -668,9 +725,12 @@ defmodule KaguyaWeb.Components.Comments do
 
   defp thread_branch(assigns) do
     ~H"""
-    <div class="pointer-events-none absolute top-0 left-[-16px] lg:left-[-29px]">
+    <div
+      data-thread-branch
+      class="pointer-events-none absolute top-0 left-[-16px] text-[rgb(var(--border-divider))] transition-colors duration-150 motion-reduce:transition-none lg:left-[-29px]"
+    >
       <svg
-        class="text-[rgb(var(--border-divider))] duration-75 lg:hidden"
+        class="lg:hidden"
         width="16"
         height="13"
         viewBox="0 0 16 13"
@@ -679,7 +739,7 @@ defmodule KaguyaWeb.Components.Comments do
         <path d="M 0.5 4 A 8 8 0 0 0 8.5 12 H 16" stroke="currentColor" stroke-width="1" />
       </svg>
       <svg
-        class="hidden text-[rgb(var(--border-divider))] duration-75 lg:block"
+        class="hidden lg:block"
         width="29"
         height="18"
         viewBox="0 0 29 18"
@@ -691,11 +751,13 @@ defmodule KaguyaWeb.Components.Comments do
     """
   end
 
-  defp expanded?(%{comment: %{id: id}, depth: depth}, collapsed_ids) do
-    depth < 3 and not MapSet.member?(collapsed_ids, id)
+  defp expanded?(%{comment: %{id: id}, depth: depth}, toggled_thread_ids) do
+    # Deep threads start collapsed; a click reverses the default at any depth.
+    depth < 3 != MapSet.member?(toggled_thread_ids, id)
   end
 
-  defp expanded?(%{comment: %{id: id}}, collapsed_ids), do: not MapSet.member?(collapsed_ids, id)
+  defp expanded?(%{comment: %{id: id}}, toggled_thread_ids),
+    do: not MapSet.member?(toggled_thread_ids, id)
 
   defp visible_children(node, show_all_ids) do
     if MapSet.member?(show_all_ids, node.comment.id) do

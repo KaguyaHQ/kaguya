@@ -19,6 +19,11 @@ defmodule KaguyaWeb.CommentsComponent do
 
   @impl true
   def update(assigns, socket) do
+    sort_changed? =
+      Map.has_key?(socket.assigns, :comment_sort) and
+        Map.get(assigns, :comment_sort, socket.assigns.comment_sort) !=
+          socket.assigns.comment_sort
+
     socket =
       socket
       |> assign_new(:adapter, fn -> ListAdapter end)
@@ -27,6 +32,8 @@ defmodule KaguyaWeb.CommentsComponent do
       |> assign_new(:page, fn -> 1 end)
       |> assign_new(:page_size, fn -> @default_page_size end)
       |> assign_new(:base_path, fn -> nil end)
+      |> assign_new(:comment_sort, fn -> nil end)
+      |> assign_new(:comment_sort_path, fn -> nil end)
       |> assign_new(:page_param, fn -> "page" end)
       |> assign_new(:focus_comment_id, fn -> nil end)
       |> assign_new(:focused_comment_id, fn -> nil end)
@@ -36,7 +43,7 @@ defmodule KaguyaWeb.CommentsComponent do
       |> assign_new(:locked, fn -> false end)
       |> assign_new(:active_reply_id, fn -> nil end)
       |> assign_new(:editing_id, fn -> nil end)
-      |> assign_new(:collapsed_ids, fn -> MapSet.new() end)
+      |> assign_new(:toggled_thread_ids, fn -> MapSet.new() end)
       |> assign_new(:show_all_ids, fn -> MapSet.new() end)
       |> assign_new(:pending_delete_id, fn -> nil end)
       |> assign_new(:pending_report_id, fn -> nil end)
@@ -45,6 +52,18 @@ defmodule KaguyaWeb.CommentsComponent do
       |> assign_new(:error_message, fn -> nil end)
       |> assign_new(:hide_header, fn -> false end)
       |> assign(assigns)
+
+    socket =
+      if sort_changed? do
+        assign(socket,
+          toggled_thread_ids: MapSet.new(),
+          show_all_ids: MapSet.new(),
+          active_reply_id: nil,
+          editing_id: nil
+        )
+      else
+        socket
+      end
 
     {:ok, load_comments(socket)}
   end
@@ -67,7 +86,15 @@ defmodule KaguyaWeb.CommentsComponent do
         current_user={@current_user}
         target={@myself}
         show_disabled_composer={!@focused_mode && !@locked}
-      />
+      >
+        <:sort_control :if={@comment_sort_path && !@focused_mode}>
+          <CommentUI.sort_menu
+            id={"#{@id}-sort"}
+            sort={@comment_sort}
+            path={@comment_sort_path}
+          />
+        </:sort_control>
+      </CommentUI.header_and_composer>
       <CommentUI.reply_input
         :if={
           @hide_header and !@focused_mode and not @locked and (@can_comment or is_nil(@current_user))
@@ -134,7 +161,7 @@ defmodule KaguyaWeb.CommentsComponent do
           current_user={@current_user}
           active_reply_id={@active_reply_id}
           editing_id={@editing_id}
-          collapsed_ids={@collapsed_ids}
+          toggled_thread_ids={@toggled_thread_ids}
           show_all_ids={@show_all_ids}
           can_moderate={@can_moderate}
           locked={@locked}
@@ -216,14 +243,14 @@ defmodule KaguyaWeb.CommentsComponent do
   end
 
   def handle_event("toggle_thread", %{"id" => id}, socket) do
-    collapsed_ids =
-      if MapSet.member?(socket.assigns.collapsed_ids, id) do
-        MapSet.delete(socket.assigns.collapsed_ids, id)
+    toggled_thread_ids =
+      if MapSet.member?(socket.assigns.toggled_thread_ids, id) do
+        MapSet.delete(socket.assigns.toggled_thread_ids, id)
       else
-        MapSet.put(socket.assigns.collapsed_ids, id)
+        MapSet.put(socket.assigns.toggled_thread_ids, id)
       end
 
-    {:noreply, assign(socket, collapsed_ids: collapsed_ids)}
+    {:noreply, assign(socket, toggled_thread_ids: toggled_thread_ids)}
   end
 
   def handle_event("show_all_replies", %{"id" => id}, socket) do
@@ -249,11 +276,12 @@ defmodule KaguyaWeb.CommentsComponent do
            socket.assigns.current_user,
            attrs
          ) do
-      {:ok, _comment} ->
+      {:ok, comment} ->
         {:noreply,
          socket
          |> assign(active_reply_id: nil, error_message: nil)
          |> load_comments()
+         |> reveal_comment(comment.id)
          |> clear_editor(editor_id)}
 
       {:error, reason} ->
@@ -438,6 +466,7 @@ defmodule KaguyaWeb.CommentsComponent do
     case adapter.load(socket.assigns.resource_id, socket.assigns.current_user, %{
            page: socket.assigns.page,
            page_size: socket.assigns.page_size,
+           sort_by: comment_sort(socket.assigns.comment_sort),
            focus_comment_id: socket.assigns.focus_comment_id
          }) do
       {:ok, %{items: comments, pagination: pagination, comments_count: comments_count} = result} ->
@@ -467,6 +496,36 @@ defmodule KaguyaWeb.CommentsComponent do
           error_message: error_message(reason)
         )
     end
+  end
+
+  defp comment_sort("top"), do: :most_liked
+  defp comment_sort("newest"), do: :newest
+  defp comment_sort(_sort), do: :oldest
+
+  defp reveal_comment(socket, id) do
+    Enum.reduce(comment_path(socket.assigns.tree, id) || [], socket, fn node, socket ->
+      toggled_thread_ids =
+        if node.depth < 3 do
+          MapSet.delete(socket.assigns.toggled_thread_ids, node.comment.id)
+        else
+          MapSet.put(socket.assigns.toggled_thread_ids, node.comment.id)
+        end
+
+      assign(socket,
+        toggled_thread_ids: toggled_thread_ids,
+        show_all_ids: MapSet.put(socket.assigns.show_all_ids, node.comment.id)
+      )
+    end)
+  end
+
+  defp comment_path(nodes, id) do
+    Enum.find_value(nodes, fn node ->
+      cond do
+        node.comment.id == id -> [node]
+        path = comment_path(node.children, id) -> [node | path]
+        true -> nil
+      end
+    end)
   end
 
   defp empty_pagination(page, page_size),

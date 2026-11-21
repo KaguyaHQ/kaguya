@@ -19,6 +19,17 @@ const CommentThread = {
       const junctionY = branchRect.top - outerRect.top + junctionOffset
 
       trunk.style.height = `${Math.max(0, junctionY - buttonTop)}px`
+
+      // Pin the +/- icon beside this comment's action row so it sits in the
+      // same place at every depth, instead of midway down a long trunk.
+      const actions = this.el.querySelector(`#comment-${threadId} [data-comment-actions]`)
+      if (actions) {
+        const actionsRect = actions.getBoundingClientRect()
+        const toggleY = actionsRect.top + actionsRect.height / 2 - outerRect.top - buttonTop
+        trunk.style.setProperty("--thread-toggle-y", `${Math.max(0, toggleY)}px`)
+      } else {
+        trunk.style.setProperty("--thread-toggle-y", "12px")
+      }
     }
 
     this._bindObserver = () => {
