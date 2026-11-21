@@ -214,7 +214,7 @@ defmodule KaguyaWeb.Components.Comments do
             phx-target={@target}
             aria-expanded="false"
             aria-controls={"comment-thread-#{@comment.id}-children"}
-            class="mt-[4px] ml-1 flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))] lg:mt-[9px]"
+            class="ml-1 flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 pt-[4.5px] text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))] lg:pt-[8.5px]"
           >
             <Lucide.circle_plus class="size-[15px] shrink-0 lg:size-[17px]" aria-hidden />
             {@descendant_count} {pluralize(@descendant_count, "reply", "replies")}
@@ -260,7 +260,7 @@ defmodule KaguyaWeb.Components.Comments do
             phx-click="show_all_replies"
             phx-value-id={@comment.id}
             phx-target={@target}
-            class="ml-1 flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))]"
+            class="ml-1 flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 pt-[4.5px] text-xs text-[rgb(var(--foreground-secondary))] duration-75 hover:text-[rgb(var(--foreground-primary))] lg:pt-[8.5px]"
           >
             <Lucide.circle_plus class="size-[15px] shrink-0 lg:size-[17px]" aria-hidden />
             Show {@hidden_children_count} more {pluralize(@hidden_children_count, "reply", "replies")}

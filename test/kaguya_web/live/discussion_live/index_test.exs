@@ -291,7 +291,7 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
 
     conn = Plug.Test.init_test_session(conn, %{"current_user_id" => author.id})
     path = "/discussions/p/#{post.short_id}/#{post.slug}"
-    {:ok, view, _html} = live(conn, path)
+    {:ok, view, _html} = live(conn, path <> "?comment_sort=oldest")
 
     assert has_element?(view, "#comment-#{parent.id}")
     refute has_element?(view, "#comment-#{Enum.at(roots, -1).id}")
@@ -311,7 +311,7 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
 
     assert has_element?(view, "#comment-#{newest.id}")
 
-    {:ok, refreshed, _html} = live(conn, path)
+    {:ok, refreshed, _html} = live(conn, path <> "?comment_sort=oldest")
     render_click(element(refreshed, "#comment-thread-#{parent.id}-expand"))
 
     render_click(
@@ -324,7 +324,7 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
 
     assert has_element?(refreshed, "#comment-#{newest.id}")
 
-    {:ok, second_page, _html} = live(conn, path <> "?page=2")
+    {:ok, second_page, _html} = live(conn, path <> "?comment_sort=oldest&page=2")
     assert has_element?(second_page, "#comment-#{Enum.at(roots, -1).id}")
     refute has_element?(second_page, "#comment-#{parent.id}")
   end
@@ -369,7 +369,7 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
     path = "/discussions/p/#{post.short_id}/#{post.slug}"
     {:ok, view, _html} = live(conn, path)
     assert has_element?(view, "#discussion-comments-sort-top[aria-current=true]")
-    assert comment_root_ids(view) |> Enum.take(3) == [pinned.id, winner.id, hd(roots).id]
+    assert comment_root_ids(view) |> Enum.take(3) == [pinned.id, winner.id, Enum.at(roots, 19).id]
 
     children = "#comment-thread-#{winner.id}-children"
     assert has_element?(view, "#{children} > div:first-child #comment-#{early_reply.id}")
@@ -439,7 +439,7 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
     ids = comments |> Enum.map(& &1.id) |> Enum.sort()
 
     for sort <- [:most_liked, :oldest, :newest] do
-      expected = if sort == :newest, do: Enum.reverse(ids), else: ids
+      expected = if sort == :oldest, do: ids, else: Enum.reverse(ids)
 
       actual =
         for page <- 1..3 do

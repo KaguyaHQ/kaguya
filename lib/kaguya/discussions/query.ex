@@ -55,7 +55,7 @@ defmodule Kaguya.Discussions.Query do
     do: order_by(query, [c], asc: c.inserted_at, asc: c.id)
 
   def apply_comment_sorting(query, :most_liked),
-    do: order_by(query, [c], desc: c.likes_count, asc: c.inserted_at, asc: c.id)
+    do: order_by(query, [c], desc: c.likes_count, desc: c.inserted_at, desc: c.id)
 
   def apply_comment_sorting(query, _), do: apply_comment_sorting(query, :newest)
 
