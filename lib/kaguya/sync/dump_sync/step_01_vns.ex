@@ -50,8 +50,7 @@ defmodule Kaguya.Sync.DumpSync.VNs do
     :min_age,
     :has_ero,
     :is_avn,
-    :aliases,
-    :title_category
+    :aliases
   ]
 
   # VNDB tag IDs for the "3D-rendered art" cluster — discriminator for AVN

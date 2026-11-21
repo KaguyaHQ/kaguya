@@ -613,6 +613,41 @@ defmodule Kaguya.VisualNovels.MergeTest do
       assert shared.width == 800
     end
 
+    test "manual covers without VNDB IDs survive across canonical and multiple sources" do
+      canonical = insert_vn!()
+      sources = [insert_vn!(), insert_vn!()]
+
+      image_ids =
+        Enum.map([canonical | sources], fn vn ->
+          insert_vn_image!(vn, nil, [])
+
+          image_id =
+            Repo.one!(
+              from i in Kaguya.VisualNovels.Image,
+                where: i.visual_novel_id == ^vn.id,
+                select: i.id
+            )
+
+          Repo.update_all(from(v in VisualNovel, where: v.id == ^vn.id),
+            set: [primary_image_id: image_id]
+          )
+
+          image_id
+        end)
+
+      assert {:ok, _} = Merge.merge_vns(canonical.id, Enum.map(sources, & &1.id), nil)
+
+      images =
+        Repo.all(
+          from i in Kaguya.VisualNovels.Image,
+            where: i.visual_novel_id == ^canonical.id,
+            select: i.id
+        )
+
+      assert Enum.sort(images) == Enum.sort(image_ids)
+      assert Repo.get!(VisualNovel, canonical.id).primary_image_id == hd(image_ids)
+    end
+
     test "vn_releases — same VNDB release id on canonical + source; canonical row wins" do
       [canonical, source] = insert_two_vns!()
       insert_vn_release!(canonical, "r1", "Canonical Release Title")
@@ -731,6 +766,28 @@ defmodule Kaguya.VisualNovels.MergeTest do
         Merge.merge_vns(canonical.id, [source.id], nil, attrs: %{slug: target_slug})
 
       assert Repo.get!(VisualNovel, canonical.id).slug == target_slug
+    end
+
+    test "cover fallback is carried over when the canonical has none" do
+      [canonical, source] = insert_two_vns!()
+      url = "https://t.vndb.org/cv/01/12301.jpg"
+      source |> Ecto.Changeset.change(temp_image_url: url) |> Repo.update!()
+
+      assert {:ok, _} = Merge.merge_vns(canonical.id, [source.id], nil)
+      assert Repo.get!(VisualNovel, canonical.id).temp_image_url == url
+    end
+
+    test "an existing canonical cover fallback is preserved" do
+      [canonical, source] = insert_two_vns!()
+      url = "https://t.vndb.org/cv/01/12301.jpg"
+      canonical |> Ecto.Changeset.change(temp_image_url: url) |> Repo.update!()
+
+      source
+      |> Ecto.Changeset.change(temp_image_url: "https://t.vndb.org/cv/02/12302.jpg")
+      |> Repo.update!()
+
+      assert {:ok, _} = Merge.merge_vns(canonical.id, [source.id], nil)
+      assert Repo.get!(VisualNovel, canonical.id).temp_image_url == url
     end
 
     test "length_minutes — summed across all merged rows" do

@@ -27,6 +27,7 @@ defmodule Kaguya.Sync.DumpSync do
   import Ecto.Query
 
   alias Kaguya.Repo
+  alias Kaguya.Sitemaps.PublisherWorker
   alias Kaguya.Sync.DumpSync.Report
   alias Kaguya.Tags.Tag
   alias Kaguya.VisualNovels.BannedVndbId
@@ -68,7 +69,15 @@ defmodule Kaguya.Sync.DumpSync do
   @doc """
   Run all steps in order, or a single step by name.
 
+  Existing title categories are preserved. Newly imported VNs default to `:vn`;
+  classification is performed separately from catalog sync.
+
   Options:
+    * `:cleanup_tags` — delete excluded tags during tag sync (default: true).
+      Set false when deferring removals.
+    * `:publish_sitemaps` — enqueue sitemap publishing after writes (default: true).
+    * `:new_nukige_ids` — reviewed VNDB IDs to classify as nukige on insertion.
+      Existing title categories are always preserved.
     * `:target_vndb_ids` — list of VNDB IDs (e.g. ["v12345"]) for selective import.
       When set, only those VNs are processed and steps that don't apply (producers,
       removals) are skipped automatically unless overridden with `:step`.
@@ -99,7 +108,10 @@ defmodule Kaguya.Sync.DumpSync do
     else
       Report.start()
 
-      ctx = build_context(vndb, dry_run, target_vndb_ids)
+      ctx =
+        build_context(vndb, dry_run, target_vndb_ids)
+        |> Map.put(:cleanup_tags, Keyword.get(opts, :cleanup_tags, true))
+        |> Map.put(:category_map, Map.new(Keyword.get(opts, :new_nukige_ids, []), &{&1, :nukige}))
 
       steps_to_run =
         if step_filter do
@@ -125,7 +137,8 @@ defmodule Kaguya.Sync.DumpSync do
       Report.stop()
 
       Logger.info("Dump sync finished. Results: #{inspect(results)}")
-      if not dry_run, do: Kaguya.Sitemaps.PublisherWorker.enqueue_full()
+
+      unless dry_run, do: maybe_publish_sitemaps(opts)
       results
     end
   end
@@ -219,8 +232,7 @@ defmodule Kaguya.Sync.DumpSync do
           """
           WITH per_tag AS (
             SELECT tv.vid, tc.classification,
-                   COUNT(*) as voters,
-                   AVG(tv.vote)::numeric as avg_vote
+                   SUM(tv.vote) AS vote_weight
             FROM tags_vn tv
             JOIN _tag_class tc ON tc.tag_id = tv.tag
             WHERE NOT tv.ignore AND tc.classification IN ('ero', 'narrative')
@@ -228,7 +240,7 @@ defmodule Kaguya.Sync.DumpSync do
           ),
           signals AS (
             SELECT vid, classification,
-                   GREATEST(voters * avg_vote, 0) as signal
+                   GREATEST(vote_weight, 0) as signal
             FROM per_tag
           ),
           per_vn AS (
@@ -295,7 +307,10 @@ defmodule Kaguya.Sync.DumpSync do
           SELECT tv.vid, tv.tag,
                  COUNT(*) as voters,
                  AVG(tv.vote)::numeric as avg_vote,
-                 ROW_NUMBER() OVER (PARTITION BY tv.vid ORDER BY COUNT(*) DESC) as rank
+                 ROW_NUMBER() OVER (
+                   PARTITION BY tv.vid
+                   ORDER BY COUNT(*) DESC, CAST(SUBSTRING(tv.tag FROM 2) AS integer)
+                 ) as rank
           FROM tags_vn tv
           WHERE NOT tv.ignore AND tv.vote > 0
           GROUP BY tv.vid, tv.tag
@@ -400,7 +415,7 @@ defmodule Kaguya.Sync.DumpSync do
 
   @doc "Execute a query against the VNDB dump. Raises on error."
   def query_vndb!(vndb, sql, params \\ []) do
-    case Postgrex.query(vndb, sql, params) do
+    case Postgrex.query(vndb, sql, params, timeout: :infinity) do
       {:ok, %{rows: rows, columns: columns}} ->
         rows_to_maps(rows, columns)
 
@@ -411,7 +426,7 @@ defmodule Kaguya.Sync.DumpSync do
 
   @doc "Execute a query against the VNDB dump. Returns [] on error (use for non-critical reads)."
   def query_vndb(vndb, sql, params \\ []) do
-    case Postgrex.query(vndb, sql, params) do
+    case Postgrex.query(vndb, sql, params, timeout: :infinity) do
       {:ok, %{rows: rows, columns: columns}} ->
         rows_to_maps(rows, columns)
 
@@ -423,7 +438,7 @@ defmodule Kaguya.Sync.DumpSync do
 
   @doc "Execute a query and return raw rows. Raises on error."
   def query_vndb_raw!(vndb, sql, params \\ []) do
-    case Postgrex.query(vndb, sql, params) do
+    case Postgrex.query(vndb, sql, params, timeout: :infinity) do
       {:ok, %{rows: rows}} -> rows
       {:error, err} -> raise "VNDB query failed: #{inspect(err)}"
     end
@@ -431,7 +446,7 @@ defmodule Kaguya.Sync.DumpSync do
 
   @doc "Execute a query and return raw rows. Returns [] on error."
   def query_vndb_raw(vndb, sql, params \\ []) do
-    case Postgrex.query(vndb, sql, params) do
+    case Postgrex.query(vndb, sql, params, timeout: :infinity) do
       {:ok, %{rows: rows}} ->
         rows
 
@@ -546,24 +561,19 @@ defmodule Kaguya.Sync.DumpSync do
 
   # ── Private ─────────────────────────────────────────────────────────────────
 
+  defp maybe_publish_sitemaps(opts) do
+    if Keyword.get(opts, :publish_sitemaps, true), do: PublisherWorker.enqueue_full()
+  end
+
   defp build_context(vndb, dry_run, target_vndb_ids) do
     banned_ids = load_banned_ids()
-
-    # Classify nukige from VNDB dump tag data (ero_prop >= 0.75)
-    # Exclude banned VNs — they must never be categorized or imported
-    nukige_ids = classify_nukige_from_dump(vndb)
-
-    category_map =
-      nukige_ids
-      |> Enum.reject(fn id -> MapSet.member?(banned_ids, id) end)
-      |> Map.new(fn id -> {id, :nukige} end)
 
     ctx = %{
       vndb: vndb,
       dry_run: dry_run,
       vn_mapping: load_vn_mapping(),
       banned_ids: banned_ids,
-      category_map: category_map,
+      category_map: %{},
       tag_mapping: load_tag_mapping(),
       char_mapping: load_char_mapping(),
       producer_mapping: load_producer_mapping(),
@@ -603,8 +613,7 @@ defmodule Kaguya.Sync.DumpSync do
         "#{map_size(ctx.tag_mapping)} tags, " <>
         "#{map_size(ctx.char_mapping)} characters, " <>
         "#{map_size(ctx.producer_mapping)} producers, " <>
-        "#{MapSet.size(ctx.banned_ids)} banned, " <>
-        "#{map_size(ctx.category_map)} nukige (classifier)"
+        "#{MapSet.size(ctx.banned_ids)} banned"
     )
   end
 

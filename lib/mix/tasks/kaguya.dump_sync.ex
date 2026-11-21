@@ -10,6 +10,8 @@ defmodule Mix.Tasks.Kaguya.DumpSync do
       mix kaguya.dump_sync --overview              # show Kaguya vs VNDB counts only
       mix kaguya.dump_sync --dry-run                # show counts, don't write
       mix kaguya.dump_sync --vndb-db vndb_latest    # use a different source database
+      mix kaguya.dump_sync --step vns,producers,characters,quotes,tags,relations,releases --no-cleanup-tags --no-publish-sitemaps
+                                                  # metadata only, defer removals and publishing
 
   ## Steps (in execution order)
 
@@ -34,7 +36,14 @@ defmodule Mix.Tasks.Kaguya.DumpSync do
 
     {opts, _, _} =
       OptionParser.parse(args,
-        strict: [step: :string, dry_run: :boolean, overview: :boolean, vndb_db: :string],
+        strict: [
+          step: :string,
+          dry_run: :boolean,
+          overview: :boolean,
+          vndb_db: :string,
+          cleanup_tags: :boolean,
+          publish_sitemaps: :boolean
+        ],
         aliases: [s: :step, n: :dry_run]
       )
 

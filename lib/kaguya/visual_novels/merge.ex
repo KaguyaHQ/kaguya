@@ -18,7 +18,7 @@ defmodule Kaguya.VisualNovels.Merge do
 
   Caller picks one slug as canonical and lists the others as sources.
   Every association on a source row is migrated to the canonical with
-  conflict resolution per the rules in `docs/plans/vn-merge-plan.md`. Source slugs
+  conflict resolution per the rules in `ops/vn-merges.md`. Source slugs
   + VNDB ids are registered in `vn_merges` (so VNDB sync skips them and
   the audit trail survives the source row's deletion). Source slugs are
   also recorded in `slug_redirects` so old URLs resolve to the canonical.
@@ -39,8 +39,7 @@ defmodule Kaguya.VisualNovels.Merge do
     caller (mod-curated edits). Returns a plain map for the changeset.
 
   ### 3. Transaction (`Repo.transact/1`, all-or-nothing)
-    1. Migrate all 27 dependent tables (see `Per-table rules` in
-       `docs/plans/vn-merge-plan.md`)
+    1. Migrate dependent tables (see conflict rules in `ops/vn-merges.md`)
     2. Update the canonical `visual_novels` row with resolved attrs
     3. Recompute aggregates (rating stats, tag relevance)
     4. Insert `vn_merges` registry rows for each source
@@ -65,13 +64,14 @@ defmodule Kaguya.VisualNovels.Merge do
   | `reviews`             | Most recent `updated_at`, falling back to longest `body`. The user's most current published take. |
   | `reading_statuses`    | Most progressed (`read > currently_reading > on_hold > did_not_finish > not_interested > want_to_read`); ties break on `updated_at`. |
   | `shelf_items`         | Per-shelf dedup; user's multi-shelf placements all survive. |
-  | `list_items`          | Per-list dedup; lowest position wins. |
-  | `vn_tag_votes`        | Per-tag dedup; max upvotes/downvotes (no double counting). |
-  | `vn_similarity_votes` | Most recent. |
+  | `list_items`          | Per-list dedup; canonical placement wins, otherwise one source placement. |
+  | `vn_tag_votes`        | Most recent `inserted_at` per user/tag, then UUID. |
+  | `vn_similarity_votes` | Canonical row wins on a composite-key conflict, otherwise one source row. |
 
-  The principle: never silently drop a user's standalone content; the
-  only "loss" is replacing an older record with a newer one written by
-  the same user.
+  Standalone user rows migrate to the canonical. Competing rows are
+  reduced according to the rules above; generic association conflicts
+  prefer the canonical row, then one source row. Review those conflicts
+  before execution as described in `ops/vn-merges.md`.
   """
 
   import Ecto.Query
@@ -149,7 +149,8 @@ defmodule Kaguya.VisualNovels.Merge do
       description, etc.). Auto-resolved values are used for any field
       not in the override.
     * `:dry_run` — boolean. If true, returns the resolved attrs and
-      counts without mutating the DB. Default false.
+      source identities without mutating the DB. It does not exercise
+      migration SQL or enumerate association conflicts. Default false.
 
   Returns `{:ok, %{canonical_id, merged: n, …}}` or `{:error, reason}`.
   """
@@ -212,6 +213,7 @@ defmodule Kaguya.VisualNovels.Merge do
       vndb_rating: weighted_avg_decimal(all, :vndb_rating, :vndb_vote_count),
       vndb_vote_count: sum(all, :vndb_vote_count),
       primary_image_id: pick_first_non_nil([canonical | sources], :primary_image_id),
+      temp_image_url: pick_first_non_nil([canonical | sources], :temp_image_url),
       featured_screenshot_id: pick_first_non_nil([canonical | sources], :featured_screenshot_id),
       is_cover_pinned: any_true(all, :is_cover_pinned),
       hidden_at: pick_min(all, :hidden_at),
@@ -474,12 +476,14 @@ defmodule Kaguya.VisualNovels.Merge do
   # The DELETE below does (1) and (2) in one pass via ROW_NUMBER over
   # PARTITION BY conflict_cols, ordered to prefer canonical's row, then
   # an arbitrary stable tiebreak by ctid. The remaining sources are then
-  # safely re-pointed.
+  # safely re-pointed. NULL keys stay distinct, matching PostgreSQL unique
+  # indexes: two manually uploaded covers without VNDB IDs are not duplicates.
   defp migrate_composite_pk(table, vn_col, conflict_cols, canonical_id, source_ids) do
     canonical_bin = Ecto.UUID.dump!(canonical_id)
     source_bins = Enum.map(source_ids, &Ecto.UUID.dump!/1)
     all_bins = [canonical_bin | source_bins]
     cols_csv = Enum.map_join(conflict_cols, ", ", &"\"#{&1}\"")
+    non_null_keys = Enum.map_join(conflict_cols, " AND ", &"\"#{&1}\" IS NOT NULL")
 
     Repo.query!(
       """
@@ -491,6 +495,7 @@ defmodule Kaguya.VisualNovels.Merge do
           ) AS rn
           FROM "#{table}"
           WHERE "#{vn_col}" = ANY($1::uuid[])
+            AND #{non_null_keys}
         ) ranked
         WHERE d.ctid = ranked.ctid AND ranked.rn > 1
       """,
@@ -977,6 +982,7 @@ defmodule Kaguya.VisualNovels.Merge do
   @merge_put_change_fields [
     :slug,
     :length_minutes,
+    :temp_image_url,
     :hidden_at,
     :is_locked,
     :is_cover_pinned,
@@ -1254,7 +1260,12 @@ defmodule Kaguya.VisualNovels.Merge do
 
   defp post_transaction_cleanup(canonical_id, source_ids) do
     SearchIndex.remove_visual_novels(source_ids)
-    canonical = Repo.get!(VisualNovel, canonical_id)
+
+    canonical =
+      VisualNovel
+      |> Repo.get!(canonical_id)
+      |> Repo.preload([:vn_titles, vn_producers: :producer])
+
     SearchIndex.index_visual_novels(canonical)
     # Refresh browse cache so the newly-merged canonical replaces the
     # source rows in any cached browse sections. Mirrors `Deletion`.

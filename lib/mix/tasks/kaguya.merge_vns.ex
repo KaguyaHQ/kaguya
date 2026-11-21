@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Kaguya.MergeVns do
 
   ## Usage
 
-      # Preview the merge — shows resolved canonical attrs and counts
+      # Preview the merge — shows resolved canonical attrs and source identities
       mix kaguya.merge_vns \\
         --canonical=summers-gone \\
         --sources=summers-gone-season-1,summers-gone-season-2-constellations
@@ -42,9 +42,9 @@ defmodule Mix.Tasks.Kaguya.MergeVns do
   exits if any are missing.
 
   After execute, sources are deleted, their slugs and VNDB ids are
-  registered in `vn_merges` (so VNDB sync skips them and the URL router
-  can 301 to the canonical), and the canonical row is updated with the
-  resolved field values. See `docs/plans/vn-merge-plan.md` and the `Merge` module's
+  registered in `vn_merges` (so VNDB sync skips them and old URLs resolve
+  to the canonical), and the canonical row is updated with the
+  resolved field values. See `ops/vn-merges.md` and the `Merge` module's
   `@moduledoc` for the full per-table conflict-resolution rules.
   """
 

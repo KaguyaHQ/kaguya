@@ -28,7 +28,10 @@ defmodule Kaguya.Sync.DumpSync.Tags do
 
       tag_count = sync_tags(ctx, useless_vndb_ids)
       parent_count = sync_tag_parents(ctx)
-      unless ctx.dry_run, do: delete_useless_tags(useless_vndb_ids)
+
+      if not ctx.dry_run and Map.get(ctx, :cleanup_tags, true),
+        do: delete_useless_tags(useless_vndb_ids)
+
       vn_tag_count = sync_vn_tags(ctx)
       {:ok, tag_count + parent_count + vn_tag_count}
     end

@@ -199,6 +199,9 @@ mix kaguya.merge_vns \
 
 Execute by adding `--execute`.
 
+Follow the [VN merge procedure](ops/vn-merges.md) for identity checks, duplicate
+metadata overrides, rehearsal, backups, user-data conflicts, and verification.
+
 ## Search
 
 Search documents are indexed into Meilisearch. VN documents include normalized
