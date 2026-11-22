@@ -423,8 +423,17 @@ defmodule KaguyaWeb.ListLive.Form do
 
   defp use_picked_vn(%{assigns: %{item_type: "character"}} = socket, vn) do
     excluded_ids = Enum.map(socket.assigns.selected_items, & &1.id)
-    picker = %{vn: %{id: vn.id, title: vn.title}, cast: load_cast(vn.id, excluded_ids)}
-    assign(socket, :cast_picker, picker)
+    cast = load_cast(vn.id, excluded_ids)
+
+    # An empty picker means either every character is already on the list or
+    # the VN has none listed; the dialog says which.
+    has_cast? = cast != [] or MapSet.member?(Characters.vn_ids_with_pickable_cast([vn.id]), vn.id)
+
+    assign(socket, :cast_picker, %{
+      vn: %{id: vn.id, title: vn.title},
+      cast: cast,
+      has_cast?: has_cast?
+    })
   end
 
   defp use_picked_vn(socket, vn) do

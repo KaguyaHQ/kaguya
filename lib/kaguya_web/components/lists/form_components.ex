@@ -645,7 +645,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
   attr :picker, :map,
     default: nil,
-    doc: "`%{vn: %{id, title}, cast: [character]}` while picking characters, else nil."
+    doc: "`%{vn: %{id, title}, cast: [character], has_cast?: boolean}` while picking, else nil."
 
   def cast_picker(assigns) do
     ~H"""
@@ -683,7 +683,9 @@ defmodule KaguyaWeb.Lists.FormComponents do
             :if={@picker.cast == []}
             class="text-foreground-tertiary text-style-body2Regular flex h-[200px] items-center justify-center text-center"
           >
-            Everyone from this VN is already on your list.
+            {if @picker.has_cast?,
+              do: "Everyone from this VN is already on your list.",
+              else: "No characters are listed for this VN yet."}
           </p>
           <div :if={@picker.cast != []} class="grid grid-cols-3 gap-3 sm:grid-cols-4">
             <button

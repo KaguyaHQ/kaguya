@@ -156,6 +156,45 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       assert has_element?(view, "#cast-picker-character-#{ctx.hero.id}")
     end
 
+    test "VNs without characters aren't offered for their cast", ctx do
+      castless = insert_vn!()
+
+      stub_search(
+        characters: [],
+        visual_novels: [
+          %{id: castless.id, title: castless.title, slug: castless.slug},
+          %{id: ctx.vn.id, title: ctx.vn.title, slug: ctx.vn.slug}
+        ]
+      )
+
+      {:ok, view, _html} = live(conn_for(ctx.user), ~p"/list/new?type=character")
+
+      view
+      |> element("#desktop-list-character-search-form")
+      |> render_change(%{"search" => %{"query" => "vn"}})
+
+      refute has_element?(view, "#picker-vn-#{castless.id}")
+      assert has_element?(view, "#picker-vn-#{ctx.vn.id}")
+    end
+
+    test "the cast picker says when a VN has no characters, or all are added", ctx do
+      castless = insert_vn!()
+      {:ok, view, _html} = live(conn_for(ctx.user), ~p"/list/new?type=character")
+
+      render_click(view, "add_item", %{"id" => castless.id})
+      assert has_element?(view, "#lists-cast-picker", "No characters are listed for this VN yet.")
+
+      render_click(view, "close_cast_picker", %{})
+      render_click(view, "add_item", %{"id" => ctx.vn.id})
+      view |> element("#cast-picker-add-all") |> render_click()
+
+      assert has_element?(
+               view,
+               "#lists-cast-picker",
+               "Everyone from this VN is already on your list."
+             )
+    end
+
     test "Escape closes the search results", ctx do
       stub_search(characters: [hit(ctx.hero, ctx.vn.title)], visual_novels: [])
 

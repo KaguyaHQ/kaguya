@@ -203,6 +203,24 @@ defmodule Kaguya.Characters do
   end
 
   @doc """
+  The subset of `vn_ids` that have at least one character a picker would
+  offer (see `list_pickable_cast/2`).
+  """
+  def vn_ids_with_pickable_cast([]), do: MapSet.new()
+
+  def vn_ids_with_pickable_cast(vn_ids) do
+    from(vc in VNCharacter,
+      join: c in Character,
+      on: c.id == vc.character_id,
+      where: vc.visual_novel_id in ^vn_ids and vc.spoiler_level <= 0 and is_nil(c.hidden_at),
+      distinct: true,
+      select: vc.visual_novel_id
+    )
+    |> Repo.all()
+    |> MapSet.new()
+  end
+
+  @doc """
   A VN's cast for character pickers (profile favorites, character lists),
   ordered by role then name. Appearances marked as spoilers and hidden
   characters are left out. Returns `[%{character: %Character{}, role: role}]`.

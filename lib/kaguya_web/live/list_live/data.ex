@@ -9,6 +9,7 @@ defmodule KaguyaWeb.ListLive.Data do
 
   import Ecto.Query
 
+  alias Kaguya.Characters
   alias Kaguya.Lists
   alias Kaguya.Lists.{List, ListLike}
   alias Kaguya.Repo
@@ -181,17 +182,35 @@ defmodule KaguyaWeb.ListLive.Data do
     )
   end
 
+  @picker_vn_count 3
+
   @doc """
   Search for the character list editor: characters by name (or by their VN's
   title), plus VNs whose cast can be added. Both searches run concurrently.
+  VNs without any pickable characters are left out, since offering their
+  cast would open an empty picker.
   Returns `{:ok, %{characters: [...], visual_novels: [...]}}`.
   """
   def search_character_picker(query, viewer) do
+    # Over-fetch VNs so dropping cast-less ones still leaves a few.
     searches = [
       characters: fn -> VisualNovels.search_characters(query, 1, 8) end,
-      visual_novels: fn -> search_visual_novels(query, viewer, page_size: 3) end
+      visual_novels: fn ->
+        search_visual_novels(query, viewer, page_size: @picker_vn_count * 2)
+      end
     ]
 
+    with {:ok, results} <- run_searches(searches) do
+      {:ok, Map.update!(results, :visual_novels, &with_pickable_cast/1)}
+    end
+  end
+
+  defp with_pickable_cast(vns) do
+    has_cast = vns |> Enum.map(& &1.id) |> Characters.vn_ids_with_pickable_cast()
+    vns |> Enum.filter(&MapSet.member?(has_cast, &1.id)) |> Enum.take(@picker_vn_count)
+  end
+
+  defp run_searches(searches) do
     searches
     |> Task.async_stream(fn {key, search} -> {key, search.()} end,
       max_concurrency: 2,
