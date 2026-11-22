@@ -279,7 +279,12 @@ defmodule Kaguya.Characters do
   end
 
   def create_from_edit(attrs) do
-    with {:ok, character} <- %Character{} |> Character.changeset(attrs) |> Repo.insert(),
+    initial_attrs =
+      if Map.has_key?(attrs, :staged_image), do: Map.delete(attrs, :primary_image_id), else: attrs
+
+    with {:ok, character} <- %Character{} |> Character.changeset(initial_attrs) |> Repo.insert(),
+         :ok <- attach_staged_image(character, attrs),
+         {:ok, character} <- set_staged_primary(character, attrs),
          :ok <- sync_appearances(character, attrs) do
       reindex_search(character)
       {:ok, character}
@@ -293,7 +298,8 @@ defmodule Kaguya.Characters do
   def apply_edit(character, changes) do
     attrs = Map.take(changes, @edit_scalar_fields)
 
-    with {:ok, character} <- update_character_fields(character, attrs),
+    with :ok <- attach_staged_image(character, changes),
+         {:ok, character} <- update_character_fields(character, attrs),
          :ok <- sync_appearances(character, changes),
          :ok <- remove_character_images(character, changes),
          :ok <- sync_character_images(character, changes) do
@@ -301,6 +307,27 @@ defmodule Kaguya.Characters do
       {:ok, character}
     end
   end
+
+  # Runs inside the revision transaction, so the image, worker job, and history
+  # roll back together. Keep earlier images available for moderator reverts.
+  defp attach_staged_image(character, %{staged_image: image}) do
+    with {:ok, row} <-
+           Kaguya.CharacterImages.upload_image(character.id, image.id, image.uploaded_by),
+         {:ok, _row} <- row |> Ecto.Changeset.change(image.flags) |> Repo.update() do
+      :ok
+    end
+  end
+
+  defp attach_staged_image(_character, _attrs), do: :ok
+
+  defp set_staged_primary(character, %{staged_image: _} = attrs),
+    do:
+      update_character_fields(
+        character,
+        Map.take(attrs, [:primary_image_id, :is_image_nsfw, :is_image_suggestive])
+      )
+
+  defp set_staged_primary(character, _attrs), do: {:ok, character}
 
   # Atomic image removal inside the edit transaction. Mirrors how
   # remove_covers / remove_screenshots work in `Kaguya.VisualNovels` so

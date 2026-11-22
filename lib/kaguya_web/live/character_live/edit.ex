@@ -3,8 +3,14 @@ defmodule KaguyaWeb.CharacterLive.Edit do
 
   alias Kaguya.Authorization
   alias Kaguya.Characters
+  alias Kaguya.Characters.Contributions
   alias Kaguya.Revisions
+  alias KaguyaWeb.CharacterLive.Edit.Uploads, as: ImageUploads
   alias KaguyaWeb.Components.Shared.NotFoundPage
+  alias KaguyaWeb.SharedComponents.CharacterImage
+
+  import KaguyaWeb.UI.Button, only: [button: 1]
+  import KaguyaWeb.UI.Checkbox, only: [checkbox: 1]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,6 +24,7 @@ defmodule KaguyaWeb.CharacterLive.Edit do
        state: :loading,
        can_moderate: false,
        base_revision: 0,
+       staged_uploads: %{},
        appearances: %{},
        original_appearances: %{},
        original_form: empty_form(),
@@ -25,6 +32,11 @@ defmodule KaguyaWeb.CharacterLive.Edit do
        appearance_query: "",
        appearance_results: %{},
        form: empty_form()
+     )
+     |> allow_upload(:character_image,
+       accept: ~w(.jpg .jpeg .png .webp),
+       max_entries: 1,
+       max_file_size: 10_000_000
      )
      |> stream(:appearances, [])
      |> stream(:appearance_results, [])}
@@ -136,7 +148,8 @@ defmodule KaguyaWeb.CharacterLive.Edit do
              "save",
              "search_appearance_vns",
              "add_appearance",
-             "remove_appearance"
+             "remove_appearance",
+             "cancel_image"
            ] and
              state not in [:editing, :creating] do
     {:noreply, put_flash(socket, :error, "You do not have permission to edit this character.")}
@@ -194,61 +207,88 @@ defmodule KaguyaWeb.CharacterLive.Edit do
         %{visual_novel_id: id, role: row.role, spoiler_level: row.spoiler_level}
       end)
 
-    case socket.assigns.live_action do
-      :new ->
-        attrs = %{
-          name: form["name"],
-          description: form["description"],
-          appearances: appearances
-        }
+    changes = %{name: form["name"], description: form["description"], appearances: appearances}
 
-        case Revisions.create_entity(:character, attrs, summary, socket.assigns.current_user) do
-          {:ok, %{entity: character}} ->
-            invalidate_appearance_pages(socket)
+    changes =
+      if socket.assigns.character do
+        changes
+        |> maybe_put_hidden_at(socket.assigns.character, form)
+        |> maybe_put_is_locked(socket.assigns.character, form)
+      else
+        changes
+      end
 
-            {:noreply,
-             socket
-             |> assign(form: form)
-             |> put_flash(:info, "Character created.")
-             |> push_navigate(to: "/character/#{character.slug}")}
+    case ImageUploads.stage(socket, form) do
+      {:ok, staged_socket, image} ->
+        finish_save(staged_socket, form, changes, summary, image)
 
-          {:error, reason} ->
-            {:noreply,
-             socket
-             |> assign(:form, form)
-             |> put_flash(:error, format_revision_error(reason))}
-        end
-
-      :edit ->
-        changes =
-          %{name: form["name"], description: form["description"], appearances: appearances}
-          |> maybe_put_hidden_at(socket.assigns.character, form)
-          |> maybe_put_is_locked(socket.assigns.character, form)
-
-        case Revisions.submit_edit(
-               :character,
-               socket.assigns.character.id,
-               changes,
-               summary,
-               socket.assigns.current_user,
-               base_revision: socket.assigns.base_revision
-             ) do
-          {:ok, _change} ->
-            invalidate_appearance_pages(socket)
-
-            {:noreply,
-             socket
-             |> assign(form: form)
-             |> put_flash(:info, "Character updated.")
-             |> push_navigate(to: "/character/#{socket.assigns.slug}")}
-
-          {:error, reason} ->
-            {:noreply,
-             socket
-             |> assign(:form, form)
-             |> put_flash(:error, format_revision_error(reason))}
-        end
+      {:error, staged_socket, message} ->
+        {:noreply, staged_socket |> assign(:form, form) |> put_flash(:error, message)}
     end
+  end
+
+  def handle_event("cancel_image", %{"ref" => ref}, socket) do
+    if Enum.any?(socket.assigns.uploads.character_image.entries, &(&1.ref == ref)) do
+      {:noreply,
+       socket
+       |> cancel_upload(:character_image, ref)
+       |> assign(
+         :form,
+         Map.merge(
+           socket.assigns.form,
+           Map.take(socket.assigns.original_form, ["image_nsfw", "image_suggestive"])
+         )
+       )
+       |> assign(:staged_uploads, Map.delete(socket.assigns.staged_uploads, ref))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp finish_save(socket, form, changes, summary, image) do
+    case save_character(socket, changes, summary, image) do
+      {:ok, result} ->
+        character =
+          if socket.assigns.live_action == :new,
+            do: result.entity,
+            else: socket.assigns.character
+
+        invalidate_appearance_pages(socket)
+
+        {:noreply,
+         socket
+         |> ImageUploads.complete()
+         |> assign(form: form)
+         |> put_flash(
+           :info,
+           if(socket.assigns.live_action == :new,
+             do: "Character created.",
+             else: "Character updated."
+           )
+         )
+         |> push_navigate(to: "/character/#{character.slug}")}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:form, form)
+         |> put_flash(:error, format_revision_error(reason))}
+    end
+  end
+
+  defp save_character(%{assigns: %{live_action: :new}} = socket, attrs, summary, image) do
+    Contributions.create(attrs, summary, socket.assigns.current_user, image)
+  end
+
+  defp save_character(socket, attrs, summary, image) do
+    Contributions.update(
+      socket.assigns.character.id,
+      attrs,
+      summary,
+      socket.assigns.current_user,
+      socket.assigns.base_revision,
+      image
+    )
   end
 
   @impl true
@@ -318,7 +358,12 @@ defmodule KaguyaWeb.CharacterLive.Edit do
         id="character-edit"
         for={@editor_form}
         phx-hook="UnsavedChanges"
-        data-dirty={to_string(@form != @original_form or @appearances != @original_appearances)}
+        data-dirty={
+          to_string(
+            @form != @original_form or @appearances != @original_appearances or
+              @uploads.character_image.entries != []
+          )
+        }
         class="bg-surface-base border-border-divider mt-6 rounded-[8px] border p-4"
         phx-change="validate"
         phx-submit="save"
@@ -345,6 +390,122 @@ defmodule KaguyaWeb.CharacterLive.Edit do
               class="bg-surface-elevated border-border-divider min-h-[180px] rounded-[6px] border px-3 py-2 text-[rgb(var(--foreground-primary))] outline-none"
             ><%= @form["description"] %></textarea>
           </label>
+
+          <section id="character-image-editor" class="border-border-divider space-y-4 border-t pt-5">
+            <div>
+              <h2 class="text-foreground-primary text-style-body1Medium">Character image</h2>
+              <p class="text-foreground-secondary text-style-body2Regular mt-1">
+                Choose a clear portrait. Your image is saved with your other changes.
+              </p>
+            </div>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div class="bg-surface-elevated size-32 shrink-0 overflow-hidden rounded-lg">
+                <.live_img_preview
+                  :for={entry <- @uploads.character_image.entries}
+                  entry={entry}
+                  id={"character-image-preview-#{entry.ref}"}
+                  class="size-full object-contain"
+                  alt="Selected character image"
+                />
+                <CharacterImage.character_image
+                  :if={@uploads.character_image.entries == [] && @character}
+                  character={@character}
+                  class="size-full object-contain"
+                  fallback_class="size-full"
+                  enable_nsfw_reveal
+                  alt="Current character image"
+                />
+                <div
+                  :if={@uploads.character_image.entries == [] && is_nil(@character)}
+                  class="text-foreground-tertiary flex size-full items-center justify-center"
+                  aria-label="No character image selected"
+                >
+                  <Lucide.image class="size-8" aria-hidden />
+                </div>
+              </div>
+              <div class="min-w-0 flex-1 space-y-3">
+                <label
+                  for={@uploads.character_image.ref}
+                  class="text-foreground-primary text-style-body2Medium block"
+                >
+                  <%= cond do %>
+                    <% @uploads.character_image.entries != [] -> %>
+                      Selected image
+                    <% @character && @character.primary_image_id -> %>
+                      Replace image
+                    <% true -> %>
+                      Upload image
+                  <% end %>
+                </label>
+                <.live_file_input
+                  upload={@uploads.character_image}
+                  class={[
+                    "border-text-field-border focus-visible:border-text-field-border-focus text-foreground-primary text-style-body2Regular w-full min-w-0 rounded-md border px-3 py-2 file:mr-3 file:border-0 file:bg-transparent file:text-inherit",
+                    @uploads.character_image.entries != [] && "hidden"
+                  ]}
+                />
+                <p class="text-foreground-secondary text-style-body2Regular">
+                  JPG, PNG, or WebP. Up to 10 MB.
+                </p>
+                <div :for={entry <- @uploads.character_image.entries} class="space-y-2">
+                  <p class="text-foreground-secondary text-style-body2Regular break-all">
+                    {entry.client_name}
+                  </p>
+                  <p
+                    :if={entry.progress > 0 && !entry.done?}
+                    class="text-foreground-secondary text-style-body2Regular"
+                    role="status"
+                  >
+                    Uploading: {entry.progress}%
+                  </p>
+                  <.button
+                    id={"character-image-cancel-#{entry.ref}"}
+                    variant="ghost"
+                    size="small"
+                    phx-click="cancel_image"
+                    phx-value-ref={entry.ref}
+                  >
+                    Cancel image selection
+                  </.button>
+                  <p
+                    :for={error <- upload_errors(@uploads.character_image, entry)}
+                    class="text-semantic-error text-style-body2Regular"
+                    role="alert"
+                  >
+                    {ImageUploads.error_message(error)}
+                  </p>
+                </div>
+                <p
+                  :for={error <- upload_errors(@uploads.character_image)}
+                  class="text-semantic-error text-style-body2Regular"
+                  role="alert"
+                >
+                  {ImageUploads.error_message(error)}
+                </p>
+                <fieldset :if={@uploads.character_image.entries != []} class="space-y-2">
+                  <legend class="text-foreground-primary text-style-body2Medium mb-2">
+                    Image content
+                  </legend>
+                  <label class="text-foreground-secondary text-style-body2Regular flex items-center gap-2">
+                    <.checkbox
+                      id="character-image-nsfw"
+                      name="character[image_nsfw]"
+                      value="true"
+                      checked={@form["image_nsfw"]}
+                    /> Explicit / NSFW
+                  </label>
+                  <label class="text-foreground-secondary text-style-body2Regular flex items-center gap-2">
+                    <.checkbox
+                      id="character-image-suggestive"
+                      name="character[image_suggestive]"
+                      value="true"
+                      checked={@form["image_suggestive"]}
+                    /> Suggestive
+                  </label>
+                </fieldset>
+              </div>
+            </div>
+          </section>
 
           <section id="character-appearances" class="border-border-divider space-y-4 border-t pt-5">
             <div>
@@ -594,7 +755,9 @@ defmodule KaguyaWeb.CharacterLive.Edit do
       "description" => "",
       "summary" => "",
       "is_hidden" => false,
-      "is_locked" => false
+      "is_locked" => false,
+      "image_nsfw" => false,
+      "image_suggestive" => false
     }
   end
 
@@ -604,7 +767,9 @@ defmodule KaguyaWeb.CharacterLive.Edit do
       "description" => character.description || "",
       "summary" => "",
       "is_hidden" => not is_nil(character.hidden_at),
-      "is_locked" => character.is_locked || false
+      "is_locked" => character.is_locked || false,
+      "image_nsfw" => character.is_image_nsfw || false,
+      "image_suggestive" => character.is_image_suggestive || false
     }
   end
 
@@ -614,7 +779,10 @@ defmodule KaguyaWeb.CharacterLive.Edit do
       "description" => normalize_text(Map.get(attrs, "description", current_form["description"])),
       "summary" => normalize_text(Map.get(attrs, "summary", current_form["summary"])),
       "is_hidden" => truthy?(Map.get(attrs, "is_hidden", Map.get(current_form, "is_hidden"))),
-      "is_locked" => truthy?(Map.get(attrs, "is_locked", Map.get(current_form, "is_locked")))
+      "is_locked" => truthy?(Map.get(attrs, "is_locked", Map.get(current_form, "is_locked"))),
+      "image_nsfw" => truthy?(Map.get(attrs, "image_nsfw", current_form["image_nsfw"])),
+      "image_suggestive" =>
+        truthy?(Map.get(attrs, "image_suggestive", current_form["image_suggestive"]))
     }
   end
 
