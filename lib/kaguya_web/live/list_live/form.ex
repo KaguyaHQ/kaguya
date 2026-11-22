@@ -323,6 +323,15 @@ defmodule KaguyaWeb.ListLive.Form do
     current_user = socket.assigns.current_user
 
     cond do
+      socket.assigns.item_type == "character" and Enum.all?(layout.items, &is_nil(&1.tier_id)) ->
+        message = "Rank at least one character to publish the list"
+
+        {:noreply,
+         socket
+         |> assign_form_attrs(attrs)
+         |> assign(:item_error, message)
+         |> put_flash(:error, message)}
+
       layout.items == [] ->
         message = "Add at least one #{item_noun(socket.assigns.item_type)} to publish the list"
 

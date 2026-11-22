@@ -399,14 +399,17 @@ defmodule Kaguya.Lists.Layout do
 
   Items are keyed by `item_key/1` for the list's item type. Duplicate items
   are rejected. Grid saves keep the flat `position` order while preserving
-  tier placement fields for mode switching.
+  tier placement fields for mode switching. Character lists are always tier
+  lists and save only placed characters (`{:error, :no_ranked_items}` when
+  none are).
   """
   def save_list_layout(list_id, user_id, attrs) when is_map(attrs) do
     Repo.transact(fn ->
       defer_list_tier_position_constraint()
 
-      with {:ok, display_mode} <- normalize_display_mode(Map.get(attrs, :display_mode)),
+      with {:ok, requested_mode} <- normalize_display_mode(Map.get(attrs, :display_mode)),
            %List{} = list <- lock_list_for_owner(list_id, user_id),
+           display_mode = display_mode_for(list, requested_mode),
            {:ok, items} <- placement_items(list, Map.get(attrs, :items, [])),
            {:ok, item_ids} <- Placement.validate_items(items),
            {:ok, _ids} <- ensure_items_exist(list.item_type, item_ids),
@@ -416,8 +419,9 @@ defmodule Kaguya.Lists.Layout do
            # removed tier fall back to "unplaced" rather than a dead tier id.
            {:ok, arranged} <-
              Placement.arrange(display_mode, items, previous_placements(list), layout_tiers),
-           {:ok, true} <- replace_items(list, arranged) do
-        update_list_layout_metadata(list, display_mode, length(arranged))
+           {:ok, kept} <- keep_saved_items(list, arranged),
+           {:ok, true} <- replace_items(list, kept) do
+        update_list_layout_metadata(list, display_mode, length(kept))
       else
         nil -> {:error, :not_found}
         error -> error
@@ -437,6 +441,24 @@ defmodule Kaguya.Lists.Layout do
   end
 
   def maybe_ensure_default_tiers(_list), do: {:ok, []}
+
+  # Character lists are tier lists only.
+  defp display_mode_for(%List{item_type: "character"}, _requested), do: "tier"
+  defp display_mode_for(_list, requested), do: requested
+
+  # A character list's unranked pool is scratch space, as on most tier list
+  # sites: only characters placed in a tier are saved. Dropping the rest here
+  # keeps every reader (counts, thumbnails, SEO) in step with the page.
+  # Unplaced items sort last, so the kept positions stay contiguous. VN lists
+  # keep unplaced items, since they show in grid mode.
+  defp keep_saved_items(%List{item_type: "character"}, items) do
+    case Enum.reject(items, &is_nil(&1.tier_id)) do
+      [] -> {:error, :no_ranked_items}
+      placed -> {:ok, placed}
+    end
+  end
+
+  defp keep_saved_items(_list, items), do: {:ok, items}
 
   # Converts payload items (keyed by `:visual_novel_id` / `:character_id`) into
   # Placement's `:item_id` shape, keeping only the fields that were submitted

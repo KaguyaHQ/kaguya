@@ -46,6 +46,12 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       render_click(view, "set_item_type", %{"type" => "vn"})
       assert has_element?(view, "#list-form-item-type [aria-selected='true']", "Characters")
 
+      # Nothing ranked yet: saving is refused with a clear message.
+      view |> element("form#list-form") |> render_submit(%{"list" => %{"name" => "Cast ranking"}})
+      assert has_element?(view, "[role=alert]", "Rank at least one character")
+
+      rank!(view, [ctx.hero.id, ctx.rival.id])
+
       {:error, {:live_redirect, %{to: to}}} =
         view
         |> element("form#list-form")
@@ -118,6 +124,7 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       assert has_element?(view, "#list-layout-island")
       assert has_element?(view, "#list-form-item-type [aria-selected='true']", "Characters")
 
+      rank!(view, [namesake.id])
       view |> element("form#list-form") |> render_submit(%{"list" => %{"name" => "Best girls"}})
 
       list = Repo.get_by!(List, user_id: ctx.user.id, name: "Best girls")
@@ -180,6 +187,8 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       refute has_element?(view, "#cast-picker-character-#{ctx.hero.id}")
       view |> element("#cast-picker-character-#{ctx.rival.id}") |> render_click()
 
+      {:ok, [tier | _]} = Lists.list_tiers_for_list(list)
+      rank!(view, [ctx.hero.id, ctx.rival.id], tier.id)
       view |> element("form#list-form") |> render_submit(%{"list" => %{"name" => list.name}})
 
       assert Repo.aggregate(from(li in ListCharacterItem, where: li.list_id == ^list.id), :count) ==
@@ -209,6 +218,19 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       assert html =~ list.name
       assert html =~ ctx.hero.name
     end
+  end
+
+  # Drags characters into a tier, as the layout island reports it.
+  defp rank!(view, ids, tier_id \\ "tier-s") do
+    render_hook(view, "layout_changed", %{
+      "displayMode" => "tier",
+      "items" =>
+        ids
+        |> Enum.with_index(1)
+        |> Enum.map(fn {id, i} ->
+          %{"item_id" => id, "position" => i, "tierId" => tier_id, "tierPosition" => i}
+        end)
+    })
   end
 
   # Stubs Meilisearch for the editor's combined search. The LiveView and its

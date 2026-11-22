@@ -680,6 +680,7 @@ const TierBoard = ({layout, update}) => {
         <UnrankedPool
           itemIds={layout.unrankedItemIds}
           itemsById={layout.itemsById}
+          itemKind={layout.itemKind}
           onRemove={id => update(current => removeItem(current, id))}
         />
         <DragOverlay>
@@ -730,7 +731,7 @@ const TierRow = ({tier, itemIds, itemsById, onRemove}) => {
   )
 }
 
-const UnrankedPool = ({itemIds, itemsById, onRemove}) => {
+const UnrankedPool = ({itemIds, itemsById, itemKind, onRemove}) => {
   const {setNodeRef, isOver} = useDroppable({id: containerDropId("unranked")})
 
   return (
@@ -740,6 +741,12 @@ const UnrankedPool = ({itemIds, itemsById, onRemove}) => {
         <span className="bg-surface-elevated rounded-full px-2 py-0.5 text-xs font-normal">
           {itemIds.length}
         </span>
+        {/* Character lists save only ranked characters (VN lists keep unranked VNs for grid view). */}
+        {itemKind === "character" ? (
+          <span className="text-style-captionRegular text-foreground-tertiary font-normal">
+            Only ranked characters are saved
+          </span>
+        ) : null}
       </div>
       <SortableContext items={itemIds}>
         <div

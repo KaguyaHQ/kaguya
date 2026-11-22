@@ -23,7 +23,10 @@ defmodule Kaguya.Lists.CharacterListsTest do
     %{user: UserFixtures.insert_user!(), characters: for(n <- 1..3, do: insert_character!(n))}
   end
 
-  test "creates a character tier list with placements", %{user: user, characters: [c1, c2, c3]} do
+  test "saves ranked characters and drops the unranked pool", %{
+    user: user,
+    characters: [c1, c2, c3]
+  } do
     assert {:ok, list} =
              Lists.create_list_with_layout(
                user.id,
@@ -40,12 +43,41 @@ defmodule Kaguya.Lists.CharacterListsTest do
              )
 
     assert list.item_type == "character"
-    assert list.vns_count == 3
+    assert list.vns_count == 2
     refute Repo.exists?(from(li in ListItem, where: li.list_id == ^list.id))
 
     assert {:ok, rows} = Lists.list_all_characters_for_list(list)
-    assert Enum.map(rows, & &1.character.id) == [c2.id, c1.id, c3.id]
-    assert Enum.map(rows, & &1.tier_position) == [1, 1, nil]
+
+    assert Enum.map(rows, &{&1.character.id, &1.position, &1.tier_position}) == [
+             {c2.id, 1, 1},
+             {c1.id, 2, 1}
+           ]
+  end
+
+  test "a save with nothing ranked is refused", %{user: user, characters: [c1 | _]} do
+    assert {:error, :no_ranked_items} =
+             Lists.create_list_with_layout(
+               user.id,
+               %{name: "Unsorted", item_type: "character"},
+               %{display_mode: "tier", items: [%{character_id: c1.id}]}
+             )
+
+    refute Repo.get_by(List, user_id: user.id, name: "Unsorted")
+  end
+
+  test "character lists stay tier lists even if grid is requested", %{
+    user: user,
+    characters: [c1 | _]
+  } do
+    list = character_list!(user, [c1])
+
+    assert {:ok, saved} =
+             Lists.save_list_layout(list.id, user.id, %{
+               display_mode: "grid",
+               items: [%{character_id: c1.id}]
+             })
+
+    assert saved.display_mode == "tier"
   end
 
   test "item_type defaults to vn and can't be changed by update", %{user: user} do
@@ -79,7 +111,7 @@ defmodule Kaguya.Lists.CharacterListsTest do
              Lists.save_list_layout(list.id, user.id, layout.([%{character_id: hidden.id}]))
   end
 
-  test "removing a tier unassigns its characters", %{user: user, characters: [c1, c2 | _]} do
+  test "removing a tier drops its characters", %{user: user, characters: [c1, c2 | _]} do
     list = character_list!(user, [c1, c2])
     {:ok, [s, a | _]} = Lists.list_tiers_for_list(list)
 
@@ -89,7 +121,8 @@ defmodule Kaguya.Lists.CharacterListsTest do
         items: [%{character_id: c1.id, tier_id: s.id}, %{character_id: c2.id, tier_id: a.id}]
       })
 
-    # Drop the S tier; items omit tier fields so they keep their saved placement.
+    # Drop the S tier; items omit tier fields so they keep their saved placement,
+    # which leaves c1 unranked, so it isn't saved.
     {:ok, _} =
       Lists.save_list_layout(list.id, user.id, %{
         display_mode: "tier",
@@ -106,7 +139,7 @@ defmodule Kaguya.Lists.CharacterListsTest do
       )
       |> Map.new()
 
-    assert placements == %{c1.id => nil, c2.id => a.id}
+    assert placements == %{c2.id => a.id}
   end
 
   test "VN membership helpers ignore character lists", %{user: user, characters: [c1 | _]} do
@@ -156,7 +189,11 @@ defmodule Kaguya.Lists.CharacterListsTest do
       Lists.create_list_with_layout(
         user.id,
         %{name: "Characters #{System.unique_integer([:positive])}", item_type: "character"},
-        %{display_mode: "tier", items: Enum.map(characters, &%{character_id: &1.id})}
+        %{
+          display_mode: "tier",
+          tiers: @tiers,
+          items: Enum.map(characters, &%{character_id: &1.id, tier_id: "tier-s"})
+        }
       )
 
     list
