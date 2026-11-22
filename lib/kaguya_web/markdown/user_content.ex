@@ -6,12 +6,18 @@ defmodule KaguyaWeb.Markdown.UserContent do
   transform pass for Discord-style `||spoilers||`, link sanitization +
   VNDB-relative href rewriting, and a tag allowlist.
 
+  Pass `vn_cards:` (from `KaguyaWeb.Markdown.VnLinks`) to render paragraphs
+  made only of Kaguya VN links as cover cards; other links stay inline.
+
   Output is bare semantic HTML — styling (paragraph spacing, blockquote
   borders, etc.) lives in the caller's `.kaguya-markdown` container, not
   here.
   """
 
+  alias KaguyaWeb.Markdown.VnLinks
+
   @link_class "text-foreground-link no-underline hover:underline"
+  @vn_card_class "group/vn-card flex max-w-full min-w-0 items-center gap-2.5 rounded-lg border border-white/7 bg-white/3 py-1.5 pr-3.5 pl-1.5 no-underline transition-colors hover:border-white/12 hover:bg-white/6"
   @vndb_relative_pattern ~r{^/[a-z]\d+(?:[#?/.].*)?$}i
 
   @default_allowed_tags ~w(p br strong b em i del a span blockquote ul ol li pre code)
@@ -56,6 +62,9 @@ defmodule KaguyaWeb.Markdown.UserContent do
     allowed = Keyword.get(opts, :allowed_tags, preset_tags) |> MapSet.new()
     preprocess = Keyword.get(opts, :preprocess, preset_pre)
 
+    # Cards are links, so presets that strip anchors (bios) never get them.
+    vn_cards = if "a" in allowed, do: Keyword.get(opts, :vn_cards, %{}), else: %{}
+
     content = apply_preprocess(content, preprocess)
     {source, spoilers} = stash_spoilers(content)
 
@@ -64,6 +73,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
         html =
           ast
           |> walk(spoilers)
+          |> render_vn_cards(vn_cards)
           |> filter(allowed)
           |> Floki.raw_html()
           |> String.replace(@spoiler_escape, "||")
@@ -199,12 +209,119 @@ defmodule KaguyaWeb.Markdown.UserContent do
   end
 
   # ---------------------------------------------------------------------------
+  # VN cards — inside a top-level paragraph, each line holding only VN links
+  # becomes a row of cover cards; other lines stay text. Runs after `walk/2`,
+  # so hrefs are already sanitized. A line linking a VN missing from
+  # `vn_cards` stays inline.
+  # ---------------------------------------------------------------------------
+
+  defp render_vn_cards(ast, vn_cards) when map_size(vn_cards) == 0, do: ast
+  defp render_vn_cards(ast, vn_cards), do: Enum.flat_map(ast, &vn_card_block(&1, vn_cards))
+
+  defp vn_card_block({"p", attrs, children} = node, vn_cards) do
+    lines = children |> split_lines() |> Enum.map(&{&1, line_cards(&1, vn_cards, [])})
+
+    if Enum.any?(lines, fn {_line, cards} -> cards end) do
+      lines
+      |> Enum.chunk_by(fn {_line, cards} -> is_list(cards) end)
+      |> Enum.map(fn
+        [{_line, cards} | _] = chunk when is_list(cards) ->
+          vn_card_row(Enum.flat_map(chunk, &elem(&1, 1)))
+
+        chunk ->
+          {"p", attrs,
+           chunk |> Enum.map(&elem(&1, 0)) |> Enum.intersperse([{"br", [], []}]) |> Enum.concat()}
+      end)
+    else
+      [node]
+    end
+  end
+
+  defp vn_card_block(node, _vn_cards), do: [node]
+
+  defp split_lines(children) do
+    children
+    |> Enum.chunk_while(
+      [],
+      fn
+        {"br", _attrs, _children}, line -> {:cont, Enum.reverse(line), []}
+        child, line -> {:cont, [child | line]}
+      end,
+      fn line -> {:cont, Enum.reverse(line), []} end
+    )
+  end
+
+  # The line's cards, or nil when it holds anything besides known VN links.
+  defp line_cards([], _vn_cards, []), do: nil
+  defp line_cards([], _vn_cards, acc), do: Enum.reverse(acc)
+
+  defp line_cards([{"a", attrs, _children} | rest], vn_cards, acc) do
+    {"href", href} = List.keyfind(attrs, "href", 0, {"href", nil})
+
+    case Map.get(vn_cards, VnLinks.slug_from_href(href)) do
+      nil -> nil
+      card -> line_cards(rest, vn_cards, [card | acc])
+    end
+  end
+
+  defp line_cards([text | rest], vn_cards, acc) when is_binary(text) do
+    if String.trim(text) == "", do: line_cards(rest, vn_cards, acc), else: nil
+  end
+
+  defp line_cards(_line, _vn_cards, _acc), do: nil
+
+  defp vn_card_row(cards) do
+    {"div", [{"data-vn-cards", ""}, {"class", "my-3 flex flex-wrap gap-2"}],
+     Enum.map(cards, &vn_card/1)}
+  end
+
+  defp vn_card(card) do
+    {"a",
+     [
+       {"href", "/vn/" <> card.slug},
+       {"data-phx-link", "redirect"},
+       {"data-phx-link-state", "push"},
+       {"class", @vn_card_class}
+     ],
+     [
+       vn_card_cover(card),
+       {"span",
+        [
+          {"class",
+           "text-foreground-primary truncate text-sm font-medium group-hover/vn-card:underline"}
+        ], [card.title]}
+     ]}
+  end
+
+  defp vn_card_cover(%{cover_url: url} = card) when is_binary(url) do
+    blur = if card.cover_nsfw, do: [{"data-nsfw-blur", "1"}, {"style", "--nsfw-blur-size: 34;"}]
+
+    {"img",
+     [
+       {"src", url},
+       {"alt", ""},
+       {"loading", "lazy"},
+       {"width", "34"},
+       {"height", "48"},
+       {"class", "h-12 w-[34px] shrink-0 rounded object-cover"}
+       | blur || []
+     ], []}
+  end
+
+  defp vn_card_cover(_card),
+    do: {"span", [{"class", "h-12 w-[34px] shrink-0 rounded bg-white/6"}], []}
+
+  # ---------------------------------------------------------------------------
   # Allowlist filter — disallowed wrappers drop, children bubble up.
   # ---------------------------------------------------------------------------
 
   defp filter(ast, allowed) when is_list(ast), do: Enum.flat_map(ast, &filter_node(&1, allowed))
 
   defp filter_node(text, _allowed) when is_binary(text), do: [text]
+
+  # Card rows are built by `render_vn_cards/2`, never parsed from user input
+  # (MDEx escapes raw HTML), so their markup is trusted as-is.
+  defp filter_node({"div", [{"data-vn-cards", ""} | _], _children} = node, _allowed), do: [node]
 
   defp filter_node({tag, attrs, children}, allowed) do
     filtered_children = filter(children, allowed)

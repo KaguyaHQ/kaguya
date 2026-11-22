@@ -756,7 +756,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
         :if={@post.content}
         class="kaguya-markdown text-foreground-primary mt-4 text-sm/6 md:text-base md:leading-[26px]"
       >
-        {UserContent.to_html(@post.content)}
+        {UserContent.to_html(@post.content, vn_cards: Map.get(@post, :vn_cards, %{}))}
       </div>
 
       <span :if={@post.is_edited} class="text-foreground-tertiary mt-1 inline-block text-xs">

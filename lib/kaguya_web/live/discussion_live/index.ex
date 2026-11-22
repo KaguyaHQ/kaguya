@@ -167,13 +167,13 @@ defmodule KaguyaWeb.DiscussionLive.Index do
      )}
   end
 
-  def handle_event("clear_category_target", _params, socket) do
+  # Changing topic keeps the current one until another is picked, so
+  # Create Post never ends up disabled mid-change.
+  def handle_event("close_category_target_picker", _params, socket) do
     {:noreply,
      assign(socket,
-       new_post_selected_target: nil,
        new_post_target_query: "",
-       new_post_target_picker_open: true,
-       new_post_target_results: target_results("", socket.assigns)
+       new_post_target_picker_open: false
      )}
   end
 
@@ -447,7 +447,11 @@ defmodule KaguyaWeb.DiscussionLive.Index do
 
     case Discussions.search_category_targets("") do
       {:ok, targets} ->
-        vn_targets = Discussions.user_vn_targets(user_id)
+        vn_targets =
+          user_id
+          |> Discussions.user_vn_targets()
+          |> Enum.map(&Map.put(&1, :group, "From your library"))
+
         allowed = Enum.filter(targets, &allowed_target?(&1, assigns))
         allowed ++ vn_targets
 

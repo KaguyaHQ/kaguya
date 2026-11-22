@@ -204,7 +204,12 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
         </div>
 
         <div class="p-5 sm:px-6 sm:pt-4 sm:pb-6">
-          <form phx-change="validate_new_post" phx-submit="submit_new_post" class="flex flex-col">
+          <form
+            id="new-post-form"
+            phx-change="validate_new_post"
+            phx-submit="submit_new_post"
+            class="flex flex-col"
+          >
             <div class="mb-4">
               <.target_picker
                 selected_target={@selected_target}
@@ -219,10 +224,13 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
             <div class="bg-text-field-bg border-text-field-border overflow-hidden rounded-lg border">
               <div class="px-3 pt-3 pb-2">
                 <input
+                  id="new-post-title"
                   name="title"
                   value={@form["title"] || ""}
                   placeholder="Title"
                   maxlength="200"
+                  autocomplete="off"
+                  aria-label="Title"
                   data-dialog-initial-focus
                   class={[
                     "placeholder:text-text-field-placeholder-text text-foreground-primary w-full bg-transparent text-base font-semibold focus:outline-hidden",
@@ -236,20 +244,32 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
 
               <div class="border-border-divider/40 mx-3 border-t"></div>
 
-              <textarea
-                name="content"
-                rows="6"
-                maxlength="20000"
-                placeholder="Write something..."
-                class={[
-                  "placeholder:text-text-field-placeholder-text text-foreground-primary max-h-[400px] min-h-[150px] w-full resize-y rounded-none border-0 bg-transparent p-3 text-base focus:outline-hidden",
-                  @visible_errors[:content] && "border-semantic-error"
-                ]}
-              ><%= @form["content"] || "" %></textarea>
-              <p :if={@visible_errors[:content]} class="text-semantic-error px-3 pb-2 text-xs">
-                {@visible_errors[:content]}
-              </p>
+              <%!-- The hook adds Cmd+B/I/K, Cmd+Enter to post, auto-height,
+                   the spoiler button, and `[[` VN link suggestions. --%>
+              <div
+                id="new-post-body-editor"
+                phx-hook="MarkdownEditor"
+                data-vn-links-panel="new-post-vn-links"
+              >
+                <textarea
+                  id="new-post-content"
+                  name="content"
+                  rows="6"
+                  maxlength="20000"
+                  placeholder={body_placeholder(@selected_target)}
+                  aria-label="Post body"
+                  class={[
+                    "placeholder:text-text-field-placeholder-text text-foreground-primary max-h-[400px] min-h-[150px] w-full resize-none rounded-none border-0 bg-transparent p-3 text-base focus:outline-hidden",
+                    @visible_errors[:content] && "border-semantic-error"
+                  ]}
+                ><%= @form["content"] || "" %></textarea>
+                <p :if={@visible_errors[:content]} class="text-semantic-error px-3 pb-2 text-xs">
+                  {@visible_errors[:content]}
+                </p>
+                <KaguyaWeb.SharedComponents.MarkdownEditor.composer_hints class="px-3 pb-3" />
+              </div>
             </div>
+            <KaguyaWeb.SharedComponents.MarkdownEditor.vn_links_panel id="new-post-vn-links" />
 
             <div class="flex justify-end gap-3 pt-4">
               <button
@@ -294,86 +314,132 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
   attr :open, :boolean, default: false
 
   defp target_picker(assigns) do
+    assigns = assign(assigns, :groups, group_targets(assigns.results))
+
     ~H"""
     <div class="relative" data-category-target-picker>
-      <%= if @selected_target do %>
-        <span class="text-foreground-primary inline-flex items-center gap-0.5 rounded-md bg-white/8 text-sm font-medium">
-          <button
-            type="button"
-            phx-click="clear_category_target"
-            class="px-2.5 py-1.5 transition-colors hover:text-white"
-            aria-label={"Change topic: #{@selected_target.name}"}
-          >
-            {@selected_target.name}
-          </button>
-          <button
-            type="button"
-            phx-click="clear_category_target"
-            class="mr-1.5 rounded-full p-0.5 transition-colors hover:bg-white/12"
-            aria-label="Clear selected topic"
-          >
-            <Lucide.x class="size-3" aria-hidden />
-          </button>
-        </span>
+      <%= if @selected_target && !@open do %>
+        <button
+          id="new-post-topic"
+          type="button"
+          phx-click="open_category_target_picker"
+          class="hover:text-foreground-primary text-foreground-secondary inline-flex max-w-full items-center gap-1.5 rounded-md bg-white/6 px-2.5 py-1.5 text-sm transition-colors hover:bg-white/10"
+          aria-label={"Posting in #{@selected_target.name}. Change topic"}
+        >
+          <span class="shrink-0">Posting in</span>
+          <span class="text-foreground-primary truncate font-medium">{@selected_target.name}</span>
+          <Lucide.chevron_down class="size-3.5 shrink-0" aria-hidden />
+        </button>
       <% else %>
-        <div class="relative">
-          <.search_icon
-            class="text-foreground-tertiary pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-            aria-hidden
-          />
-          <input
-            type="text"
-            name="target_query"
-            value={@query}
-            phx-focus="open_category_target_picker"
-            phx-change="search_category_targets"
-            phx-debounce="250"
-            placeholder="Search topics, VNs, characters..."
-            class="bg-text-field-bg border-text-field-border focus:border-text-field-border-focus placeholder:text-text-field-placeholder-text text-foreground-primary w-full rounded-lg border px-9 py-2.5 text-sm focus:outline-hidden"
-          />
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1">
+            <.search_icon
+              class="text-foreground-tertiary pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+              aria-hidden
+            />
+            <input
+              id="new-post-topic-search"
+              type="text"
+              name="target_query"
+              value={@query}
+              phx-focus="open_category_target_picker"
+              phx-change="search_category_targets"
+              phx-debounce="250"
+              phx-mounted={@selected_target && Phoenix.LiveView.JS.focus()}
+              autocomplete="off"
+              aria-label="Search topics"
+              placeholder="Search topics, VNs, characters..."
+              class="bg-text-field-bg border-text-field-border focus:border-text-field-border-focus placeholder:text-text-field-placeholder-text text-foreground-primary w-full rounded-lg border px-9 py-2.5 text-sm focus:outline-hidden"
+            />
+          </div>
+          <button
+            :if={@selected_target}
+            id="new-post-topic-cancel"
+            type="button"
+            phx-click="close_category_target_picker"
+            class="hover:text-foreground-primary text-foreground-secondary h-9 shrink-0 rounded-md px-3 text-sm font-medium transition-colors hover:bg-white/6"
+          >
+            Cancel
+          </button>
         </div>
 
         <div
           :if={@open}
-          class="bg-surface-elevated border-border-divider absolute z-50 mt-1 max-h-[240px] w-full overflow-y-auto rounded-lg border p-1 shadow-md"
+          id="new-post-topic-results"
+          class="bg-surface-elevated border-border-divider absolute z-50 mt-1 max-h-[300px] w-full overflow-y-auto rounded-lg border p-1 shadow-md"
         >
           <div :if={@results == []} class="text-foreground-tertiary py-4 text-center text-sm">
             No results found.
           </div>
 
-          <button
-            :for={target <- @results}
-            type="button"
-            phx-click="select_category_target"
-            phx-value-category_type={target.category_type}
-            phx-value-entity_id={target.entity_id}
-            phx-value-name={target.name}
-            phx-value-slug={target.slug}
-            class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-white/4"
-          >
-            <%= if target.image_url do %>
-              <img
-                src={target.image_url}
-                alt=""
-                class="size-7 shrink-0 rounded object-cover"
-                data-nsfw-blur={if target_cover_needs_blur?(target), do: "1"}
-                style={if target_cover_needs_blur?(target), do: "--nsfw-blur-size: 28;"}
-              />
-            <% else %>
-              <span class="flex size-7 shrink-0 items-center justify-center rounded bg-white/6">
-                <.category_icon
-                  category_type={target.category_type}
-                  class="text-foreground-tertiary size-3.5"
+          <div :for={{label, targets} <- @groups} role="group" aria-label={label}>
+            <p class="text-foreground-tertiary text-style-captionMedium px-2.5 pt-2 pb-1">
+              {label}
+            </p>
+            <button
+              :for={target <- targets}
+              type="button"
+              phx-click="select_category_target"
+              phx-value-category_type={target.category_type}
+              phx-value-entity_id={target.entity_id}
+              phx-value-name={target.name}
+              phx-value-slug={target.slug}
+              class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-white/4"
+            >
+              <%= if target.image_url do %>
+                <img
+                  src={target.image_url}
+                  alt=""
+                  class="size-7 shrink-0 rounded object-cover"
+                  data-nsfw-blur={if target_cover_needs_blur?(target), do: "1"}
+                  style={if target_cover_needs_blur?(target), do: "--nsfw-blur-size: 28;"}
                 />
-              </span>
-            <% end %>
-            <span class="text-foreground-primary truncate font-medium">{target.name}</span>
-          </button>
+              <% else %>
+                <span class="flex size-7 shrink-0 items-center justify-center rounded bg-white/6">
+                  <.category_icon
+                    category_type={target.category_type}
+                    class="text-foreground-tertiary size-3.5"
+                  />
+                </span>
+              <% end %>
+              <span class="text-foreground-primary truncate font-medium">{target.name}</span>
+            </button>
+          </div>
         </div>
       <% end %>
     </div>
     """
   end
+
+  # Groups keep the search's ranking inside each kind and order kinds by their
+  # best-ranked hit, so the most relevant section still comes first.
+  defp group_targets(targets) do
+    targets
+    |> Enum.group_by(&target_group/1)
+    |> Enum.sort_by(fn {_label, [first | _]} -> Enum.find_index(targets, &(&1 == first)) end)
+  end
+
+  defp target_group(%{group: group}) when is_binary(group), do: group
+  defp target_group(%{category_type: :visual_novel}), do: "Visual novels"
+  defp target_group(%{category_type: :character}), do: "Characters"
+  defp target_group(%{category_type: :producer}), do: "Producers"
+  defp target_group(%{category_type: :user}), do: "Users"
+  defp target_group(_target), do: "Topics"
+
+  defp body_placeholder(%{category_type: :visual_novel, name: name}),
+    do: "What did you think of #{name}? Routes, endings, favorite moments..."
+
+  defp body_placeholder(%{category_type: :character, name: name}),
+    do: "What makes #{name} stand out to you?"
+
+  defp body_placeholder(%{category_type: :producer, name: name}),
+    do: "What's your take on #{name}'s work?"
+
+  defp body_placeholder(%{category_type: :site_discussions}),
+    do: "What should we improve, fix, or add?"
+
+  defp body_placeholder(_target),
+    do: "Share a thought, ask for recommendations, or start a conversation..."
 
   attr :posts, :list, required: true
   attr :pinned_posts, :list, default: []

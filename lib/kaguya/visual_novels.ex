@@ -513,6 +513,42 @@ defmodule Kaguya.VisualNovels do
     |> Repo.all()
   end
 
+  @max_card_slugs 50
+
+  @doc """
+  Returns compact card data for linked VNs, keyed by slug, in a single query.
+  Used to render `/vn/:slug` links in user content as cover cards.
+  """
+  def cards_by_slugs(slugs) when is_list(slugs) do
+    case slugs |> Enum.uniq() |> Enum.take(@max_card_slugs) do
+      [] ->
+        %{}
+
+      slugs ->
+        from(vn in VisualNovel,
+          where: vn.slug in ^slugs,
+          select: %{
+            slug: vn.slug,
+            title: vn.title,
+            primary_image_id: vn.primary_image_id,
+            temp_image_url: vn.temp_image_url,
+            is_image_nsfw: vn.is_image_nsfw,
+            is_image_suggestive: vn.is_image_suggestive
+          }
+        )
+        |> Repo.all()
+        |> Map.new(fn vn ->
+          {vn.slug,
+           %{
+             slug: vn.slug,
+             title: vn.title,
+             cover_url: vn |> build_image_urls() |> Map.get(:small),
+             cover_nsfw: cover_nsfw?(vn)
+           }}
+        end)
+    end
+  end
+
   # ============================================================================
   # Image URLs
   # ============================================================================

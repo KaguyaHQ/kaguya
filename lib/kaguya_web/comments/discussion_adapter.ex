@@ -12,6 +12,7 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
   alias Kaguya.Repo
   alias Kaguya.Users
   alias KaguyaWeb.Discussions.Paths, as: DiscussionPaths
+  alias KaguyaWeb.Markdown.VnLinks
 
   @default_page_size 20
 
@@ -32,8 +33,14 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
       liked_ids = liked_ids(comments, viewer_id)
       share_base_path = canonical_post_path(post)
 
+      vn_cards = VnLinks.cards_for(Enum.map(comments, & &1.content))
+
       normalized_comments =
-        Enum.map(comments, &normalize_comment(&1, liked_ids, share_base_path))
+        Enum.map(comments, fn comment ->
+          comment
+          |> normalize_comment(liked_ids, share_base_path)
+          |> VnLinks.attach(vn_cards)
+        end)
 
       {:ok,
        result
@@ -84,7 +91,7 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
              content: Map.get(attrs, :content)
            }) do
       liked_ids = liked_ids([comment], user_id)
-      {:ok, comment |> Repo.preload(:user) |> normalize_comment(liked_ids)}
+      {:ok, comment |> Repo.preload(:user) |> normalize_comment(liked_ids) |> VnLinks.attach()}
     end
   end
 
@@ -94,7 +101,7 @@ defmodule KaguyaWeb.Comments.DiscussionAdapter do
          {:ok, comment} <-
            Discussions.update_comment(comment_id, user_id, Map.get(attrs, :content)) do
       liked_ids = liked_ids([comment], user_id)
-      {:ok, comment |> Repo.preload(:user) |> normalize_comment(liked_ids)}
+      {:ok, comment |> Repo.preload(:user) |> normalize_comment(liked_ids) |> VnLinks.attach()}
     end
   end
 

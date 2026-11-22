@@ -117,6 +117,7 @@ defmodule KaguyaWeb.Components.Comments do
       collapsible={@collapsible}
       placeholder={@placeholder}
       submit_label={@button_text}
+      vn_links
       class={["w-full", @parent_comment_id && "mt-3", @class]}
     >
       <:leading_inputs>
@@ -353,6 +354,7 @@ defmodule KaguyaWeb.Components.Comments do
           :if={@editing_id != @comment.id}
           id={"comment-#{@comment.id}-content"}
           content={@comment.content}
+          vn_cards={Map.get(@comment, :vn_cards, %{})}
           class="mt-1 text-sm font-normal text-[rgb(var(--foreground-primary))] lg:text-base"
         />
 
@@ -681,6 +683,7 @@ defmodule KaguyaWeb.Components.Comments do
   attr :content, :string, default: ""
   attr :id, :string, required: true
   attr :class, :any, default: nil
+  attr :vn_cards, :map, default: %{}
 
   def comment_content(assigns) do
     ~H"""
@@ -689,7 +692,11 @@ defmodule KaguyaWeb.Components.Comments do
       phx-hook="CommentContent"
       class={["comment-content kaguya-markdown wrap-break-word", @class]}
     >
-      <KaguyaWeb.SharedComponents.Markdown.markdown_inline content={@content} variant="comment" />
+      <KaguyaWeb.SharedComponents.Markdown.markdown_inline
+        content={@content}
+        variant="comment"
+        vn_cards={@vn_cards}
+      />
     </div>
     """
   end

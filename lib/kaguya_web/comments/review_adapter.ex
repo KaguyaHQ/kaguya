@@ -24,6 +24,7 @@ defmodule KaguyaWeb.Comments.ReviewAdapter do
   alias Kaguya.Reviews
   alias Kaguya.Reviews.{Review, ReviewComment, ReviewCommentLike}
   alias Kaguya.Users
+  alias KaguyaWeb.Markdown.VnLinks
 
   @default_page_size 10
 
@@ -52,10 +53,12 @@ defmodule KaguyaWeb.Comments.ReviewAdapter do
       {comments, pagination} = Pagination.paginate(query, page, page_size, total_count)
       comments = Repo.preload(comments, :user)
       liked_ids = liked_ids(comments, viewer_id)
+      vn_cards = VnLinks.cards_for(Enum.map(comments, & &1.content))
 
       {:ok,
        %{
-         items: Enum.map(comments, &normalize_comment(&1, liked_ids)),
+         items:
+           Enum.map(comments, &(&1 |> normalize_comment(liked_ids) |> VnLinks.attach(vn_cards))),
          pagination: normalize_pagination(pagination, page, page_size),
          comments_count: review.comments_count || total_count
        }}
@@ -73,7 +76,7 @@ defmodule KaguyaWeb.Comments.ReviewAdapter do
              parent_comment_id: blank_to_nil(Map.get(attrs, :parent_comment_id)),
              content: Map.get(attrs, :content)
            }) do
-      {:ok, comment |> Repo.preload(:user) |> normalize_comment(MapSet.new())}
+      {:ok, comment |> Repo.preload(:user) |> normalize_comment(MapSet.new()) |> VnLinks.attach()}
     end
   end
 
@@ -83,7 +86,7 @@ defmodule KaguyaWeb.Comments.ReviewAdapter do
          {:ok, comment} <-
            Reviews.update_review_comment(comment_id, user_id, Map.get(attrs, :content)) do
       liked_set = liked_ids([comment], user_id)
-      {:ok, comment |> Repo.preload(:user) |> normalize_comment(liked_set)}
+      {:ok, comment |> Repo.preload(:user) |> normalize_comment(liked_set) |> VnLinks.attach()}
     end
   end
 

@@ -12,7 +12,7 @@
 // Native light-dismiss and focus return come from the Popover API. The fallback
 // handles these itself while leaving the panel in LiveView's DOM.
 
-function placePanel(panel, anchor, opts) {
+export function placePanel(panel, anchor, opts) {
   const {placement, align, sideOffset, alignOffset} = opts
   const a = anchor.getBoundingClientRect()
   const w = panel.offsetWidth
@@ -87,7 +87,7 @@ function placePanel(panel, anchor, opts) {
   panel.dataset.side = side
 }
 
-function supportsNativePopover(panel) {
+export function supportsNativePopover(panel) {
   if (typeof panel.showPopover !== "function" || typeof panel.hidePopover !== "function") return false
   try {
     panel.matches(":popover-open")

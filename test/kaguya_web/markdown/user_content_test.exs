@@ -425,4 +425,71 @@ defmodule KaguyaWeb.Markdown.UserContentTest do
       assert {:safe, ""} = UserContent.to_html(123)
     end
   end
+
+  describe "vn cards" do
+    @cards %{
+      "saya-no-uta" => %{
+        slug: "saya-no-uta",
+        title: "Saya no Uta",
+        cover_url: "https://images.kaguya.io/visual_novels/saya-128w.webp",
+        cover_nsfw: true
+      },
+      "muv-luv" => %{slug: "muv-luv", title: "Muv-Luv", cover_url: nil, cover_nsfw: false}
+    }
+
+    test "renders a paragraph of VN links, one per line, as cover cards" do
+      html =
+        render("[Saya no Uta](/vn/saya-no-uta)\n[Muv-Luv](https://kaguya.io/vn/muv-luv)",
+          vn_cards: @cards
+        )
+
+      assert html =~ ~s(<div data-vn-cards="")
+      assert html =~ ~s(href="/vn/saya-no-uta" data-phx-link="redirect")
+      assert html =~ ~s(href="/vn/muv-luv" data-phx-link="redirect")
+      assert html =~ ~s(src="https://images.kaguya.io/visual_novels/saya-128w.webp")
+      assert html =~ ~s(data-nsfw-blur="1")
+      refute html =~ "<p>"
+    end
+
+    test "keeps VN links inside sentences inline" do
+      html = render("I finally read [Saya no Uta](/vn/saya-no-uta) last week", vn_cards: @cards)
+
+      refute html =~ "data-vn-cards"
+      assert html =~ ~s(<a href="/vn/saya-no-uta")
+    end
+
+    test "turns VN-only lines into cards and keeps the other lines as text" do
+      html =
+        render("Mine so far:\n[Saya no Uta](/vn/saya-no-uta)\n[Muv-Luv](/vn/muv-luv)\nThat is all",
+          vn_cards: @cards
+        )
+
+      assert html =~ ~r{^<p>Mine so far:</p><div data-vn-cards="".*</div><p>\s*That is all</p>$}s
+      assert html |> String.split("data-phx-link=") |> length() == 3
+    end
+
+    test "keeps a line inline when it links a VN without card data" do
+      html = render("[Saya no Uta](/vn/saya-no-uta) [Unknown](/vn/unknown)", vn_cards: @cards)
+
+      refute html =~ "data-vn-cards"
+    end
+
+    test "escapes card titles" do
+      cards = %{
+        "x" => %{slug: "x", title: "<script>alert(1)</script>", cover_url: nil, cover_nsfw: false}
+      }
+
+      html = render("[X](/vn/x)", vn_cards: cards)
+
+      assert html =~ "&lt;script&gt;"
+      refute html =~ "<script>"
+    end
+
+    test "presets without links never render cards" do
+      html = render("[Saya no Uta](/vn/saya-no-uta)", preset: :bio, vn_cards: @cards)
+
+      refute html =~ "data-vn-cards"
+      refute html =~ "<a "
+    end
+  end
 end

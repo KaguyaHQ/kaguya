@@ -52,6 +52,7 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
         </div>
 
         <form
+          id="edit-post-form"
           phx-submit={@submit_event}
           class="flex flex-col p-5 sm:px-6 sm:pt-4 sm:pb-6"
         >
@@ -74,10 +75,13 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
           <div class="overflow-hidden rounded-lg border border-[rgb(var(--text-field-border))] bg-[rgb(var(--text-field-bg))]">
             <div class="px-3 pt-3 pb-2">
               <input
+                id="edit-post-title"
                 name="title"
                 value={Map.get(@form, "title", @post.title)}
                 placeholder="Title"
                 maxlength="200"
+                autocomplete="off"
+                aria-label="Title"
                 data-dialog-initial-focus={!@title_locked}
                 disabled={@title_locked}
                 class={[
@@ -95,15 +99,25 @@ defmodule KaguyaWeb.Components.Discussions.EditPostDialog do
 
             <div class="mx-3 border-t border-[rgb(var(--border-divider))]/40"></div>
 
-            <textarea
-              name="content"
-              rows="6"
-              maxlength="20000"
-              placeholder="Write something..."
-              data-dialog-initial-focus={@title_locked}
-              class="max-h-[400px] min-h-[150px] w-full resize-y rounded-none border-0 bg-transparent p-3 text-base text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--text-field-placeholder-text))] focus:outline-hidden"
-            ><%= Map.get(@form, "content", @post.content) || "" %></textarea>
+            <div
+              id="edit-post-body-editor"
+              phx-hook="MarkdownEditor"
+              data-vn-links-panel="edit-post-vn-links"
+            >
+              <textarea
+                id="edit-post-content"
+                name="content"
+                rows="6"
+                maxlength="20000"
+                placeholder="Write something..."
+                aria-label="Post body"
+                data-dialog-initial-focus={@title_locked}
+                class="max-h-[400px] min-h-[150px] w-full resize-none rounded-none border-0 bg-transparent p-3 text-base text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--text-field-placeholder-text))] focus:outline-hidden"
+              ><%= Map.get(@form, "content", @post.content) || "" %></textarea>
+              <KaguyaWeb.SharedComponents.MarkdownEditor.composer_hints class="px-3 pb-3" />
+            </div>
           </div>
+          <KaguyaWeb.SharedComponents.MarkdownEditor.vn_links_panel id="edit-post-vn-links" />
 
           <div class="flex justify-end gap-3 pt-4">
             <button

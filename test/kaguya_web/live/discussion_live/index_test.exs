@@ -1029,4 +1029,73 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
       html
     )
   end
+
+  test "new post composer changes topic without clearing it", %{conn: conn} do
+    author = UserFixtures.insert_user!(username: "composer_author", display_name: "Composer")
+    conn = Plug.Test.init_test_session(conn, %{"current_user_id" => author.id})
+
+    {:ok, view, _html} = live(conn, ~p"/discussions")
+    render_click(view, "open_new_post")
+
+    assert has_element?(view, "#new-post-title[autocomplete=off]")
+    assert has_element?(view, "#new-post-topic", "General")
+    assert has_element?(view, "#new-post-body-editor [data-markdown-spoiler]")
+
+    view |> element("#new-post-topic") |> render_click()
+
+    assert has_element?(view, "#new-post-topic-search")
+    assert has_element?(view, "#new-post-topic-results [role=group][aria-label=Topics]")
+    refute has_element?(view, "#new-post-dialog button[type=submit][disabled]")
+
+    view |> element("#new-post-topic-cancel") |> render_click()
+
+    assert has_element?(view, "#new-post-topic", "General")
+    refute has_element?(view, "#new-post-topic-results")
+  end
+
+  test "VN links on their own line render as cover cards in posts and comments", %{conn: conn} do
+    author = UserFixtures.insert_user!(username: "card_author", display_name: "Card Author")
+
+    %VisualNovel{}
+    |> VisualNovel.changeset(%{
+      title: "Full Metal Daemon Muramasa",
+      slug: "full-metal-daemon-muramasa",
+      description: "A" <> String.duplicate(" test visual novel description", 3)
+    })
+    |> Repo.insert!()
+
+    {:ok, post} =
+      Discussions.create_post(author.id, %{
+        title: "Best VNs this year",
+        content: "Mine:\n\n[Muramasa](/vn/full-metal-daemon-muramasa)",
+        category_type: :general
+      })
+
+    {:ok, card_comment} =
+      Discussions.create_comment(%{
+        post_id: post.id,
+        user_id: author.id,
+        content: "[Muramasa](/vn/full-metal-daemon-muramasa)"
+      })
+
+    {:ok, inline_comment} =
+      Discussions.create_comment(%{
+        post_id: post.id,
+        user_id: author.id,
+        content: "I keep thinking about [Muramasa](/vn/full-metal-daemon-muramasa) lately."
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/discussions/p/#{post.short_id}/#{post.slug}")
+
+    card = "[data-vn-cards] a[href='/vn/full-metal-daemon-muramasa']"
+
+    assert has_element?(view, "article #{card}", "Full Metal Daemon Muramasa")
+    assert has_element?(view, "#comment-#{card_comment.id}-content #{card}")
+    refute has_element?(view, "#comment-#{inline_comment.id}-content [data-vn-cards]")
+
+    assert has_element?(
+             view,
+             "#comment-#{inline_comment.id}-content a[href='/vn/full-metal-daemon-muramasa']"
+           )
+  end
 end

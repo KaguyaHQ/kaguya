@@ -134,8 +134,17 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
   attr :content, :any, required: true
   attr :variant, :string, default: "user", values: ~w(user comment review bio policy plain)
 
+  attr :vn_cards, :map,
+    default: %{},
+    doc: "Card data from `KaguyaWeb.Markdown.VnLinks` for rendering VN links as covers."
+
   def markdown_inline(assigns) do
-    assigns = assign(assigns, :rendered, render_content(assigns.content, assigns.variant))
+    assigns =
+      assign(
+        assigns,
+        :rendered,
+        render_content(assigns.content, assigns.variant, assigns.vn_cards)
+      )
 
     ~H"""
     {@rendered}
@@ -147,19 +156,21 @@ defmodule KaguyaWeb.SharedComponents.Markdown do
   # ---------------------------------------------------------------------------
 
   # Already a safe tuple — render verbatim.
-  defp render_content({:safe, _iodata} = safe, _variant), do: safe
+  defp render_content(content, variant, vn_cards \\ %{})
+
+  defp render_content({:safe, _iodata} = safe, _variant, _vn_cards), do: safe
 
   # nil or empty → render nothing.
-  defp render_content(nil, _variant), do: {:safe, ""}
-  defp render_content("", _variant), do: {:safe, ""}
+  defp render_content(nil, _variant, _vn_cards), do: {:safe, ""}
+  defp render_content("", _variant, _vn_cards), do: {:safe, ""}
 
   # Markdown source — compile through the user-content pipeline with the
   # preset matching the surface variant.
-  defp render_content(content, variant) when is_binary(content) do
-    UserContent.to_html(content, preset: preset_for(variant))
+  defp render_content(content, variant, vn_cards) when is_binary(content) do
+    UserContent.to_html(content, preset: preset_for(variant), vn_cards: vn_cards)
   end
 
-  defp render_content(_other, _variant), do: {:safe, ""}
+  defp render_content(_other, _variant, _vn_cards), do: {:safe, ""}
 
   defp preset_for("comment"), do: :comment
   defp preset_for("review"), do: :review

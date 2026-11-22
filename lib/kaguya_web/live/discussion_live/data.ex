@@ -16,6 +16,7 @@ defmodule KaguyaWeb.DiscussionLive.Data do
   alias Kaguya.Users
   alias Kaguya.Users.User
   alias Kaguya.VisualNovels.VisualNovel
+  alias KaguyaWeb.Markdown.VnLinks
   alias KaguyaWeb.SharedComponents.Time, as: SharedTime
 
   @posts_page_size 20
@@ -220,6 +221,7 @@ defmodule KaguyaWeb.DiscussionLive.Data do
       short_id: post.short_id,
       slug: post.slug,
       content: post.content,
+      vn_cards: VnLinks.cards_for(post.content),
       hidden_at: post.hidden_at,
       hidden_reason: post.hidden_reason,
       deleted_at: post.deleted_at,

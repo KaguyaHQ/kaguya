@@ -51,6 +51,11 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
   attr :name, :string, default: "content", doc: "Textarea name (POST'd on submit)."
   attr :value, :string, default: "", doc: "Pre-populated content (e.g. for edit forms)."
   attr :rows, :integer, default: 1
+
+  attr :vn_links, :boolean,
+    default: false,
+    doc: "Enable `[[` VN link autocomplete and the spoiler button with its hint."
+
   attr :collapsible, :boolean, default: false
   attr :maxlength, :integer, default: 5000
   attr :placeholder, :string, default: ""
@@ -99,6 +104,7 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
         phx-target={@target}
         phx-hook="MarkdownEditor"
         data-expand-event={@expand_event}
+        data-vn-links-panel={@vn_links && "#{@id}-vn-links"}
         data-collapsible={to_string(@collapsible)}
         class={@form_class || @default_form_class}
       >
@@ -132,6 +138,7 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
               style={if @collapsible && String.trim(@value || "") == "", do: "display: none;"}
               class="flex items-center justify-end gap-2 px-2.5 pb-2.5 lg:px-3 lg:pb-3"
             >
+              <.composer_hints :if={@vn_links} class="mr-auto" />
               {render_slot(@before_actions)} {render_slot(@extra_actions)}
               <button
                 :if={@cancel_event}
@@ -155,6 +162,50 @@ defmodule KaguyaWeb.SharedComponents.MarkdownEditor do
           <% true -> %>
         <% end %>
       </form>
+      <.vn_links_panel :if={@vn_links} id={"#{@id}-vn-links"} />
+    </div>
+    """
+  end
+
+  @doc """
+  Spoiler button and `[[` hint for composers whose `MarkdownEditor` hook has
+  VN links enabled. The hook handles clicks on `[data-markdown-spoiler]`.
+  """
+  attr :class, :any, default: nil
+
+  def composer_hints(assigns) do
+    ~H"""
+    <div class={["text-foreground-tertiary flex min-w-0 items-center gap-3", @class]}>
+      <button
+        type="button"
+        data-markdown-spoiler
+        class="hover:text-foreground-primary flex shrink-0 items-center gap-1.5 rounded-md text-xs font-medium transition-colors"
+        title="Hide text as a spoiler: ||like this||"
+      >
+        <Lucide.eye_off class="size-3.5" aria-hidden /> Spoiler
+      </button>
+      <span class="hidden truncate text-xs sm:inline">
+        Type <kbd class="font-sans font-semibold">[[</kbd> to link a VN
+      </span>
+    </div>
+    """
+  end
+
+  @doc """
+  Client-owned popover for `[[` VN link suggestions; the `MarkdownEditor` hook
+  finds it through `data-vn-links-panel` and fills it.
+  """
+  attr :id, :string, required: true
+
+  def vn_links_panel(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      popover="manual"
+      phx-update="ignore"
+      class="bg-surface-menu-item-default border-border-divider max-h-[320px] overflow-y-auto rounded-lg border p-0 pb-1 shadow-xl"
+      style="margin:0;position:fixed;inset:auto;visibility:hidden;"
+    >
     </div>
     """
   end

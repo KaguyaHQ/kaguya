@@ -1,6 +1,10 @@
 // Markdown composer hook — paired with `KaguyaWeb.SharedComponents.MarkdownEditor`.
 // Cmd/Ctrl+B/I/K wrap selection, Cmd/Ctrl+Enter submits, textarea auto-grows,
-// focus expands the composer via the configured event.
+// focus expands the composer via the configured event. `[data-markdown-spoiler]`
+// buttons wrap the selection in `||spoiler||`; `data-vn-links-panel` names the
+// popover used for `[[` VN link autocomplete.
+
+import {attachVnLinkAutocomplete} from "../lib/vn_link_autocomplete"
 
 const MarkdownEditor = {
   mounted() {
@@ -57,7 +61,17 @@ const MarkdownEditor = {
       }
     }
     this._onClick = event => {
+      if (event.target.closest("[data-markdown-spoiler]")) {
+        event.preventDefault()
+        this._wrapSelection("||", "||", "spoiler")
+        return
+      }
       if (!event.target.closest("button") && this.textarea) this.textarea.focus()
+    }
+    // Toolbar buttons must not take focus, or the textarea selection they act
+    // on can be lost to a LiveView patch during the blur.
+    this._onPointerDown = event => {
+      if (event.target.closest("[data-markdown-spoiler]")) event.preventDefault()
     }
     this._onFocusIn = () => {
       this.expanded = true
@@ -77,6 +91,7 @@ const MarkdownEditor = {
     }
 
     this.el.addEventListener("click", this._onClick)
+    this.el.addEventListener("pointerdown", this._onPointerDown)
     this.el.addEventListener("focusin", this._onFocusIn)
     this.el.addEventListener("kaguya:reply-input-cancel", this._onCancel)
 
@@ -114,6 +129,7 @@ const MarkdownEditor = {
     }
     this._unbindTextarea()
     this.el.removeEventListener("click", this._onClick)
+    this.el.removeEventListener("pointerdown", this._onPointerDown)
     this.el.removeEventListener("focusin", this._onFocusIn)
     this.el.removeEventListener("kaguya:reply-input-cancel", this._onCancel)
     window.removeEventListener("kaguya:markdown-draft-clear", this._onDraftClear)
@@ -130,12 +146,17 @@ const MarkdownEditor = {
 
     this._unbindTextarea()
     this.textarea = nextTextarea
+    // Attach autocomplete first so its Enter/Escape handling runs before ours.
+    const vnPanel = document.getElementById(this.el.dataset.vnLinksPanel)
+    this._detachVnLinks = vnPanel ? attachVnLinkAutocomplete(this.textarea, vnPanel) : null
     this.textarea?.addEventListener("input", this._onInput)
     this.textarea?.addEventListener("keydown", this._onKeyDown)
     this._adjustHeight()
   },
 
   _unbindTextarea() {
+    this._detachVnLinks?.()
+    this._detachVnLinks = null
     this.textarea?.removeEventListener("input", this._onInput)
     this.textarea?.removeEventListener("keydown", this._onKeyDown)
   },
