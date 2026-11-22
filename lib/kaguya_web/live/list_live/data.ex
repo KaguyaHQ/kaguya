@@ -95,15 +95,15 @@ defmodule KaguyaWeb.ListLive.Data do
          :ok <- verify_username(list, username),
          hidden? <- hidden_for_viewer?(list, viewer),
          {:ok, tiers} <- load_tiers(list, hidden?),
-         {:ok, visual_novels} <- load_visual_novels(list, page, viewer, hidden?),
+         {:ok, items} <- load_items(list, page, viewer, hidden?),
          {:ok, comments} <- load_comments(list, comments_page, viewer, hidden?) do
       {:ok,
        %{
          list: normalize_list(list),
          raw_list: list,
          user: normalize_user(list.user),
-         visual_novels: visual_novels.items,
-         pagination: visual_novels.pagination,
+         items: items.items,
+         pagination: items.pagination,
          tiers: tiers,
          comments: comments.items,
          comments_pagination: comments.pagination,
@@ -127,15 +127,13 @@ defmodule KaguyaWeb.ListLive.Data do
          :ok <- verify_username(list, username),
          :ok <- verify_owner(list, viewer_id),
          {:ok, tiers} <- Lists.list_tiers_for_list(list),
-         {:ok, items} <- Lists.list_all_vns_for_list(list) do
-      items = enrich_items(items, viewer_id)
-
+         {:ok, items} <- load_all_items(list, viewer_id, nil) do
       {:ok,
        %{
          list: normalize_list(list),
          raw_list: list,
          user: normalize_user(list.user),
-         visual_novels: items,
+         items: items,
          tiers: normalize_tiers(tiers),
          layout: layout_payload(list, tiers, items),
          is_mine: true,
@@ -147,7 +145,13 @@ defmodule KaguyaWeb.ListLive.Data do
     end
   end
 
-  def new_form_payload(viewer) do
+  @doc """
+  Blank editor payload. Character lists are tier lists only, so they start in
+  tier mode.
+  """
+  def new_form_payload(viewer, item_type \\ "vn") do
+    display_mode = if item_type == "character", do: "tier", else: "grid"
+
     %{
       list: %{
         id: nil,
@@ -156,12 +160,13 @@ defmodule KaguyaWeb.ListLive.Data do
         description: "",
         is_public: true,
         is_ranked: false,
-        display_mode: "grid",
+        display_mode: display_mode,
+        item_type: item_type,
         vns_count: 0
       },
-      visual_novels: [],
+      items: [],
       tiers: @default_tiers,
-      layout: %{display_mode: "grid", tiers: @default_tiers, items: []},
+      layout: %{display_mode: display_mode, tiers: @default_tiers, items: []},
       is_mine: logged_in?(viewer),
       is_logged_in: logged_in?(viewer)
     }
@@ -183,33 +188,14 @@ defmodule KaguyaWeb.ListLive.Data do
       items:
         Enum.map(items, fn item ->
           %{
-            visual_novel_id: item.visual_novel.id,
+            item_id: subject(item).id,
             position: item.position,
             tier_id: item.tier_id,
-            tier_position: item.tier_position,
-            visual_novel: item.visual_novel
+            tier_position: item.tier_position
           }
         end)
     }
   end
-
-  def normalize_layout_attrs(%{"display_mode" => _} = attrs) do
-    %{
-      display_mode: Map.get(attrs, "display_mode"),
-      tiers: normalize_submitted_tiers(Map.get(attrs, "tiers", [])),
-      items: normalize_submitted_items(Map.get(attrs, "items", []))
-    }
-  end
-
-  def normalize_layout_attrs(%{display_mode: _} = attrs) do
-    %{
-      display_mode: Map.get(attrs, :display_mode),
-      tiers: normalize_submitted_tiers(Map.get(attrs, :tiers, [])),
-      items: normalize_submitted_items(Map.get(attrs, :items, []))
-    }
-  end
-
-  def normalize_layout_attrs(_attrs), do: %{display_mode: "grid", tiers: [], items: []}
 
   def normalize_form_attrs(attrs) when is_map(attrs) do
     %{
@@ -230,6 +216,7 @@ defmodule KaguyaWeb.ListLive.Data do
       is_public: list.is_public,
       is_ranked: list.is_ranked,
       display_mode: list.display_mode,
+      item_type: list.item_type,
       vns_count: list.vns_count || 0,
       likes_count: list.likes_count || 0,
       comments_count: list.comments_count || 0,
@@ -264,6 +251,8 @@ defmodule KaguyaWeb.ListLive.Data do
       |> Enum.map(&{&1.id, &1.vns_count || 0})
       |> Lists.batch_list_vns_for_lists(page_size)
 
+    thumbnails = character_thumbnails(lists, page_size)
+
     Enum.map(lists, fn list ->
       vns =
         vns_by_list
@@ -277,6 +266,7 @@ defmodule KaguyaWeb.ListLive.Data do
       |> normalize_list()
       |> Map.put(:user, normalize_user(list.user))
       |> Map.put(:visual_novels, vns)
+      |> Map.put(:thumbnails, Map.get(thumbnails, list.id))
     end)
   end
 
@@ -305,26 +295,29 @@ defmodule KaguyaWeb.ListLive.Data do
     with {:ok, tiers} <- Lists.list_tiers_for_list(list), do: {:ok, normalize_tiers(tiers)}
   end
 
-  defp load_visual_novels(_list, page, _viewer, true) do
+  defp load_items(_list, page, _viewer, true) do
     {:ok, %{items: [], pagination: empty_pagination(page, @list_page_size)}}
   end
 
-  defp load_visual_novels(%{display_mode: "tier"} = list, _page, viewer, false) do
+  # Tier boards can't be split across pages (the bottom tiers would vanish),
+  # and character lists are always tier lists, so both load everything.
+  defp load_items(%{display_mode: mode, item_type: type} = list, page, viewer, false)
+       when mode == "tier" or type == "character" do
     viewer_id = viewer_id(viewer)
-    allowed = visible_categories(list, viewer, viewer_id)
 
-    with {:ok, items} <- Lists.list_all_vns_for_list(list, allowed_categories: allowed) do
+    with {:ok, items} <-
+           load_all_items(list, viewer_id, visible_categories(list, viewer, viewer_id)) do
       total = length(items)
 
       {:ok,
        %{
-         items: enrich_items(items, viewer_id),
-         pagination: %{page: 1, page_size: max(total, 1), total_count: total, total_pages: 1}
+         items: items,
+         pagination: %{page: page, page_size: max(total, 1), total_count: total, total_pages: 1}
        }}
     end
   end
 
-  defp load_visual_novels(list, page, viewer, false) do
+  defp load_items(list, page, viewer, false) do
     viewer_id = viewer_id(viewer)
     allowed = visible_categories(list, viewer, viewer_id)
 
@@ -332,6 +325,53 @@ defmodule KaguyaWeb.ListLive.Data do
            Lists.list_vns_for_list(list, page, @list_page_size, allowed_categories: allowed) do
       {:ok, %{items: enrich_items(items, viewer_id), pagination: pagination}}
     end
+  end
+
+  # Character lists aren't scoped by VN category: characters carry their own
+  # image NSFW flags, which the UI blurs.
+  defp load_all_items(%{item_type: "character"} = list, _viewer_id, _allowed) do
+    with {:ok, rows} <- Lists.list_all_characters_for_list(list) do
+      {:ok, Enum.map(rows, &%{&1 | character: normalize_character(&1.character)})}
+    end
+  end
+
+  defp load_all_items(list, viewer_id, allowed) do
+    with {:ok, items} <- Lists.list_all_vns_for_list(list, allowed_categories: allowed) do
+      {:ok, enrich_items(items, viewer_id)}
+    end
+  end
+
+  @doc """
+  The thing an item displays: its VN or character map.
+  """
+  def subject(%{character: character}), do: character
+  def subject(%{visual_novel: visual_novel}), do: visual_novel
+
+  @doc """
+  Card thumbnails for the character lists among `lists`, keyed by list id.
+  Each thumbnail is cover-shaped (`:title` is the character's name), so the
+  shared cover stacks render it like a VN cover. VN lists are left out.
+  """
+  def character_thumbnails(lists, limit) do
+    for(%{item_type: "character", id: id} <- lists, do: id)
+    |> Lists.batch_list_characters_for_lists(limit)
+    |> Map.new(fn {list_id, characters} ->
+      {list_id, Enum.map(characters, &(&1 |> normalize_character() |> Map.put(:title, &1.name)))}
+    end)
+  end
+
+  @doc """
+  Display map for a character, shared by the editor and the list page.
+  """
+  def normalize_character(character) do
+    %{
+      id: character.id,
+      name: character.name,
+      slug: character.slug,
+      images: VisualNovels.build_character_image_urls(character),
+      is_image_nsfw: character.is_image_nsfw,
+      is_image_suggestive: character.is_image_suggestive
+    }
   end
 
   defp visible_categories(%{user_id: owner_id}, _viewer, owner_id) when not is_nil(owner_id),
@@ -432,33 +472,6 @@ defmodule KaguyaWeb.ListLive.Data do
     |> Enum.sort_by(&{&1.position, &1.id})
   end
 
-  defp normalize_submitted_tiers(tiers) when is_list(tiers) do
-    Enum.map(tiers, fn tier ->
-      %{
-        id: Map.get(tier, "id") || Map.get(tier, :id),
-        label: Map.get(tier, "label") || Map.get(tier, :label),
-        color: Map.get(tier, "color") || Map.get(tier, :color),
-        position: int(Map.get(tier, "position") || Map.get(tier, :position))
-      }
-    end)
-  end
-
-  defp normalize_submitted_tiers(_tiers), do: []
-
-  defp normalize_submitted_items(items) when is_list(items) do
-    Enum.map(items, fn item ->
-      %{
-        visual_novel_id: Map.get(item, "visual_novel_id") || Map.get(item, :visual_novel_id),
-        position: int(Map.get(item, "position") || Map.get(item, :position)),
-        tier_id: Map.get(item, "tier_id") || Map.get(item, :tier_id),
-        tier_position:
-          optional_int(Map.get(item, "tier_position") || Map.get(item, :tier_position))
-      }
-    end)
-  end
-
-  defp normalize_submitted_items(_items), do: []
-
   defp liked_by_me?(_list_id, nil), do: false
 
   defp liked_by_me?(list_id, viewer_id) do
@@ -471,12 +484,4 @@ defmodule KaguyaWeb.ListLive.Data do
 
   defp bool(value) when value in [true, "true", "on", "1", 1], do: true
   defp bool(_value), do: false
-
-  defp int(value) when is_integer(value), do: value
-  defp int(value) when is_binary(value), do: String.to_integer(value)
-  defp int(_value), do: nil
-
-  defp optional_int(nil), do: nil
-  defp optional_int(""), do: nil
-  defp optional_int(value), do: int(value)
 end

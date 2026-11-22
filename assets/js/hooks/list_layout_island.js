@@ -14,9 +14,11 @@ import {parseJSONAttribute, browserImport, booleanValue} from "../lib/dom"
  *
  * Accepted data-layout:
  *   {
+ *     item_kind: "vn" | "character",
  *     display_mode: "grid" | "tier",
  *     is_ranked: boolean,
- *     items: [{ visual_novel_id, position, tier_id, tier_position, visual_novel }],
+ *     items: [{ id, title, slug, images, is_image_nsfw, is_image_suggestive,
+ *               position, tier_id, tier_position }],
  *     tiers: [{ id, label, color, position }]
  *   }
  *
@@ -31,7 +33,7 @@ import {parseJSONAttribute, browserImport, booleanValue} from "../lib/dom"
  *     {
  *       display_mode,
  *       is_ranked,
- *       items: [{ visual_novel_id, position, tier_id, tier_position }],
+ *       items: [{ item_id, position, tier_id, tier_position }],
  *       tiers: [{ id, label, color, position }]
  *     }
  *

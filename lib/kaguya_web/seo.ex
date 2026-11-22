@@ -165,12 +165,13 @@ defmodule KaguyaWeb.SEO do
         n -> n
       end
 
-    page_title = "#{list_name}, a list of visual novels by #{owner_name} • Kaguya"
+    noun = list_item_noun(list)
+    page_title = "#{list_name}, a list of #{noun} by #{owner_name} • Kaguya"
 
     vn_titles =
       items
       |> Enum.take(5)
-      |> Enum.map(&get_in(&1, [:visual_novel, :title]))
+      |> Enum.map(&list_item_name/1)
       |> Enum.filter(&is_binary/1)
 
     user_desc =
@@ -189,13 +190,13 @@ defmodule KaguyaWeb.SEO do
 
         vn_titles != [] ->
           tail = if total_count > length(vn_titles), do: " and more.", else: "."
-          "A list of #{total_count} visual novels: #{Enum.join(vn_titles, ", ")}#{tail}"
+          "A list of #{total_count} #{noun}: #{Enum.join(vn_titles, ", ")}#{tail}"
 
         true ->
-          "A list of #{total_count} visual novels by #{owner_name} on Kaguya."
+          "A list of #{total_count} #{noun} by #{owner_name} on Kaguya."
       end
 
-    meta_description = build_list_meta_description(total_count, vn_titles, user_desc)
+    meta_description = build_list_meta_description(total_count, noun, vn_titles, user_desc)
     cover_url = first_list_image_url(items)
     canonical = @base_url <> "/@#{owner.username}/list/#{list.slug}"
 
@@ -218,6 +219,7 @@ defmodule KaguyaWeb.SEO do
       twitter_image: cover_url,
       json_ld:
         JsonLd.item_list(list, owner, items,
+          noun: noun,
           page: page,
           page_size: page_size,
           total_count: total_count
@@ -378,12 +380,12 @@ defmodule KaguyaWeb.SEO do
     "#{name} is #{article} #{type_label} producer with #{total_count} visual novels listed on Kaguya#{suffix}"
   end
 
-  defp build_list_meta_description(total_count, vn_titles, user_desc) do
+  defp build_list_meta_description(total_count, noun, vn_titles, user_desc) do
     parts = []
 
     parts =
       if total_count > 0,
-        do: parts ++ ["A list of #{total_count} visual novels compiled on Kaguya"],
+        do: parts ++ ["A list of #{total_count} #{noun} compiled on Kaguya"],
         else: parts
 
     parts =
@@ -421,9 +423,15 @@ defmodule KaguyaWeb.SEO do
   defp first_list_image_url([]), do: nil
 
   defp first_list_image_url([item | _]) do
-    images = get_in(item, [:visual_novel, :images]) || %{}
+    images = get_in(item, [:visual_novel, :images]) || get_in(item, [:character, :images]) || %{}
     Map.get(images, :medium) || Map.get(images, :small)
   end
+
+  defp list_item_noun(%{item_type: "character"}), do: "characters"
+  defp list_item_noun(_list), do: "visual novels"
+
+  defp list_item_name(%{character: %{name: name}}), do: name
+  defp list_item_name(item), do: get_in(item, [:visual_novel, :title])
 
   defp humanize_slug(slug) when is_binary(slug) do
     slug

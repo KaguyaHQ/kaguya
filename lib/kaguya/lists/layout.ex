@@ -1,19 +1,26 @@
 defmodule Kaguya.Lists.Layout do
   @moduledoc """
-  Tier / grid layout engine for VN lists: persisting `display_mode`, tier
-  definitions, and ordered list-item membership. Read helpers for tiers and
-  list items live here too so they sit alongside the writes that maintain
-  them.
+  Persistence for list layouts: `display_mode`, tier definitions, and ordered
+  item membership. Read helpers for tiers and items live here too so they sit
+  alongside the writes that maintain them.
 
-  `Kaguya.Lists` delegates the public read APIs (`list_tiers_for_list`,
-  `list_vns_for_list`, `batch_*`) and orchestrates the higher-level write
-  flows (`create_list`, `update_list`, `add_vns_to_list`, etc.) on top of
-  the primitives exposed here.
+  A list holds one kind of item, chosen by `lists.item_type`:
+
+    * `"vn"` — rows in `list_items`, keyed by `visual_novel_id`
+    * `"character"` — rows in `list_character_items`, keyed by `character_id`
+
+  Ordering and validation rules are shared and live in `Kaguya.Lists.Placement`;
+  this module only maps item types to their tables.
+
+  `Kaguya.Lists` delegates the public read APIs and orchestrates the
+  higher-level write flows (`create_list`, `update_list`, `add_vns_to_list`,
+  etc.) on top of the primitives exposed here.
   """
 
   import Ecto.Query
 
-  alias Kaguya.Lists.{List, ListItem, ListTier}
+  alias Kaguya.Characters.Character
+  alias Kaguya.Lists.{List, ListCharacterItem, ListItem, ListTier, Placement}
   alias Kaguya.Pagination
   alias Kaguya.Repo
   alias Kaguya.VisualNovels.VisualNovel
@@ -204,41 +211,131 @@ defmodule Kaguya.Lists.Layout do
   end
 
   # ============================================================================
+  # Character-in-list Reads
+  # ============================================================================
+
+  @doc """
+  Lists every character in a character list with its placement, in flat order.
+  Hidden characters are left out.
+  """
+  def list_all_characters_for_list(%{id: list_id}) do
+    rows =
+      Repo.all(
+        from(c in Character,
+          join: li in ListCharacterItem,
+          on: li.character_id == c.id,
+          where: li.list_id == ^list_id and is_nil(c.hidden_at),
+          order_by: [asc: li.position],
+          select: %{
+            character: c,
+            position: li.position,
+            tier_id: li.tier_id,
+            tier_position: li.tier_position
+          }
+        )
+      )
+
+    {:ok, rows}
+  end
+
+  @doc """
+  Batch-fetches the first `limit` characters for multiple character lists in
+  one query. Returns `list_id => [%Character{}]` in list order.
+  """
+  def batch_list_characters_for_lists([], _limit), do: %{}
+
+  def batch_list_characters_for_lists(list_ids, limit) when is_list(list_ids) do
+    ranked =
+      from(li in ListCharacterItem,
+        join: c in Character,
+        on: c.id == li.character_id,
+        where: li.list_id in ^list_ids and is_nil(c.hidden_at),
+        windows: [w: [partition_by: li.list_id, order_by: li.position]],
+        select: %{
+          list_id: li.list_id,
+          character_id: li.character_id,
+          rn: row_number() |> over(:w)
+        }
+      )
+
+    grouped =
+      from(r in subquery(ranked),
+        join: c in Character,
+        on: c.id == r.character_id,
+        where: r.rn <= ^limit,
+        order_by: [asc: r.list_id, asc: r.rn],
+        select: {r.list_id, c}
+      )
+      |> Repo.all()
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    Map.new(list_ids, &{&1, Map.get(grouped, &1, [])})
+  end
+
+  # ============================================================================
+  # Item Types
+  # ============================================================================
+
+  @doc """
+  The payload key that identifies an item for a list's item type
+  (`:visual_novel_id` or `:character_id`).
+  """
+  def item_key(%List{item_type: item_type}), do: item_key(item_type)
+  def item_key("vn"), do: :visual_novel_id
+  def item_key("character"), do: :character_id
+
+  defp item_schema("vn"), do: ListItem
+  defp item_schema("character"), do: ListCharacterItem
+
+  @doc """
+  Checks that every id refers to an existing item of the given type.
+  Hidden characters count as missing, since they can't be shown.
+  """
+  def ensure_items_exist(_item_type, []), do: {:ok, []}
+
+  def ensure_items_exist(item_type, ids) when is_list(ids) do
+    found = item_type |> existing_items_query(ids) |> Repo.all() |> MapSet.new()
+
+    if Enum.all?(ids, &MapSet.member?(found, &1)),
+      do: {:ok, ids},
+      else: {:error, :unknown_items}
+  end
+
+  defp existing_items_query("vn", ids),
+    do: from(vn in VisualNovel, where: vn.id in ^ids, select: vn.id)
+
+  defp existing_items_query("character", ids),
+    do: from(c in Character, where: c.id in ^ids and is_nil(c.hidden_at), select: c.id)
+
+  # ============================================================================
   # Items Engine
   # ============================================================================
 
   @doc """
   Appends `item_ids` to the end of a list, then bumps the parent list's
   `vns_count` / `updated_at` / `last_activity_at` by the number actually
-  inserted. Conflicts (already-present VNs) are silently dropped.
+  inserted. Conflicts (already-present items) are silently dropped.
   """
-  def add_items_to_list(_list_id, item_ids) when not is_list(item_ids) or item_ids == [],
+  def add_items_to_list(_list, item_ids) when not is_list(item_ids) or item_ids == [],
     do: {:ok, 0}
 
-  def add_items_to_list(list_id, item_ids) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+  def add_items_to_list(%List{id: list_id, item_type: item_type}, item_ids) do
+    schema = item_schema(item_type)
+    key = item_key(item_type)
+    now = now()
 
     max_pos =
-      from(j in ListItem,
-        where: j.list_id == ^list_id,
-        select: max(j.position)
-      )
+      from(j in schema, where: j.list_id == ^list_id, select: max(j.position))
       |> Repo.one() || 0
 
     entries =
       item_ids
       |> Enum.with_index(max_pos + 1)
       |> Enum.map(fn {item_id, pos} ->
-        %{
-          list_id: list_id,
-          visual_novel_id: item_id,
-          position: pos,
-          inserted_at: now,
-          updated_at: now
-        }
+        %{key => item_id, list_id: list_id, position: pos, inserted_at: now, updated_at: now}
       end)
 
-    {num_inserted, _} = Repo.insert_all(ListItem, entries, on_conflict: :nothing)
+    {num_inserted, _} = Repo.insert_all(schema, entries, on_conflict: :nothing)
 
     if num_inserted > 0 do
       Repo.update_all(
@@ -252,18 +349,18 @@ defmodule Kaguya.Lists.Layout do
   end
 
   @doc """
-  Removes the given VN ids from a list and decrements `vns_count`.
+  Removes the given item ids from a list and decrements `vns_count`.
   """
-  def remove_items_from_list(_list_id, item_ids)
-      when not is_list(item_ids) or item_ids == [],
-      do: {:ok, 0}
+  def remove_items_from_list(_list, item_ids) when not is_list(item_ids) or item_ids == [],
+    do: {:ok, 0}
 
-  def remove_items_from_list(list_id, item_ids) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+  def remove_items_from_list(%List{id: list_id, item_type: item_type}, item_ids) do
+    key = item_key(item_type)
+    now = now()
 
     {num_deleted, _} =
-      from(j in ListItem,
-        where: j.list_id == ^list_id and j.visual_novel_id in ^item_ids
+      from(j in item_schema(item_type),
+        where: j.list_id == ^list_id and field(j, ^key) in ^item_ids
       )
       |> Repo.delete_all()
 
@@ -279,92 +376,18 @@ defmodule Kaguya.Lists.Layout do
   end
 
   @doc """
-  Replace the entire ordered list membership with the provided ordered IDs.
-
-  Opens its own `Repo.transact`. For callers already inside a transaction,
-  use `set_list_items_in_transaction/2`.
+  Replaces the entire ordered membership with the provided ordered ids,
+  keeping each item's saved tier placement.
   """
-  def set_list_items(list_id, ordered_item_ids) when is_list(ordered_item_ids) do
-    do_set_list_items(list_id, ordered_item_ids, true)
-  end
+  def set_list_items(%List{} = list, ordered_item_ids) when is_list(ordered_item_ids) do
+    Repo.transact(fn ->
+      items = Placement.reorder(ordered_item_ids, previous_placements(list))
 
-  @doc """
-  Same as `set_list_items/2` but assumes the caller already opened a
-  `Repo.transact` block — does not open a nested one.
-  """
-  def set_list_items_in_transaction(list_id, ordered_item_ids)
-      when is_list(ordered_item_ids) do
-    do_set_list_items(list_id, ordered_item_ids, false)
-  end
-
-  defp do_set_list_items(list_id, ordered_item_ids, open_transaction?) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    runner =
-      if open_transaction? do
-        fn fun -> Repo.transact(fun) end
-      else
-        fn fun -> fun.() end
-      end
-
-    runner.(fn ->
-      previous_tiers = previous_item_tier_map(list_id)
-
-      entries =
-        ordered_item_ids
-        |> Enum.reject(&is_nil/1)
-        |> Enum.with_index(1)
-        |> Enum.map(fn {item_id, position} ->
-          previous = Map.get(previous_tiers, item_id, %{})
-
-          %{
-            list_id: list_id,
-            visual_novel_id: item_id,
-            position: position,
-            tier_id: Map.get(previous, :tier_id),
-            tier_position: Map.get(previous, :tier_position),
-            inserted_at: now,
-            updated_at: now
-          }
-        end)
-
-      with {:ok, true} <- replace_list_items(list_id, entries) do
-        new_count = length(entries)
-
-        Repo.update_all(
-          from(l in List, where: l.id == ^list_id),
-          set: [vns_count: new_count, updated_at: now, last_activity_at: now]
-        )
-
+      with {:ok, true} <- replace_items(list, items) do
+        update_counts(list.id, length(items))
         {:ok, true}
       end
     end)
-  end
-
-  defp replace_list_items(list_id, entries) when is_list(entries) do
-    if entries != [] do
-      Repo.insert_all(
-        ListItem,
-        entries,
-        on_conflict: {:replace, [:position, :tier_id, :tier_position, :updated_at]},
-        conflict_target: [:list_id, :visual_novel_id]
-      )
-    end
-
-    kept_ids = Enum.map(entries, & &1.visual_novel_id)
-
-    delete_query = from(j in ListItem, where: j.list_id == ^list_id)
-
-    delete_query =
-      if kept_ids == [] do
-        delete_query
-      else
-        from(j in delete_query, where: j.visual_novel_id not in ^kept_ids)
-      end
-
-    Repo.delete_all(delete_query)
-
-    {:ok, true}
   end
 
   # ============================================================================
@@ -372,10 +395,11 @@ defmodule Kaguya.Lists.Layout do
   # ============================================================================
 
   @doc """
-  Atomically saves a list's display mode, tier definitions, and full VN layout.
+  Atomically saves a list's display mode, tier definitions, and full layout.
 
-  Tier-list saves reject duplicate VN placements. Grid saves keep the flat
-  `position` order while preserving tier placement fields for mode switching.
+  Items are keyed by `item_key/1` for the list's item type. Duplicate items
+  are rejected. Grid saves keep the flat `position` order while preserving
+  tier placement fields for mode switching.
   """
   def save_list_layout(list_id, user_id, attrs) when is_map(attrs) do
     Repo.transact(fn ->
@@ -383,18 +407,17 @@ defmodule Kaguya.Lists.Layout do
 
       with {:ok, display_mode} <- normalize_display_mode(Map.get(attrs, :display_mode)),
            %List{} = list <- lock_list_for_owner(list_id, user_id),
-           tier_attrs <- Map.get(attrs, :tiers, :omitted),
-           item_attrs <- Map.get(attrs, :items, []),
-           {:ok, item_attrs} <- validate_layout_items(item_attrs),
-           :ok <- validate_item_positions(item_attrs),
-           {:ok, vn_ids} <- item_visual_novel_ids(item_attrs),
-           {:ok, _vn_ids} <- Kaguya.Lists.ensure_visual_novels_exist(vn_ids),
-           {:ok, layout_tiers} <- save_layout_tiers(list.id, display_mode, tier_attrs),
-           {:ok, entries} <-
-             build_layout_item_entries(list.id, display_mode, layout_tiers, item_attrs),
-           {:ok, true} <- replace_list_items(list.id, entries),
-           {:ok, updated} <- update_list_layout_metadata(list, display_mode, length(entries)) do
-        {:ok, updated}
+           {:ok, items} <- placement_items(list, Map.get(attrs, :items, [])),
+           {:ok, item_ids} <- Placement.validate_items(items),
+           {:ok, _ids} <- ensure_items_exist(list.item_type, item_ids),
+           {:ok, layout_tiers} <-
+             save_layout_tiers(list.id, display_mode, Map.get(attrs, :tiers, :omitted)),
+           # Read saved placements only after tiers are written, so items in a
+           # removed tier fall back to "unplaced" rather than a dead tier id.
+           {:ok, arranged} <-
+             Placement.arrange(display_mode, items, previous_placements(list), layout_tiers),
+           {:ok, true} <- replace_items(list, arranged) do
+        update_list_layout_metadata(list, display_mode, length(arranged))
       else
         nil -> {:error, :not_found}
         error -> error
@@ -415,11 +438,78 @@ defmodule Kaguya.Lists.Layout do
 
   def maybe_ensure_default_tiers(_list), do: {:ok, []}
 
-  defp normalize_display_mode(:grid), do: {:ok, "grid"}
-  defp normalize_display_mode(:tier), do: {:ok, "tier"}
-  defp normalize_display_mode("grid"), do: {:ok, "grid"}
-  defp normalize_display_mode("tier"), do: {:ok, "tier"}
-  defp normalize_display_mode(nil), do: {:ok, "grid"}
+  # Converts payload items (keyed by `:visual_novel_id` / `:character_id`) into
+  # Placement's `:item_id` shape, keeping only the fields that were submitted
+  # so omitted tier fields fall back to saved placement.
+  defp placement_items(list, items) when is_list(items) do
+    key = item_key(list)
+
+    {:ok,
+     Enum.map(items, fn item ->
+       item
+       |> Map.take([:position, :tier_id, :tier_position])
+       |> Map.put(:item_id, Map.get(item, key))
+     end)}
+  end
+
+  defp placement_items(_list, _items), do: {:error, :invalid_list_items}
+
+  defp previous_placements(%List{id: list_id, item_type: item_type}) do
+    key = item_key(item_type)
+
+    Repo.all(
+      from(li in item_schema(item_type),
+        where: li.list_id == ^list_id,
+        select: {field(li, ^key), %{tier_id: li.tier_id, tier_position: li.tier_position}}
+      )
+    )
+    |> Map.new()
+  end
+
+  defp replace_items(%List{id: list_id, item_type: item_type}, items) do
+    schema = item_schema(item_type)
+    key = item_key(item_type)
+    now = now()
+
+    entries =
+      Enum.map(items, fn item ->
+        %{
+          key => item.item_id,
+          list_id: list_id,
+          position: item.position,
+          tier_id: item.tier_id,
+          tier_position: item.tier_position,
+          inserted_at: now,
+          updated_at: now
+        }
+      end)
+
+    if entries != [] do
+      Repo.insert_all(schema, entries,
+        on_conflict: {:replace, [:position, :tier_id, :tier_position, :updated_at]},
+        conflict_target: [:list_id, key]
+      )
+    end
+
+    kept_ids = Enum.map(items, & &1.item_id)
+
+    from(j in schema, where: j.list_id == ^list_id and field(j, ^key) not in ^kept_ids)
+    |> Repo.delete_all()
+
+    {:ok, true}
+  end
+
+  defp update_counts(list_id, count) do
+    now = now()
+
+    Repo.update_all(
+      from(l in List, where: l.id == ^list_id),
+      set: [vns_count: count, updated_at: now, last_activity_at: now]
+    )
+  end
+
+  defp normalize_display_mode(mode) when mode in [:grid, "grid", nil], do: {:ok, "grid"}
+  defp normalize_display_mode(mode) when mode in [:tier, "tier"], do: {:ok, "tier"}
   defp normalize_display_mode(_), do: {:error, :invalid_display_mode}
 
   defp lock_list_for_owner(list_id, user_id) do
@@ -435,79 +525,44 @@ defmodule Kaguya.Lists.Layout do
     Repo.query!("SET CONSTRAINTS list_tiers_list_id_position_unique DEFERRED")
   end
 
-  defp validate_layout_items(items) when is_list(items), do: {:ok, items}
-  defp validate_layout_items(_), do: {:error, :invalid_list_items}
+  # ============================================================================
+  # Tier Writes
+  # ============================================================================
 
-  defp validate_item_positions(items) do
-    invalid? =
-      Enum.any?(items, fn item ->
-        invalid_optional_positive_integer?(Map.get(item, :position)) or
-          invalid_optional_positive_integer?(Map.get(item, :tier_position))
-      end)
-
-    if invalid?, do: {:error, :invalid_position}, else: :ok
-  end
-
-  defp invalid_optional_positive_integer?(nil), do: false
-  defp invalid_optional_positive_integer?(value) when is_integer(value), do: value < 1
-  defp invalid_optional_positive_integer?(_), do: true
-
-  defp item_visual_novel_ids(items) do
-    ids = Enum.map(items, &Map.get(&1, :visual_novel_id))
-
-    cond do
-      Enum.any?(ids, &is_nil/1) ->
-        {:error, :missing_visual_novel_id}
-
-      length(ids) != length(Enum.uniq(ids)) ->
-        {:error, :duplicate_visual_novel}
-
-      true ->
-        {:ok, ids}
-    end
-  end
-
-  defp save_layout_tiers(list_id, "grid", :omitted) do
+  # Grid saves only touch tiers when the payload carries a tier set (so tier
+  # edits made while viewing the grid are kept); otherwise saved tiers stay.
+  defp save_layout_tiers(list_id, "grid", tier_attrs) when tier_attrs in [:omitted, []] do
     with {:ok, tiers} <- list_tiers_for_list(list_id), do: {:ok, layout_tiers_result(tiers)}
   end
 
-  defp save_layout_tiers(list_id, "grid", tier_attrs) when is_list(tier_attrs) do
-    if tier_attrs == [] do
-      with {:ok, tiers} <- list_tiers_for_list(list_id) do
-        {:ok, layout_tiers_result(tiers)}
-      end
-    else
-      save_layout_tiers(list_id, "tier", tier_attrs)
-    end
-  end
+  defp save_layout_tiers(list_id, "grid", tier_attrs) when is_list(tier_attrs),
+    do: write_tiers(list_id, tier_attrs)
 
   defp save_layout_tiers(list_id, "tier", :omitted) do
-    with {:ok, tiers} <- list_tiers_for_list(list_id) do
-      case tiers do
-        [] -> save_layout_tiers(list_id, "tier", [])
-        tiers -> {:ok, layout_tiers_result(tiers)}
-      end
+    case list_tiers_for_list(list_id) do
+      {:ok, []} -> write_tiers(list_id, default_tier_attrs())
+      {:ok, tiers} -> {:ok, layout_tiers_result(tiers)}
     end
   end
 
-  defp save_layout_tiers(list_id, "tier", tier_attrs) when is_list(tier_attrs) do
-    attrs = if tier_attrs == [], do: default_tier_attrs(), else: tier_attrs
+  defp save_layout_tiers(list_id, "tier", []), do: write_tiers(list_id, default_tier_attrs())
 
+  defp save_layout_tiers(list_id, "tier", tier_attrs) when is_list(tier_attrs),
+    do: write_tiers(list_id, tier_attrs)
+
+  defp save_layout_tiers(_list_id, _mode, _tier_attrs), do: {:error, :invalid_tiers}
+
+  defp write_tiers(list_id, attrs) do
     with :ok <- validate_unique_tier_positions(attrs),
-         :ok <- validate_unique_tier_ids(attrs) do
-      existing = Repo.all(from(t in ListTier, where: t.list_id == ^list_id))
-      existing_by_id = Map.new(existing, &{&1.id, &1})
-      submitted_ids = attrs |> Enum.map(&db_tier_id/1) |> Enum.reject(&is_nil/1)
-
-      with :ok <- ensure_tier_ids_belong_to_list(submitted_ids, list_id),
-           now <- DateTime.utc_now() |> DateTime.truncate(:second),
-           {:ok, saved_tiers} <- persist_layout_tiers(attrs, list_id, existing_by_id) do
-        finish_layout_tiers(list_id, attrs, Enum.reverse(saved_tiers), now)
-      end
+         :ok <- validate_unique_tier_ids(attrs),
+         submitted_ids = attrs |> Enum.map(&db_tier_id/1) |> Enum.reject(&is_nil/1),
+         :ok <- ensure_tier_ids_belong_to_list(submitted_ids, list_id),
+         existing_by_id =
+           Repo.all(from(t in ListTier, where: t.list_id == ^list_id)) |> Map.new(&{&1.id, &1}),
+         {:ok, saved_tiers} <- persist_layout_tiers(attrs, list_id, existing_by_id) do
+      finish_layout_tiers(list_id, attrs, Enum.reverse(saved_tiers))
     end
   end
-
-  defp save_layout_tiers(_list_id, "tier", _), do: {:error, :invalid_tiers}
 
   defp persist_layout_tiers(attrs, list_id, existing_by_id) do
     Enum.reduce_while(attrs, {:ok, []}, fn attrs, {:ok, acc} ->
@@ -532,8 +587,11 @@ defmodule Kaguya.Lists.Layout do
     end
   end
 
-  defp finish_layout_tiers(list_id, attrs, saved_tiers, now) do
+  # Removes tiers that were dropped from the payload. Their items are
+  # unassigned (in both item tables) rather than lost.
+  defp finish_layout_tiers(list_id, attrs, saved_tiers) do
     saved_ids = Enum.map(saved_tiers, & &1.id)
+    now = now()
 
     id_map =
       attrs
@@ -541,8 +599,10 @@ defmodule Kaguya.Lists.Layout do
       |> Map.new(fn {attrs, tier} -> {Map.get(attrs, :id, tier.id), tier.id} end)
       |> Map.merge(Map.new(saved_tiers, &{&1.id, &1.id}))
 
-    from(li in ListItem, where: li.list_id == ^list_id and li.tier_id not in ^saved_ids)
-    |> Repo.update_all(set: [tier_id: nil, tier_position: nil, updated_at: now])
+    for schema <- [ListItem, ListCharacterItem] do
+      from(li in schema, where: li.list_id == ^list_id and li.tier_id not in ^saved_ids)
+      |> Repo.update_all(set: [tier_id: nil, tier_position: nil, updated_at: now])
+    end
 
     from(t in ListTier, where: t.list_id == ^list_id and t.id not in ^saved_ids)
     |> Repo.delete_all()
@@ -565,10 +625,7 @@ defmodule Kaguya.Lists.Layout do
     if length(ids) == length(Enum.uniq(ids)), do: :ok, else: {:error, :duplicate_tier_id}
   end
 
-  defp db_tier_id(%{id: id}) when is_binary(id) do
-    if binary_id?(id), do: id, else: nil
-  end
-
+  defp db_tier_id(%{id: id}) when is_binary(id), do: if(binary_id?(id), do: id)
   defp db_tier_id(_), do: nil
 
   defp binary_id?(id) when is_binary(id), do: Regex.match?(@uuid_string_pattern, id)
@@ -595,185 +652,8 @@ defmodule Kaguya.Lists.Layout do
     end)
   end
 
-  defp build_layout_item_entries(list_id, "grid", layout_tiers, items) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-    previous_tiers = previous_item_tier_map(list_id)
-    tiers = Map.get(layout_tiers, :tiers, [])
-    id_map = Map.get(layout_tiers, :id_map, %{})
-    tier_ids = MapSet.new(Enum.map(tiers, & &1.id))
-
-    enriched_items =
-      items
-      |> Enum.map(fn item ->
-        visual_novel_id = Map.fetch!(item, :visual_novel_id)
-        previous = Map.get(previous_tiers, visual_novel_id, %{})
-
-        tier_id =
-          item
-          |> item_field_or_previous(:tier_id, previous)
-          |> resolve_tier_ref(id_map)
-
-        item
-        |> Map.put(:tier_id, tier_id)
-        |> Map.put(:tier_position, item_field_or_previous(item, :tier_position, previous))
-      end)
-
-    entries =
-      enriched_items
-      |> order_grid_items()
-      |> Enum.with_index(1)
-      |> Enum.map(fn {item, position} ->
-        visual_novel_id = Map.fetch!(item, :visual_novel_id)
-
-        %{
-          list_id: list_id,
-          visual_novel_id: visual_novel_id,
-          position: position,
-          tier_id: Map.get(item, :tier_id),
-          tier_position: Map.get(item, :tier_position),
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
-
-    with :ok <- validate_item_tier_references(entries, tier_ids),
-         :ok <- validate_unique_tier_positions_within_items(entries) do
-      {:ok, entries}
-    end
-  end
-
-  defp build_layout_item_entries(list_id, "tier", layout_tiers, items) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-    tiers = Map.get(layout_tiers, :tiers, [])
-    id_map = Map.get(layout_tiers, :id_map, %{})
-    tier_ids = MapSet.new(Enum.map(tiers, & &1.id))
-    previous_tiers = previous_item_tier_map(list_id)
-
-    enriched_items =
-      Enum.map(items, fn item ->
-        visual_novel_id = Map.fetch!(item, :visual_novel_id)
-        previous = Map.get(previous_tiers, visual_novel_id, %{})
-
-        tier_id =
-          item
-          |> item_field_or_previous(:tier_id, previous)
-          |> resolve_tier_ref(id_map)
-
-        item
-        |> Map.put(:tier_id, tier_id)
-        |> Map.put(:tier_position, item_field_or_previous(item, :tier_position, previous))
-      end)
-
-    with :ok <- validate_item_tier_references(enriched_items, tier_ids),
-         :ok <- validate_unique_tier_positions_within_items(enriched_items) do
-      entries =
-        enriched_items
-        |> order_tier_items(tiers, %{})
-        |> normalize_item_tier_positions()
-        |> Enum.with_index(1)
-        |> Enum.map(fn {item, position} ->
-          %{
-            list_id: list_id,
-            visual_novel_id: Map.fetch!(item, :visual_novel_id),
-            position: position,
-            tier_id: Map.get(item, :tier_id),
-            tier_position: Map.get(item, :tier_position),
-            inserted_at: now,
-            updated_at: now
-          }
-        end)
-
-      {:ok, entries}
-    end
-  end
-
-  defp previous_item_tier_map(list_id) do
-    Repo.all(
-      from(li in ListItem,
-        where: li.list_id == ^list_id,
-        select: {li.visual_novel_id, %{tier_id: li.tier_id, tier_position: li.tier_position}}
-      )
-    )
-    |> Map.new()
-  end
-
-  defp item_field_or_previous(item, field, previous) do
-    if Map.has_key?(item, field), do: Map.get(item, field), else: Map.get(previous, field)
-  end
-
-  defp validate_item_tier_references(items, tier_ids, id_map \\ %{}) do
-    invalid? =
-      Enum.any?(items, fn item ->
-        tier_id = resolve_tier_ref(Map.get(item, :tier_id), id_map)
-        not is_nil(tier_id) and not MapSet.member?(tier_ids, tier_id)
-      end)
-
-    if invalid?, do: {:error, :tier_not_found}, else: :ok
-  end
-
-  defp resolve_tier_ref(nil, _id_map), do: nil
-  defp resolve_tier_ref(tier_id, id_map), do: Map.get(id_map, tier_id, tier_id)
-
-  defp validate_unique_tier_positions_within_items(items) do
-    duplicate? =
-      items
-      |> Enum.reject(&(is_nil(Map.get(&1, :tier_id)) or is_nil(Map.get(&1, :tier_position))))
-      |> Enum.group_by(&Map.get(&1, :tier_id), &Map.get(&1, :tier_position))
-      |> Enum.any?(fn {_tier_id, positions} ->
-        length(positions) != length(Enum.uniq(positions))
-      end)
-
-    if duplicate?, do: {:error, :duplicate_tier_position}, else: :ok
-  end
-
-  defp order_grid_items(items) do
-    items
-    |> Enum.with_index()
-    |> Enum.sort_by(fn {item, idx} -> {Map.get(item, :position) || idx + 1, idx} end)
-    |> Enum.map(&elem(&1, 0))
-  end
-
-  defp order_tier_items(items, tiers, id_map) do
-    tier_order =
-      tiers
-      |> Enum.with_index()
-      |> Map.new(fn {tier, idx} -> {tier.id, {tier.position, idx}} end)
-
-    items
-    |> Enum.with_index()
-    |> Enum.sort_by(fn {item, idx} ->
-      case resolve_tier_ref(Map.get(item, :tier_id), id_map) do
-        nil ->
-          {{999_999, 999_999},
-           Map.get(item, :tier_position) || Map.get(item, :position) || idx + 1, idx}
-
-        tier_id ->
-          {Map.get(tier_order, tier_id, {999_998, 999_998}),
-           Map.get(item, :tier_position) || Map.get(item, :position) || idx + 1, idx}
-      end
-    end)
-    |> Enum.map(&elem(&1, 0))
-  end
-
-  defp normalize_item_tier_positions(items) do
-    {normalized, _counts} =
-      Enum.map_reduce(items, %{}, fn item, counts ->
-        case Map.get(item, :tier_id) do
-          nil ->
-            {Map.put(item, :tier_position, nil), counts}
-
-          tier_id ->
-            position = Map.get(counts, tier_id, 0) + 1
-
-            {Map.put(item, :tier_position, position), Map.put(counts, tier_id, position)}
-        end
-      end)
-
-    normalized
-  end
-
   defp update_list_layout_metadata(list, display_mode, count) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = now()
 
     list
     |> Ecto.Changeset.change(%{
@@ -784,4 +664,6 @@ defmodule Kaguya.Lists.Layout do
     })
     |> Repo.update()
   end
+
+  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 end

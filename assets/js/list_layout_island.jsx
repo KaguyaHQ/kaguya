@@ -58,15 +58,8 @@ const field = (source, ...names) => {
   return undefined
 }
 
-const itemId = item =>
-  asString(
-    field(item, "visual_novel_id", "visualNovelId", "id") ||
-      field(item?.visual_novel, "id") ||
-      field(item?.visualNovel, "id") ||
-      field(item?.vn, "id")
-  )
-
-const itemPayload = item => item?.visual_novel || item?.visualNovel || item?.vn || item || {}
+// Items arrive as flat display maps (a VN or a character), keyed by `id`.
+const itemId = item => asString(field(item, "id"))
 
 const itemPosition = item => Number(field(item, "position", "rank")) || Number.MAX_SAFE_INTEGER
 
@@ -87,23 +80,18 @@ const normalizeTiers = tiers => {
     .map((tier, index) => ({...tier, position: index + 1}))
 }
 
-const normalizeItem = item => {
-  const payload = itemPayload(item)
+const normalizeItem = (item, kind) => {
   const id = itemId(item)
   if (!id) return null
 
   return {
-    ...payload,
     ...item,
     id,
-    visual_novel_id: id,
-    title: field(payload, "title", "name") || field(item, "title", "name") || "",
-    slug: field(payload, "slug") || field(item, "slug") || null,
-    images: field(payload, "images") || field(item, "images") || null,
-    imageUrl:
-      field(payload, "imageUrl", "image_url", "coverUrl", "cover_url") ||
-      field(item, "imageUrl", "image_url", "coverUrl", "cover_url") ||
-      null,
+    kind,
+    title: field(item, "title", "name") || "",
+    slug: field(item, "slug") || null,
+    images: field(item, "images") || null,
+    imageUrl: field(item, "imageUrl", "image_url") || null,
     tier_id: asString(field(item, "tier_id", "tierId")),
     tier_position: field(item, "tier_position", "tierPosition") ?? null,
     position: Number(field(item, "position", "rank")) || null
@@ -130,8 +118,9 @@ const normalizeLayout = rawLayout => {
   const raw = rawLayout || {}
   const displayMode = normalizedMode(field(raw, "display_mode", "displayMode", "mode"))
   const isRanked = booleanValue(field(raw, "is_ranked", "isRanked"))
-  const items = toArray(field(raw, "items", "vns", "visual_novels", "visualNovels"))
-    .map(normalizeItem)
+  const itemKind = field(raw, "item_kind", "itemKind") === "character" ? "character" : "vn"
+  const items = toArray(field(raw, "items"))
+    .map(item => normalizeItem(item, itemKind))
     .filter(Boolean)
     .sort((a, b) => itemPosition(a) - itemPosition(b))
 
@@ -186,7 +175,7 @@ const normalizeLayout = rawLayout => {
     tierItemIds[tier.id] = unique(toArray(tierItemIds[tier.id]).filter(id => validIds.has(id)))
   }
 
-  return {displayMode, isRanked, itemsById, itemIds, tiers, tierItemIds, unrankedItemIds}
+  return {displayMode, isRanked, itemKind, itemsById, itemIds, tiers, tierItemIds, unrankedItemIds}
 }
 
 const serverLayout = layout => {
@@ -213,7 +202,7 @@ const serverLayout = layout => {
     items: orderedIds
       .filter(id => layout.itemsById[id])
       .map((id, index) => ({
-        visual_novel_id: id,
+        item_id: id,
         position: index + 1,
         tier_id: placement.get(id)?.tier_id ?? null,
         tier_position: placement.get(id)?.tier_position ?? null
@@ -274,7 +263,7 @@ const replaceTiers = (layout, tiers) => {
 }
 
 const addItem = (layout, item) => {
-  const normalized = normalizeItem(item)
+  const normalized = normalizeItem(item, layout.itemKind)
   if (!normalized || layout.itemsById[normalized.id]) return layout
 
   const itemIds = [...layout.itemIds, normalized.id]
@@ -463,6 +452,9 @@ const coverSensitive = item =>
   item?.is_image_suggestive === true ||
   item?.isImageSuggestive === true
 
+// Character portraits keep the face in frame; VN covers stay centred.
+const coverFocus = item => (item?.kind === "character" ? "object-top" : "object-center")
+
 const Cover = ({item, className, blurSize = 140}) => {
   const {src, srcSet} = imageData(item)
   const title = item?.title || "Untitled"
@@ -642,7 +634,7 @@ const GridItem = ({item, rank, isRanked, onRemove, dragOverlay = false}) => {
     >
       <div className="touch-pan-y select-none [-webkit-touch-callout:none]">
         <div className="group relative aspect-[1/1.5] overflow-hidden">
-          <Cover item={item} className="h-full w-full rounded-[2px] object-cover object-center" />
+          <Cover item={item} className={cx("h-full w-full rounded-[2px] object-cover", coverFocus(item))} />
           {!dragOverlay && <RemoveButton onClick={onRemove} />}
         </div>
         {isRanked && rank ? (
@@ -803,7 +795,7 @@ const TierCover = ({item, containerId, onRemove, dragOverlay = false}) => {
       <Cover
         item={item}
         blurSize={70}
-        className="h-full w-full rounded-[4px] object-cover object-center"
+        className={cx("h-full w-full rounded-[4px] object-cover", coverFocus(item))}
       />
       {!isTouchDevice && !dragOverlay && <ItemDropZones itemId={item.id} />}
       {!dragOverlay && <RemoveButton onClick={onRemove} />}

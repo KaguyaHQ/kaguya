@@ -352,7 +352,7 @@ defmodule KaguyaWeb.ListLive.Show do
     |> assign(:list, list)
     |> assign(:raw_list, payload.raw_list)
     |> assign(:owner, owner)
-    |> assign(:items, payload.visual_novels)
+    |> assign(:items, payload.items)
     |> assign(:tiers, payload.tiers)
     |> assign(:list_pagination, list_pagination)
     |> assign(:comments, payload.comments)
@@ -384,7 +384,7 @@ defmodule KaguyaWeb.ListLive.Show do
       SharedTime.calendar_custom(list.last_activity_at || list.updated_at || list.inserted_at)
     )
     |> assign(
-      SEO.list(list, owner, payload.visual_novels,
+      SEO.list(list, owner, payload.items,
         page: list_pagination.page,
         page_size: Data.list_page_size(),
         total_count: total_count

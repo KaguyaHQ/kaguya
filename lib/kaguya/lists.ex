@@ -1,6 +1,7 @@
 defmodule Kaguya.Lists do
   @moduledoc """
-  Context for VN lists (public/private curated lists).
+  Context for curated lists. A list holds either VNs or characters
+  (`List.item_type`); see `Kaguya.Lists.Layout` for how items are stored.
   """
 
   import Ecto.Query
@@ -43,6 +44,9 @@ defmodule Kaguya.Lists do
   defdelegate list_tiers_for_list(list_or_id), to: Layout
   defdelegate batch_list_tiers_for_lists(list_ids), to: Layout
   defdelegate batch_list_vns_for_lists(list_tuples, page_size), to: Layout
+  defdelegate list_all_characters_for_list(list), to: Layout
+  defdelegate batch_list_characters_for_lists(list_ids, limit), to: Layout
+  defdelegate item_key(list_or_item_type), to: Layout
 
   # ============================================================================
   # List CRUD
@@ -179,7 +183,7 @@ defmodule Kaguya.Lists do
   def list_my_lists_with_membership(user_id, vn_id) do
     query =
       from l in List,
-        where: l.user_id == ^user_id,
+        where: l.user_id == ^user_id and l.item_type == "vn",
         left_join: li in ListItem,
         on: li.list_id == l.id and li.visual_novel_id == ^vn_id,
         order_by: [asc: l.is_public, desc: l.updated_at],
@@ -227,34 +231,20 @@ defmodule Kaguya.Lists do
         raw_vn_ids = Map.get(attrs, :vn_ids, [])
         vn_ids = normalize_vn_ids(raw_vn_ids)
         list_attrs = Map.delete(attrs, :vn_ids)
-        list_changeset = List.changeset(%List{}, list_attrs)
+        list_changeset = List.create_changeset(%List{}, list_attrs, "vn")
 
         with {:ok, vn_ids} <- ensure_vn_ids_present(vn_ids, list_changeset),
              {:ok, vn_ids} <- ensure_visual_novels_exist(vn_ids, list_changeset),
              {:ok, list} <- Repo.insert(list_changeset),
              {:ok, _tiers} <- Layout.maybe_ensure_default_tiers(list),
-             # Return the updated list (with vns_count/last_activity_at set).
-             {:ok, true} <- Layout.set_list_items_in_transaction(list.id, vn_ids) do
+             {:ok, true} <- Layout.set_list_items(list, vn_ids) do
+          # Return the updated list (with vns_count/last_activity_at set).
           get_list(list.id, list.user_id)
         end
       end)
 
     with {:ok, list} <- result do
-      if list.is_public do
-        Activities.record_activity(%{
-          user_id: list.user_id,
-          action: :created_list,
-          entity_type: "list",
-          entity_id: list.id,
-          metadata: %{
-            list_name: list.name,
-            list_slug: list.slug,
-            list_username: list_creator_username(list),
-            list_display_name: list_creator_display_name(list)
-          }
-        })
-      end
-
+      record_created_list_activity(list)
       {:ok, list}
     end
   end
@@ -262,52 +252,56 @@ defmodule Kaguya.Lists do
   @doc """
   Creates a list and persists its full layout in one transaction.
 
+  `attrs[:item_type]` picks what the list holds (`"vn"` by default, or
+  `"character"`); it can't change afterwards. Layout items are keyed by
+  `item_key/1` for that type.
+
   LiveView form flows use this instead of calling `create_list/1` followed by
   `save_list_layout/3`, so invalid tier/item payloads do not leave behind a
   partially-created list.
   """
   def create_list_with_layout(user_id, attrs, layout_attrs)
       when is_binary(user_id) and is_map(attrs) and is_map(layout_attrs) do
-    attrs =
-      attrs
-      |> Map.put(:user_id, user_id)
-      |> put_layout_vn_ids(layout_attrs)
+    {item_type, attrs} = Map.pop(attrs, :item_type, "vn")
 
     result =
       Repo.transact(fn ->
-        raw_vn_ids = Map.get(attrs, :vn_ids, [])
-        vn_ids = normalize_vn_ids(raw_vn_ids)
-        list_attrs = Map.delete(attrs, :vn_ids)
-        list_changeset = List.changeset(%List{}, list_attrs)
+        changeset = List.create_changeset(%List{}, Map.put(attrs, :user_id, user_id), item_type)
 
-        with {:ok, vn_ids} <- ensure_vn_ids_present(vn_ids, list_changeset),
-             {:ok, vn_ids} <- ensure_visual_novels_exist(vn_ids, list_changeset),
-             {:ok, list} <- Repo.insert(list_changeset),
-             {:ok, _tiers} <- Layout.maybe_ensure_default_tiers(list),
-             {:ok, true} <- Layout.set_list_items_in_transaction(list.id, vn_ids) do
+        with :ok <- ensure_layout_has_items(layout_attrs, changeset),
+             {:ok, list} <- Repo.insert(changeset),
+             {:ok, _tiers} <- Layout.maybe_ensure_default_tiers(list) do
           Layout.save_list_layout(list.id, user_id, layout_attrs)
         end
       end)
 
     with {:ok, list} <- result do
-      if list.is_public do
-        Activities.record_activity(%{
-          user_id: list.user_id,
-          action: :created_list,
-          entity_type: "list",
-          entity_id: list.id,
-          metadata: %{
-            list_name: list.name,
-            list_slug: list.slug,
-            list_username: list_creator_username(list),
-            list_display_name: list_creator_display_name(list)
-          }
-        })
-      end
-
+      record_created_list_activity(list)
       {:ok, list}
     end
   end
+
+  defp ensure_layout_has_items(%{items: [_ | _]}, _changeset), do: :ok
+
+  defp ensure_layout_has_items(_layout_attrs, changeset),
+    do: {:error, Ecto.Changeset.add_error(changeset, :items, "must contain at least one item")}
+
+  defp record_created_list_activity(%List{is_public: true} = list) do
+    Activities.record_activity(%{
+      user_id: list.user_id,
+      action: :created_list,
+      entity_type: "list",
+      entity_id: list.id,
+      metadata: %{
+        list_name: list.name,
+        list_slug: list.slug,
+        list_username: list_creator_username(list),
+        list_display_name: list_creator_display_name(list)
+      }
+    })
+  end
+
+  defp record_created_list_activity(_list), do: :ok
 
   defp normalize_vn_ids(nil), do: []
 
@@ -318,24 +312,6 @@ defmodule Kaguya.Lists do
   end
 
   defp normalize_vn_ids(vn_id), do: normalize_vn_ids([vn_id])
-
-  defp put_layout_vn_ids(attrs, layout_attrs) do
-    case Map.get(attrs, :vn_ids) do
-      nil -> Map.put(attrs, :vn_ids, layout_visual_novel_ids(layout_attrs))
-      [] -> Map.put(attrs, :vn_ids, layout_visual_novel_ids(layout_attrs))
-      _vn_ids -> attrs
-    end
-  end
-
-  defp layout_visual_novel_ids(%{items: items}) when is_list(items) do
-    Enum.map(items, &Map.get(&1, :visual_novel_id))
-  end
-
-  defp layout_visual_novel_ids(%{"items" => items}) when is_list(items) do
-    Enum.map(items, &(Map.get(&1, :visual_novel_id) || Map.get(&1, "visual_novel_id")))
-  end
-
-  defp layout_visual_novel_ids(_layout_attrs), do: []
 
   defp ensure_vn_ids_present(vn_ids, changeset \\ Ecto.Changeset.change(%List{})) do
     case vn_ids do
@@ -352,10 +328,8 @@ defmodule Kaguya.Lists do
     end
   end
 
-  @doc false
-  # Public so `Kaguya.Lists.Layout` can re-use it. Not part of the user-facing API.
-  def ensure_visual_novels_exist(vn_ids, changeset \\ Ecto.Changeset.change(%List{}))
-      when is_list(vn_ids) do
+  defp ensure_visual_novels_exist(vn_ids, changeset \\ Ecto.Changeset.change(%List{}))
+       when is_list(vn_ids) do
     existing_ids =
       from(vn in VisualNovel, where: vn.id in ^vn_ids, select: vn.id)
       |> Repo.all()
@@ -431,9 +405,9 @@ defmodule Kaguya.Lists do
   def add_vns_to_list(list_id, vn_ids, user_id) when is_list(vn_ids) and vn_ids != [] do
     vn_ids = normalize_vn_ids(vn_ids)
 
-    with {:ok, _list} <- get_list_for_owner(list_id, user_id),
+    with {:ok, list} <- get_vn_list_for_owner(list_id, user_id),
          {:ok, vn_ids} <- ensure_visual_novels_exist(vn_ids),
-         {:ok, _count} <- Layout.add_items_to_list(list_id, vn_ids) do
+         {:ok, _count} <- Layout.add_items_to_list(list, vn_ids) do
       {:ok, true}
     end
   end
@@ -444,8 +418,8 @@ defmodule Kaguya.Lists do
   Removes VNs from a list.
   """
   def remove_vns_from_list(list_id, vn_ids, user_id) when is_list(vn_ids) do
-    with {:ok, _list} <- get_list_for_owner(list_id, user_id) do
-      Layout.remove_items_from_list(list_id, vn_ids)
+    with {:ok, list} <- get_vn_list_for_owner(list_id, user_id) do
+      Layout.remove_items_from_list(list, vn_ids)
     end
   end
 
@@ -456,10 +430,20 @@ defmodule Kaguya.Lists do
   def set_list_vns(list_id, ordered_vn_ids, user_id) when is_list(ordered_vn_ids) do
     normalized_ids = normalize_vn_ids(ordered_vn_ids)
 
-    with {:ok, _list} <- get_list_for_owner(list_id, user_id),
+    with {:ok, list} <- get_vn_list_for_owner(list_id, user_id),
          {:ok, vn_ids} <- ensure_vn_ids_present(normalized_ids),
          {:ok, vn_ids} <- ensure_visual_novels_exist(vn_ids) do
-      Layout.set_list_items(list_id, vn_ids)
+      Layout.set_list_items(list, vn_ids)
+    end
+  end
+
+  # The VN-membership helpers above serve the VN page's "Add to list" flow, so
+  # they refuse character lists instead of writing VN rows into them.
+  defp get_vn_list_for_owner(list_id, user_id) do
+    case get_list_for_owner(list_id, user_id) do
+      {:ok, %List{item_type: "vn"} = list} -> {:ok, list}
+      {:ok, _list} -> {:error, :wrong_item_type}
+      error -> error
     end
   end
 

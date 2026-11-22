@@ -55,7 +55,7 @@ defmodule Kaguya.Lists.ListLayoutHelpersTest do
     user: user,
     vns: [vn | _]
   } do
-    assert {:error, :duplicate_visual_novel} =
+    assert {:error, :duplicate_item} =
              Lists.create_list_with_layout(
                user.id,
                %{name: "Rollback list", display_mode: "tier", is_public: true},

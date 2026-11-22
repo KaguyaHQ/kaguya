@@ -304,7 +304,7 @@ defmodule Kaguya.Lists.TierListsTest do
   } do
     {:ok, list} = create_grid_list!(user, [vn1, vn2])
 
-    assert {:error, :duplicate_visual_novel} =
+    assert {:error, :duplicate_item} =
              Lists.save_list_layout(list.id, user.id, %{
                display_mode: "tier",
                tiers: [%{label: "S", color: "#ff5555", position: 1}],

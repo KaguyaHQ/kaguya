@@ -1,11 +1,12 @@
 defmodule KaguyaWeb.Lists.ShowComponents do
   @moduledoc """
-  HEEx components for the read-only VN list show page.
+  HEEx components for the read-only list show page (VN and character lists).
   """
 
   use KaguyaWeb, :html
   import Bitwise, only: [&&&: 2]
 
+  alias KaguyaWeb.SharedComponents.CharacterImage
   alias KaguyaWeb.SharedComponents.Cover
   alias KaguyaWeb.SharedComponents.LikeButton
   alias KaguyaWeb.SharedComponents.Pagination, as: SharedPagination
@@ -91,7 +92,7 @@ defmodule KaguyaWeb.Lists.ShowComponents do
           <div :for={item <- @items} class="flex min-w-0 flex-col gap-1">
             <.vn_cover
               vn={item.visual_novel}
-              fade={@fade_read && read?(item.visual_novel)}
+              fade={@fade_read && read?(item)}
               image_class="rounded-[2px]"
             />
 
@@ -99,7 +100,7 @@ defmodule KaguyaWeb.Lists.ShowComponents do
               :if={@is_ranked}
               class={[
                 "mb-[3px] flex items-center justify-center gap-0.5 text-xs font-normal text-[rgb(var(--foreground-primary))] lg:text-sm",
-                @fade_read && read?(item.visual_novel) && "opacity-20"
+                @fade_read && read?(item) && "opacity-20"
               ]}
             >
               <p>{item.position}</p>
@@ -191,7 +192,7 @@ defmodule KaguyaWeb.Lists.ShowComponents do
             <.tier_cover
               :for={item <- tier_items(@items, tier.id)}
               item={item}
-              fade={@fade_read && read?(item.visual_novel)}
+              fade={@fade_read && read?(item)}
             />
           </div>
         </div>
@@ -245,7 +246,7 @@ defmodule KaguyaWeb.Lists.ShowComponents do
         panel_id={@panel_id}
       />
 
-      <%= if @total_count > 0 do %>
+      <%= if @total_count > 0 and @list.item_type == "vn" do %>
         <div class="mx-4 h-px bg-white/6" />
         <.reading_progress
           current_count={@current_count}
@@ -271,8 +272,9 @@ defmodule KaguyaWeb.Lists.ShowComponents do
           <Lucide.link_2 class="size-[14px]" aria-hidden />
           <span>Share</span>
         </button>
-        <div class="h-4 w-px bg-white/6" />
+        <div :if={@list.item_type == "vn"} class="h-4 w-px bg-white/6" />
         <button
+          :if={@list.item_type == "vn"}
           type="button"
           id={"#{@panel_id}-fade-read"}
           phx-click="toggle_fade_read"
@@ -479,6 +481,25 @@ defmodule KaguyaWeb.Lists.ShowComponents do
   attr :item, :map, required: true
   attr :fade, :boolean, default: false
 
+  defp tier_cover(%{item: %{character: _}} = assigns) do
+    ~H"""
+    <.link
+      navigate={"/character/#{@item.character.slug}"}
+      title={@item.character.name}
+      aria-label={@item.character.name}
+      class="block h-[104px] w-[70px] shrink-0 overflow-hidden rounded-[4px] bg-[rgb(var(--surface-elevated))] max-sm:h-[72px] max-sm:w-[48px]"
+    >
+      <CharacterImage.character_image
+        character={@item.character}
+        sizes="80px"
+        alt={@item.character.name}
+        class="h-[104px] w-[70px] rounded-[4px] object-cover object-top max-sm:h-[72px] max-sm:w-[48px]"
+        fallback_class="h-[104px] w-[70px] rounded-[4px] border border-[rgb(var(--border-divider))] max-sm:h-[72px] max-sm:w-[48px]"
+      />
+    </.link>
+    """
+  end
+
   defp tier_cover(assigns) do
     ~H"""
     <div class={[
@@ -547,7 +568,9 @@ defmodule KaguyaWeb.Lists.ShowComponents do
 
   defp present?(value), do: is_binary(value) and String.trim(value) != ""
 
-  defp read?(%{my_reading_status: %{status: status}}), do: status in [:read, "read", "READ"]
+  defp read?(%{visual_novel: %{my_reading_status: %{status: status}}}),
+    do: status in [:read, "read", "READ"]
+
   defp read?(_), do: false
 
   defp tier_items(items, tier_id) do

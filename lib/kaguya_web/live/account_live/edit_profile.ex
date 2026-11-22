@@ -6,7 +6,8 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   import KaguyaWeb.UI.Button, only: [button: 1]
   import KaguyaWeb.UI.ImageCropper, only: [image_cropper: 1]
 
-  alias Kaguya.Characters.{Character, CharacterFavorite, VNCharacter}
+  alias Kaguya.Characters
+  alias Kaguya.Characters.{Character, CharacterFavorite}
   alias Kaguya.Repo
   alias Kaguya.Uploads
   alias Kaguya.Users
@@ -1076,32 +1077,8 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   end
 
   defp load_characters_for_vn(vn_id, excluded_ids) do
-    query =
-      from vc in VNCharacter,
-        join: c in Character,
-        on: c.id == vc.character_id,
-        where: vc.visual_novel_id == ^vn_id,
-        where: vc.spoiler_level <= 0,
-        where: is_nil(c.hidden_at),
-        order_by: [
-          asc:
-            fragment(
-              "CASE ? WHEN 'main' THEN 0 WHEN 'primary' THEN 1 WHEN 'side' THEN 2 ELSE 3 END",
-              vc.role
-            ),
-          asc: c.name
-        ],
-        select: %{character: c, role: vc.role}
-
-    query =
-      if excluded_ids == [] do
-        query
-      else
-        where(query, [_vc, c], c.id not in ^excluded_ids)
-      end
-
-    query
-    |> Repo.all()
+    vn_id
+    |> Characters.list_pickable_cast(excluded_ids)
     |> Enum.map(fn %{character: character, role: role} ->
       character
       |> decorate_character()

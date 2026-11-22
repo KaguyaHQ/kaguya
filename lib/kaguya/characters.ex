@@ -195,6 +195,30 @@ defmodule Kaguya.Characters do
   defp apply_sort(query, :recently_added),
     do: order_by(query, [c], desc: c.inserted_at, asc: c.id)
 
+  @doc """
+  A VN's cast for character pickers (profile favorites, character lists),
+  ordered by role then name. Appearances marked as spoilers and hidden
+  characters are left out. Returns `[%{character: %Character{}, role: role}]`.
+  """
+  def list_pickable_cast(vn_id, excluded_ids \\ []) do
+    from(vc in VNCharacter,
+      join: c in Character,
+      on: c.id == vc.character_id,
+      where: vc.visual_novel_id == ^vn_id and vc.spoiler_level <= 0 and is_nil(c.hidden_at),
+      where: c.id not in ^excluded_ids,
+      order_by: [
+        asc:
+          fragment(
+            "CASE ? WHEN 'main' THEN 0 WHEN 'primary' THEN 1 WHEN 'side' THEN 2 ELSE 3 END",
+            vc.role
+          ),
+        asc: c.name
+      ],
+      select: %{character: c, role: vc.role}
+    )
+    |> Repo.all()
+  end
+
   # ============================================================================
   # Profile Favorites (character_favorites join table)
   # ============================================================================

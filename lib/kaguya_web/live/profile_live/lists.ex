@@ -179,6 +179,7 @@ defmodule KaguyaWeb.ProfileLive.Lists do
   defp hydrate_lists(lists, profile, allowed) do
     owner = owner_view(profile)
     vn_batches = list_thumbnail_batches(lists, allowed)
+    thumbnails = ListData.character_thumbnails(lists, @cover_page_size)
 
     Enum.map(lists, fn list ->
       items =
@@ -191,6 +192,7 @@ defmodule KaguyaWeb.ProfileLive.Lists do
       |> ListData.normalize_list()
       |> Map.put(:user, owner)
       |> Map.put(:visual_novels, %{items: items})
+      |> Map.put(:thumbnails, Map.get(thumbnails, list.id))
     end)
   end
 

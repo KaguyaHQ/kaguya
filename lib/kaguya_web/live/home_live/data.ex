@@ -21,6 +21,7 @@ defmodule KaguyaWeb.HomeLive.Data do
   alias Kaguya.Users.User
   alias Kaguya.VisualNovels
   alias Kaguya.VisualNovels.{TitleCategory, VisualNovel}
+  alias KaguyaWeb.ListLive.Data, as: ListData
   alias KaguyaWeb.SharedComponents.Time, as: SharedTime
 
   @feed_limit 15
@@ -445,10 +446,8 @@ defmodule KaguyaWeb.HomeLive.Data do
   end
 
   defp list_covers(items) do
-    list_tuples =
-      items
-      |> Enum.filter(&match?(%Lists.List{}, &1))
-      |> Enum.map(&{&1.id, &1.vns_count || 0})
+    lists = Enum.filter(items, &match?(%Lists.List{}, &1))
+    list_tuples = Enum.map(lists, &{&1.id, &1.vns_count || 0})
 
     list_tuples
     |> Lists.batch_list_vns_for_lists(@list_cover_count)
@@ -467,6 +466,7 @@ defmodule KaguyaWeb.HomeLive.Data do
 
       {list_id, covers}
     end)
+    |> Map.merge(ListData.character_thumbnails(lists, @list_cover_count))
   end
 
   defp post_url(%{

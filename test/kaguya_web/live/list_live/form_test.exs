@@ -167,12 +167,12 @@ defmodule KaguyaWeb.ListLive.FormTest do
         ],
         "items" => [
           %{
-            "visualNovelId" => vn2.id,
+            "item_id" => vn2.id,
             "position" => 1,
             "tierId" => "tier-s",
             "tierPosition" => 1
           },
-          %{"visualNovelId" => vn1.id, "position" => 2, "tierId" => nil, "tierPosition" => nil}
+          %{"item_id" => vn1.id, "position" => 2, "tierId" => nil, "tierPosition" => nil}
         ]
       })
 
@@ -229,7 +229,7 @@ defmodule KaguyaWeb.ListLive.FormTest do
         "tiers" => existing_tiers,
         "items" => [
           %{
-            "visualNovelId" => vn.id,
+            "item_id" => vn.id,
             "position" => 1,
             "tierId" => nil,
             "tierPosition" => nil
@@ -300,7 +300,7 @@ defmodule KaguyaWeb.ListLive.FormTest do
         ],
         "items" => [
           %{
-            "visualNovelId" => vn.id,
+            "item_id" => vn.id,
             "position" => 1,
             "tierId" => "tier-a",
             "tierPosition" => 1

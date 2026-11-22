@@ -41,7 +41,7 @@ defmodule KaguyaWeb.SharedComponents.SegmentedControl do
         :for={seg <- @segment}
         type="button"
         role="tab"
-        aria-selected={seg.selected}
+        aria-selected={to_string(seg.selected)}
         phx-click={seg.on_select}
         {value_attrs(seg[:value])}
         class={[

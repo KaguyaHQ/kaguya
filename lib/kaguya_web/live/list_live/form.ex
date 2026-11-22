@@ -1,6 +1,7 @@
 defmodule KaguyaWeb.ListLive.Form do
   use KaguyaWeb, :live_view
 
+  alias Kaguya.Characters
   alias Kaguya.Lists
   alias Kaguya.Repo
   alias Kaguya.Users
@@ -48,6 +49,8 @@ defmodule KaguyaWeb.ListLive.Form do
      |> assign(:saving, false)
      |> assign(:deleting, false)
      |> assign(:item_error, nil)
+     |> assign(:item_type, "vn")
+     |> assign(:cast_picker, nil)
      |> assign(:list, nil)
      |> assign(:tiers, Data.default_tiers())
      |> assign(:layout_state, %{display_mode: "grid", tiers: Data.default_tiers(), items: []})
@@ -77,14 +80,54 @@ defmodule KaguyaWeb.ListLive.Form do
     {:noreply, assign_form_attrs(socket, attrs)}
   end
 
+  # The item type is chosen once, on a new list that has no items yet.
+  def handle_event("set_item_type", %{"type" => type}, socket)
+      when type in ["vn", "character"] do
+    %{live_action: action, selected_items: items, item_type: current} = socket.assigns
+
+    if action == :new and items == [] and type != current do
+      {:noreply, socket |> assign(:item_type, type) |> apply_display_mode(default_mode(type))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("pick_cast_vn", %{"id" => vn_id}, socket) do
+    case Repo.get(VisualNovel, vn_id) do
+      %VisualNovel{} = vn when socket.assigns.item_type == "character" ->
+        {:noreply,
+         socket
+         |> assign(:mobile_search_open?, false)
+         |> assign(:cast_picker, %{
+           vn: %{id: vn.id, title: vn.title},
+           cast: load_cast(vn.id, Enum.map(socket.assigns.selected_items, & &1.id))
+         })}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_cast_picker", _params, socket) do
+    {:noreply, assign(socket, :cast_picker, nil)}
+  end
+
+  def handle_event("add_character", %{"id" => id}, socket) do
+    {:noreply, add_cast_members(socket, &(&1.id == id))}
+  end
+
+  def handle_event("add_whole_cast", _params, socket) do
+    {:noreply, add_cast_members(socket, fn _ -> true end)}
+  end
+
   def handle_event("set_display_mode", %{"mode" => mode}, socket) do
     mode = if mode == "tier", do: "tier", else: "grid"
 
-    {:noreply,
-     socket
-     |> assign_form_attrs(%{"display_mode" => mode})
-     |> assign(:layout_state, %{socket.assigns.layout_state | display_mode: mode})
-     |> push_event("list_layout:set_mode", %{mode: mode})}
+    if socket.assigns.item_type == "character" do
+      {:noreply, socket}
+    else
+      {:noreply, apply_display_mode(socket, mode)}
+    end
   end
 
   def handle_event("toggle_flag", %{"field" => field}, socket)
@@ -277,11 +320,13 @@ defmodule KaguyaWeb.ListLive.Form do
 
     cond do
       layout.items == [] ->
+        message = "Add at least one #{item_noun(socket.assigns.item_type)} to publish the list"
+
         {:noreply,
          socket
          |> assign_form_attrs(attrs)
-         |> assign(:item_error, "Add at least one VN to publish the list")
-         |> put_flash(:error, "Add at least one VN to publish the list")}
+         |> assign(:item_error, message)
+         |> put_flash(:error, message)}
 
       form_attrs.is_public and not Data.can_publish_public_lists?(current_user) ->
         {:noreply,
@@ -296,7 +341,7 @@ defmodule KaguyaWeb.ListLive.Form do
                socket.assigns.live_action,
                socket.assigns.list,
                current_user,
-               form_attrs,
+               Map.put(form_attrs, :item_type, socket.assigns.item_type),
                layout
              ) do
           {:ok, list, :created} ->
@@ -345,26 +390,73 @@ defmodule KaguyaWeb.ListLive.Form do
     end
   end
 
-  defp add_item_by_id(socket, vn_id) do
+  defp add_item_by_id(%{assigns: %{item_type: "vn"}} = socket, vn_id) do
     with nil <- find_item(socket.assigns.selected_items, vn_id),
          %VisualNovel{} = vn <- Repo.get(VisualNovel, vn_id) do
-      item = item_from_vn(vn)
-
       {:noreply,
        socket
-       |> assign_items(socket.assigns.selected_items ++ [item])
+       |> append_items([item_from_vn(vn)])
        |> assign(:mobile_search_open?, false)
        |> assign(:search_query, "")
-       |> assign(:search_results, [])
-       |> assign(:item_error, nil)
-       |> push_event("list_layout:add_item", %{item: island_item(item)})}
+       |> assign(:search_results, [])}
     else
       _ -> {:noreply, socket}
     end
   end
 
+  defp add_item_by_id(socket, _id), do: {:noreply, socket}
+
+  # Adds the picked cast members not already on the list, and drops them from
+  # the picker so it shows only who's left.
+  defp add_cast_members(%{assigns: %{cast_picker: %{cast: cast} = picker}} = socket, pick?) do
+    {picked, remaining} = Enum.split_with(cast, pick?)
+
+    socket
+    |> append_items(Enum.map(picked, &item_from_character/1))
+    |> assign(:cast_picker, %{picker | cast: remaining})
+  end
+
+  defp add_cast_members(socket, _pick?), do: socket
+
+  defp append_items(socket, new_items) do
+    Enum.reduce(new_items, socket, fn item, socket ->
+      socket
+      |> assign_items(socket.assigns.selected_items ++ [item])
+      |> push_event("list_layout:add_item", %{item: island_item(item)})
+    end)
+    |> assign(:item_error, nil)
+  end
+
+  defp load_cast(vn_id, excluded_ids) do
+    vn_id
+    |> Characters.list_pickable_cast(excluded_ids)
+    |> Enum.map(fn %{character: character, role: role} ->
+      character |> Data.normalize_character() |> Map.put(:role, role)
+    end)
+  end
+
+  defp apply_display_mode(socket, mode) do
+    socket
+    |> assign_form_attrs(%{"display_mode" => mode})
+    |> assign(:layout_state, %{socket.assigns.layout_state | display_mode: mode})
+    |> push_event("list_layout:set_mode", %{mode: mode})
+  end
+
+  defp default_mode("character"), do: "tier"
+  defp default_mode(_item_type), do: "grid"
+
+  # Character lists pick a VN first, then choose from its cast.
+  defp search_select_event("character"), do: "pick_cast_vn"
+  defp search_select_event(_item_type), do: "add_item"
+
+  defp search_placeholder("character"), do: "Find a VN to add its characters…"
+  defp search_placeholder(_item_type), do: "Search visual novels…"
+
+  defp item_noun("character"), do: "character"
+  defp item_noun(_item_type), do: "VN"
+
   defp remove_item_by_id(socket, vn_id) do
-    items = Enum.reject(socket.assigns.selected_items, &(item_id(&1) == vn_id))
+    items = Enum.reject(socket.assigns.selected_items, &(&1.id == vn_id))
     {:noreply, assign_items(socket, items)}
   end
 
@@ -394,7 +486,7 @@ defmodule KaguyaWeb.ListLive.Form do
         <section class="mx-auto grid max-w-[760px] gap-2 px-4 py-20">
           <h1 class="text-2xl font-semibold">Sign in to create lists</h1>
           <p class="text-sm text-[rgb(var(--foreground-secondary))]">
-            Sign in to create and edit visual novel lists.
+            Sign in to create and edit lists.
           </p>
         </section>
       <% else %>
@@ -415,7 +507,11 @@ defmodule KaguyaWeb.ListLive.Form do
             results={@search_results}
             error={@search_error}
             loading={@searching?}
+            select_event={search_select_event(@item_type)}
+            placeholder={search_placeholder(@item_type)}
           />
+
+          <FormComponents.cast_picker picker={@cast_picker} />
 
           <FormComponents.confirm_dialog dialog={@dialog} deleting={@deleting} />
           <FormComponents.tier_dialog open={@tier_dialog_open?} tiers={@draft_tiers} />
@@ -452,7 +548,13 @@ defmodule KaguyaWeb.ListLive.Form do
                 data-dirty={to_string(@dirty?)}
                 class="text-[rgb(var(--foreground-primary))]"
               >
-                <FormComponents.metadata_fields form={@form} values={@form_attrs} />
+                <FormComponents.metadata_fields
+                  form={@form}
+                  values={@form_attrs}
+                  item_type={@item_type}
+                  show_item_type={@live_action == :new}
+                  item_type_locked={@selected_items != []}
+                />
               </.form>
             </section>
 
@@ -462,9 +564,9 @@ defmodule KaguyaWeb.ListLive.Form do
               <div class="mb-3 hidden items-center justify-between gap-3 lg:flex">
                 <KaguyaWeb.SharedComponents.Search.vn_select_search
                   id="desktop-list-vn-search"
-                  select_event="add_item"
+                  select_event={search_select_event(@item_type)}
                   page_size={5}
-                  placeholder="Search visual novels…"
+                  placeholder={search_placeholder(@item_type)}
                   class="flex-1"
                   popover_class="lg:!top-[48px] lg:!left-0 lg:!max-w-[500px] lg:rounded-t-none lg:border-t-0"
                 />
@@ -512,6 +614,7 @@ defmodule KaguyaWeb.ListLive.Form do
                   display_mode={@form_attrs["display_mode"]}
                   is_ranked={truthy?(@form_attrs["is_ranked"])}
                   item_error={@item_error}
+                  item_type={@item_type}
                 />
               <% else %>
                 <p class="-mb-1 text-xs text-[rgb(var(--foreground-tertiary))]">
@@ -521,7 +624,9 @@ defmodule KaguyaWeb.ListLive.Form do
                   id="list-layout-island"
                   phx-hook="ListLayoutIsland"
                   phx-update="ignore"
-                  data-layout={island_layout_json(@layout_state, @selected_items, @form_attrs)}
+                  data-layout={
+                    island_layout_json(@layout_state, @selected_items, @form_attrs, @item_type)
+                  }
                   data-island-src={~p"/assets/js/list_layout_island.js"}
                   data-emit-initial="false"
                   class="lg:min-h-[65vh]"
@@ -532,6 +637,7 @@ defmodule KaguyaWeb.ListLive.Form do
                     display_mode={@form_attrs["display_mode"]}
                     is_ranked={truthy?(@form_attrs["is_ranked"])}
                     item_error={nil}
+                    item_type={@item_type}
                   />
                 </div>
 
@@ -539,7 +645,9 @@ defmodule KaguyaWeb.ListLive.Form do
                   type="button"
                   phx-click="open_mobile_search"
                   class="sticky bottom-6 mt-auto flex size-14 items-center justify-center self-end rounded-full bg-[rgb(var(--button-background-brand-default))] text-[rgb(var(--button-text-on-brand))] shadow-2xl transition hover:bg-[rgb(var(--button-background-brand-hover))] lg:hidden"
-                  aria-label="Add visual novel"
+                  aria-label={
+                    if @item_type == "character", do: "Add characters", else: "Add visual novel"
+                  }
                 >
                   <FormComponents.icon name={:plus} class="size-6" />
                 </button>
@@ -555,7 +663,8 @@ defmodule KaguyaWeb.ListLive.Form do
   defp load_editor(socket, params, current_user) do
     case socket.assigns.live_action do
       :new ->
-        payload = Data.new_form_payload(current_user)
+        item_type = if params["type"] == "character", do: "character", else: "vn"
+        payload = Data.new_form_payload(current_user, item_type)
         assign_payload(socket, payload, "New list · Kaguya")
 
       :edit ->
@@ -570,7 +679,7 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   defp assign_payload(socket, payload, page_title) do
-    selected_items = payload.visual_novels |> normalize_editor_items() |> normalize_positions()
+    selected_items = payload.items |> Enum.map(&editor_item/1) |> normalize_positions()
     tiers = normalize_tiers(payload.tiers)
 
     layout = %{
@@ -585,6 +694,7 @@ defmodule KaguyaWeb.ListLive.Form do
       |> assign(:not_found?, false)
       |> assign(:page_title, page_title)
       |> assign(:list, Map.get(payload, :raw_list))
+      |> assign(:item_type, payload.list.item_type)
       |> assign(:tiers, tiers)
       |> assign(:layout_state, layout)
       |> assign(:selected_items, selected_items)
@@ -654,7 +764,7 @@ defmodule KaguyaWeb.ListLive.Form do
       items:
         socket.assigns.selected_items
         |> layout_items_from_selected()
-        |> Enum.map(&{&1.visual_novel_id, &1.position, &1.tier_id, &1.tier_position})
+        |> Enum.map(&{&1.item_id, &1.position, &1.tier_id, &1.tier_position})
     }
   end
 
@@ -792,6 +902,8 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   defp save_list(:new, _existing_list, current_user, form_attrs, layout) do
+    layout = keyed_layout(layout, form_attrs.item_type)
+
     case Lists.create_list_with_layout(current_user.id, form_attrs, layout) do
       {:ok, list} -> {:ok, list, :created}
       {:error, reason} -> {:error, reason}
@@ -799,10 +911,27 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   defp save_list(:edit, existing_list, current_user, form_attrs, layout) do
+    layout = keyed_layout(layout, existing_list.item_type)
+    form_attrs = Map.delete(form_attrs, :item_type)
+
     case Lists.update_list_with_layout(existing_list.id, current_user.id, form_attrs, layout) do
       {:ok, list} -> {:ok, list, :updated}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  # The editor tracks items by a generic `item_id`; the context keys them by
+  # `:visual_novel_id` or `:character_id` depending on the list type.
+  defp keyed_layout(layout, item_type) do
+    key = Lists.item_key(item_type)
+
+    %{
+      layout
+      | items:
+          Enum.map(layout.items, fn item ->
+            item |> Map.delete(:item_id) |> Map.put(key, item.item_id)
+          end)
+    }
   end
 
   defp layout_for_submit(socket, form_attrs) do
@@ -825,7 +954,7 @@ defmodule KaguyaWeb.ListLive.Form do
       items:
         Enum.map(Map.get(payload, "items", []), fn item ->
           %{
-            visual_novel_id: Map.get(item, "visualNovelId") || Map.get(item, "visual_novel_id"),
+            item_id: Map.get(item, "item_id"),
             position: Map.get(item, "position") || 1,
             tier_id: Map.get(item, "tierId") || Map.get(item, "tier_id"),
             tier_position: Map.get(item, "tierPosition") || Map.get(item, "tier_position")
@@ -848,12 +977,12 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   defp reorder_items_from_layout(layout_items, selected_items) do
-    item_map = Map.new(selected_items, &{item_id(&1), &1})
+    item_map = Map.new(selected_items, &{&1.id, &1})
 
     layout_items
     |> Enum.sort_by(&{&1.position || 0, &1.tier_position || 0})
     |> Enum.flat_map(fn item ->
-      case Map.fetch(item_map, item.visual_novel_id) do
+      case Map.fetch(item_map, item.item_id) do
         {:ok, selected} ->
           [
             %{
@@ -874,7 +1003,7 @@ defmodule KaguyaWeb.ListLive.Form do
   defp layout_items_from_selected(items) do
     Enum.map(items, fn item ->
       %{
-        visual_novel_id: item_id(item),
+        item_id: item.id,
         position: item.position,
         tier_id: item.tier_id,
         tier_position: item.tier_position
@@ -889,7 +1018,7 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   defp move_item(items, vn_id, direction) do
-    index = Enum.find_index(items, &(item_id(&1) == vn_id))
+    index = Enum.find_index(items, &(&1.id == vn_id))
 
     cond do
       is_nil(index) -> items
@@ -908,58 +1037,40 @@ defmodule KaguyaWeb.ListLive.Form do
     |> List.replace_at(right, left_item)
   end
 
-  defp find_item(items, vn_id), do: Enum.find(items, &(item_id(&1) == vn_id))
-  defp item_id(%{id: id}) when is_binary(id), do: id
-  defp item_id(item), do: get_in(item, [:visual_novel, :id])
+  defp find_item(items, id), do: Enum.find(items, &(&1.id == id))
 
+  # Editor items are flat display maps, the same shape for VNs and characters:
+  # `title` is the VN title or the character name.
   defp item_from_vn(vn) do
-    nsfw = Map.get(vn, :is_image_nsfw, false)
-    suggestive = Map.get(vn, :is_image_suggestive, false)
+    editor_item(%{
+      visual_novel: %{
+        id: vn.id,
+        slug: vn.slug,
+        title: vn.title,
+        images: VisualNovels.build_image_urls(vn),
+        is_image_nsfw: vn.is_image_nsfw,
+        is_image_suggestive: vn.is_image_suggestive
+      }
+    })
+  end
 
-    visual_novel = %{
-      id: vn.id,
-      slug: vn.slug,
-      title: vn.title,
-      images: VisualNovels.build_image_urls(vn),
-      is_image_nsfw: nsfw,
-      is_image_suggestive: suggestive,
-      my_reading_status: nil
-    }
+  defp item_from_character(character), do: editor_item(%{character: character})
+
+  defp editor_item(item) do
+    subject = Data.subject(item)
 
     %{
-      id: vn.id,
-      slug: vn.slug,
-      title: vn.title,
-      images: visual_novel.images,
-      is_image_nsfw: nsfw,
-      is_image_suggestive: suggestive,
-      position: 0,
-      tier_id: nil,
-      tier_position: nil,
-      visual_novel: visual_novel
+      id: subject.id,
+      slug: subject.slug,
+      title: Map.get(subject, :title) || Map.get(subject, :name),
+      images: subject.images || %{},
+      is_image_nsfw: Map.get(subject, :is_image_nsfw, false),
+      is_image_suggestive: Map.get(subject, :is_image_suggestive, false),
+      position: Map.get(item, :position) || 0,
+      tier_id: Map.get(item, :tier_id),
+      tier_position: Map.get(item, :tier_position)
     }
   end
-
-  defp normalize_editor_items(items) do
-    Enum.map(items, &editor_item/1)
-  end
-
-  defp editor_item(%{visual_novel: vn} = item) do
-    visual_novel = normalize_visual_novel_map(vn)
-
-    %{
-      id: visual_novel.id,
-      slug: visual_novel.slug,
-      title: visual_novel.title,
-      images: visual_novel.images,
-      position: item.position || 0,
-      tier_id: item.tier_id,
-      tier_position: item.tier_position,
-      visual_novel: visual_novel
-    }
-  end
-
-  defp editor_item(%VisualNovel{} = vn), do: item_from_vn(vn)
 
   defp search_result_item(item) do
     %{
@@ -975,20 +1086,9 @@ defmodule KaguyaWeb.ListLive.Form do
     }
   end
 
-  defp normalize_visual_novel_map(%{} = vn) do
+  defp island_layout_json(layout_state, selected_items, form_attrs, item_type) do
     %{
-      id: Map.get(vn, :id),
-      slug: Map.get(vn, :slug),
-      title: Map.get(vn, :title),
-      images: Map.get(vn, :images) || %{},
-      is_image_nsfw: Map.get(vn, :is_image_nsfw, false),
-      is_image_suggestive: Map.get(vn, :is_image_suggestive, false),
-      my_reading_status: Map.get(vn, :my_reading_status)
-    }
-  end
-
-  defp island_layout_json(layout_state, selected_items, form_attrs) do
-    %{
+      item_kind: item_type,
       display_mode: Map.get(form_attrs, "display_mode", layout_state.display_mode || "grid"),
       is_ranked: truthy?(Map.get(form_attrs, "is_ranked", false)),
       tiers: normalize_tiers(layout_state.tiers),
@@ -998,19 +1098,17 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   defp island_item(item) do
-    visual_novel = item.visual_novel
-
-    %{
-      id: item_id(item),
-      visual_novel_id: item_id(item),
-      title: item.title,
-      slug: item.slug,
-      images: item.images || %{},
-      position: item.position,
-      tier_id: item.tier_id,
-      tier_position: item.tier_position,
-      visual_novel: visual_novel
-    }
+    Map.take(item, [
+      :id,
+      :title,
+      :slug,
+      :images,
+      :is_image_nsfw,
+      :is_image_suggestive,
+      :position,
+      :tier_id,
+      :tier_position
+    ])
   end
 
   defp normalize_tiers([]), do: Data.default_tiers()

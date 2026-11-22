@@ -54,13 +54,14 @@ defmodule KaguyaWeb.SEO.JsonLd do
     page = Keyword.get(opts, :page, 1)
     page_size = Keyword.get(opts, :page_size, 100)
     total_count = Keyword.get(opts, :total_count, length(items))
+    noun = Keyword.get(opts, :noun, "visual novels")
 
     list_name = Map.get(list, :name) || humanize_slug(Map.get(list, :slug))
 
     description =
       case nonempty(Map.get(list, :description)) do
         nil ->
-          "#{total_count} visual novels in \"#{list_name}\" on Kaguya. " <>
+          "#{total_count} #{noun} in \"#{list_name}\" on Kaguya. " <>
             "Explore the full list and discover new reads."
 
         desc ->
@@ -137,27 +138,34 @@ defmodule KaguyaWeb.SEO.JsonLd do
     items
     |> Enum.with_index(1)
     |> Enum.map(fn {entry, idx} ->
-      vn = Map.get(entry, :visual_novel) || %{}
-      position = (page - 1) * page_size + idx
-
-      item =
-        %{"@type" => "CreativeWork", "name" => Map.get(vn, :title)}
-        |> maybe_put_work_url(vn)
-        |> maybe_put_item_image(vn)
-
-      %{"@type" => "ListItem", "position" => position, "item" => item}
+      %{
+        "@type" => "ListItem",
+        "position" => (page - 1) * page_size + idx,
+        "item" => entry_item(entry)
+      }
     end)
   end
 
-  defp maybe_put_work_url(item, %{slug: slug}) when is_binary(slug) and slug != "" do
-    url = @base_url <> "/vn/#{slug}"
-
-    item
-    |> Map.put("@id", url)
-    |> Map.put("url", url)
+  defp entry_item(%{character: character}) do
+    %{"@type" => "Thing", "name" => Map.get(character, :name)}
+    |> maybe_put_url("/character/", character)
+    |> maybe_put_item_image(character)
   end
 
-  defp maybe_put_work_url(item, _), do: item
+  defp entry_item(entry) do
+    vn = Map.get(entry, :visual_novel) || %{}
+
+    %{"@type" => "CreativeWork", "name" => Map.get(vn, :title)}
+    |> maybe_put_url("/vn/", vn)
+    |> maybe_put_item_image(vn)
+  end
+
+  defp maybe_put_url(item, prefix, %{slug: slug}) when is_binary(slug) and slug != "" do
+    url = @base_url <> prefix <> slug
+    item |> Map.put("@id", url) |> Map.put("url", url)
+  end
+
+  defp maybe_put_url(item, _prefix, _subject), do: item
 
   defp maybe_put_item_image(item, vn) do
     case get_in(vn, [:images, :medium]) do

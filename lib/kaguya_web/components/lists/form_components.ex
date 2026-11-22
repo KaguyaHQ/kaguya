@@ -3,7 +3,10 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
   use KaguyaWeb, :html
 
+  import KaguyaWeb.SharedComponents.SegmentedControl
   import KaguyaWeb.UI.Menu
+
+  alias KaguyaWeb.Components.VN.Cards
 
   alias KaguyaWeb.SharedComponents.Search, as: SharedSearch
 
@@ -81,6 +84,13 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
   attr :form, :any, required: true
   attr :values, :map, required: true
+  attr :item_type, :string, default: "vn"
+
+  attr :show_item_type, :boolean,
+    default: false,
+    doc: "Offer the VN/character choice (new lists)."
+
+  attr :item_type_locked, :boolean, default: false, doc: "Items were added, so the type is fixed."
 
   def metadata_fields(assigns) do
     assigns =
@@ -98,6 +108,33 @@ defmodule KaguyaWeb.Lists.FormComponents do
     <div class="flex gap-8">
       <div class="flex w-full flex-col lg:w-1/2">
         <div class="space-y-6">
+          <div :if={@show_item_type} id="list-form-item-type" class="space-y-2">
+            <p class="text-foreground-primary text-style-body2Medium">List of</p>
+            <.segmented_control
+              label="What this list holds"
+              size={:sm}
+              class={@item_type_locked && "pointer-events-none opacity-50"}
+            >
+              <:segment
+                selected={@item_type == "vn"}
+                on_select="set_item_type"
+                value={%{type: "vn"}}
+              >
+                Visual novels
+              </:segment>
+              <:segment
+                selected={@item_type == "character"}
+                on_select="set_item_type"
+                value={%{type: "character"}}
+              >
+                Characters
+              </:segment>
+            </.segmented_control>
+            <p :if={@item_type_locked} class="text-foreground-tertiary text-style-captionRegular">
+              Remove all items to switch.
+            </p>
+          </div>
+
           <div class="space-y-2">
             <label
               for={@form[:name].id}
@@ -151,7 +188,10 @@ defmodule KaguyaWeb.Lists.FormComponents do
             <label class="block text-sm font-medium text-[rgb(var(--foreground-primary))] lg:text-xs">
               Layout
             </label>
-            <div class="grid h-8 grid-cols-2 rounded-[7px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] p-0.5 lg:h-8">
+            <div
+              :if={@item_type == "vn"}
+              class="grid h-8 grid-cols-2 rounded-[7px] border border-[rgb(var(--border-divider))] bg-[rgb(var(--surface-elevated))] p-0.5 lg:h-8"
+            >
               <button
                 id="list-form-display-grid"
                 type="button"
@@ -196,7 +236,10 @@ defmodule KaguyaWeb.Lists.FormComponents do
               <.icon name={:settings} class="size-4" /> Customize tiers
             </button>
 
-            <div :if={@display_mode == "grid"} class="mt-2 flex items-center gap-2">
+            <div
+              :if={@display_mode == "grid" and @item_type == "vn"}
+              class="mt-2 flex items-center gap-2"
+            >
               <button
                 type="button"
                 role="switch"
@@ -347,6 +390,8 @@ defmodule KaguyaWeb.Lists.FormComponents do
   attr :results, :list, default: []
   attr :error, :string, default: nil
   attr :loading, :boolean, default: false
+  attr :select_event, :string, default: "add_item", doc: "Event pushed with a picked VN's id."
+  attr :placeholder, :string, default: "Search visual novels…"
 
   def mobile_search_overlay(assigns) do
     ~H"""
@@ -383,7 +428,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
             type="search"
             name="search[query]"
             value={@query}
-            placeholder="Search visual novels…"
+            placeholder={@placeholder}
             autocomplete="off"
             phx-debounce="350"
             class="h-11 w-full rounded-full border-none bg-[rgb(var(--surface-elevated))] pr-4 pl-11 text-sm/5 text-[rgb(var(--foreground-primary))] placeholder:text-[rgb(var(--foreground-tertiary))] focus:outline-none"
@@ -420,7 +465,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           <button
             :for={result <- @results}
             type="button"
-            phx-click="add_item"
+            phx-click={@select_event}
             phx-value-id={result.id}
             class="flex w-full items-center gap-4 rounded-lg p-3 text-left transition-colors hover:bg-[rgb(var(--surface-menu-item-hover))] active:bg-[rgb(var(--surface-menu-item-pressed))]"
           >
@@ -443,11 +488,99 @@ defmodule KaguyaWeb.Lists.FormComponents do
     """
   end
 
+  attr :picker, :map,
+    default: nil,
+    doc: "`%{vn: %{id, title}, cast: [character]}` while picking characters, else nil."
+
+  def cast_picker(assigns) do
+    ~H"""
+    <KaguyaWeb.UI.Dialog.dialog
+      :if={@picker}
+      class="flex items-center justify-center bg-black/60 px-5"
+      id="lists-cast-picker"
+      viewport
+      on_close={Phoenix.LiveView.JS.push("close_cast_picker")}
+      aria-labelledby="cast-picker-title"
+    >
+      <div class="flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[12px] bg-[rgb(var(--surface-base))] shadow-2xl">
+        <div class="flex items-center justify-between gap-3 border-b border-[rgb(var(--border-divider))] px-5 py-4">
+          <div class="min-w-0">
+            <p id="cast-picker-title" class="text-foreground-primary text-style-body1Semibold">
+              Add characters
+            </p>
+            <p class="text-foreground-secondary text-style-body2Regular truncate">
+              {@picker.vn.title}
+            </p>
+          </div>
+          <button
+            :if={@picker.cast != []}
+            id="cast-picker-add-all"
+            type="button"
+            phx-click="add_whole_cast"
+            class="text-style-body2Medium shrink-0 rounded-[8px] bg-[rgb(var(--surface-elevated))] px-3 py-2 text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
+          >
+            Add all ({length(@picker.cast)})
+          </button>
+        </div>
+
+        <div class="min-h-[240px] overflow-y-auto p-4">
+          <p
+            :if={@picker.cast == []}
+            class="text-foreground-tertiary text-style-body2Regular flex h-[200px] items-center justify-center text-center"
+          >
+            Everyone from this VN is already on your list.
+          </p>
+          <div :if={@picker.cast != []} class="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            <button
+              :for={character <- @picker.cast}
+              id={"cast-picker-character-#{character.id}"}
+              type="button"
+              phx-click="add_character"
+              phx-value-id={character.id}
+              aria-label={"Add #{character.name}"}
+              class="group flex flex-col items-center rounded-lg p-2 transition-colors hover:bg-[rgb(var(--surface-menu-item-hover))] focus-visible:bg-[rgb(var(--surface-menu-item-hover))] focus-visible:outline-none"
+            >
+              <Cards.character_image
+                character={character}
+                sizes="(max-width: 640px) 90px, 110px"
+                class="aspect-2/3 w-full rounded-[8px] object-cover object-top transition-all group-hover:ring-2 group-hover:ring-[rgb(var(--foreground-primary))]/50"
+                rounded="rounded-[8px]"
+              />
+              <span class="text-foreground-primary text-style-captionMedium mt-2 line-clamp-1 w-full text-center">
+                {character.name}
+              </span>
+              <span class="text-foreground-tertiary text-style-captionRegular mt-0.5">
+                {role_label(character.role)}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex justify-end border-t border-[rgb(var(--border-divider))] px-5 py-3">
+          <button
+            type="button"
+            data-dialog-close
+            class="text-style-body2Medium h-10 rounded-[8px] bg-[rgb(var(--button-background-brand-default))] px-4 text-[rgb(var(--button-text-on-brand))] transition hover:bg-[rgb(var(--button-background-brand-hover))]"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </KaguyaWeb.UI.Dialog.dialog>
+    """
+  end
+
+  defp role_label(:main), do: "Main"
+  defp role_label(:primary), do: "Primary"
+  defp role_label(:side), do: "Side"
+  defp role_label(_role), do: "Appears"
+
   attr :items, :list, default: []
   attr :tiers, :list, default: []
   attr :display_mode, :string, default: "grid"
   attr :is_ranked, :boolean, default: false
   attr :item_error, :any, default: nil
+  attr :item_type, :string, default: "vn"
 
   def item_surface(assigns) do
     ~H"""
@@ -461,7 +594,9 @@ defmodule KaguyaWeb.Lists.FormComponents do
           <% @items == [] -> %>
             <div class="flex items-center justify-center py-20 lg:py-28">
               <span class="text-sm text-[rgb(var(--foreground-secondary))]">
-                Add visual novels that belong on this list
+                {if @item_type == "character",
+                  do: "Find a VN, then pick characters from its cast",
+                  else: "Add visual novels that belong on this list"}
               </span>
             </div>
           <% @display_mode == "tier" -> %>
@@ -475,7 +610,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
         type="button"
         phx-click="open_mobile_search"
         class="sticky bottom-6 mt-auto ml-auto flex size-14 items-center justify-center rounded-full bg-[rgb(var(--button-background-brand-default))] text-[rgb(var(--button-text-on-brand))] shadow-2xl transition hover:bg-[rgb(var(--button-background-brand-hover))] lg:hidden"
-        aria-label="Add visual novel"
+        aria-label={if @item_type == "character", do: "Add characters", else: "Add visual novel"}
       >
         <.icon name={:plus} class="size-6" />
       </button>
@@ -858,7 +993,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
         :if={@items == []}
         class="flex h-full min-h-20 items-center text-sm text-[rgb(var(--foreground-tertiary))]"
       >
-        No VNs in this row
+        Nothing in this row
       </div>
       <div :if={@items != []} class="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
         <div :for={{item, index} <- Enum.with_index(@items)} class="group relative">

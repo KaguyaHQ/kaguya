@@ -280,6 +280,8 @@ defmodule KaguyaWeb.Lists.Cards do
     """
   end
 
+  # Character lists carry ready-made cover maps; VN lists carry their VNs.
+  defp thumbnail_items(%{thumbnails: items}) when is_list(items), do: items
   defp thumbnail_items(%{visual_novels: %{items: items}}), do: Enum.map(items, & &1.visual_novel)
 
   defp thumbnail_items(%{visual_novels: items}) when is_list(items),
