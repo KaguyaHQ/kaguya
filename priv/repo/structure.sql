@@ -1080,7 +1080,6 @@ CREATE TABLE public.visual_novels (
     length_minutes integer,
     original_language character varying(255),
     release_date date,
-    min_age integer,
     average_rating real DEFAULT 3.5 NOT NULL,
     ratings_count integer DEFAULT 0 NOT NULL,
     ratings_dist integer[] DEFAULT ARRAY[0, 0, 0, 0, 0, 0, 0, 0, 0, 0] NOT NULL,
@@ -1107,8 +1106,7 @@ CREATE TABLE public.visual_novels (
     content_score_breakdown jsonb DEFAULT '{}'::jsonb NOT NULL,
     content_score_updated_at timestamp(0) without time zone,
     CONSTRAINT development_status_check CHECK (((development_status IS NULL) OR ((development_status)::text = ANY (ARRAY[('finished'::character varying)::text, ('in_development'::character varying)::text, ('on_hiatus'::character varying)::text, ('abandoned'::character varying)::text])))),
-    CONSTRAINT length_category_check CHECK (((length_category IS NULL) OR ((length_category)::text = ANY (ARRAY[('short'::character varying)::text, ('medium'::character varying)::text, ('long'::character varying)::text, ('very_long'::character varying)::text])))),
-    CONSTRAINT min_age_check CHECK (((min_age IS NULL) OR (min_age >= 0)))
+    CONSTRAINT length_category_check CHECK (((length_category IS NULL) OR ((length_category)::text = ANY (ARRAY[('short'::character varying)::text, ('medium'::character varying)::text, ('long'::character varying)::text, ('very_long'::character varying)::text]))))
 );
 
 
@@ -1202,7 +1200,6 @@ CREATE TABLE public.vn_hist (
     length_category character varying(255),
     original_language character varying(255),
     release_date date,
-    min_age integer,
     has_ero boolean DEFAULT false,
     title_category character varying(255) DEFAULT 'vn'::character varying,
     primary_image_id uuid,
@@ -5013,3 +5010,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20260621130000);
 INSERT INTO public."schema_migrations" (version) VALUES (20260622070728);
 INSERT INTO public."schema_migrations" (version) VALUES (20260622100248);
 INSERT INTO public."schema_migrations" (version) VALUES (20260624044341);
+INSERT INTO public."schema_migrations" (version) VALUES (20261122060341);

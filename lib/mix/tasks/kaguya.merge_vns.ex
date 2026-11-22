@@ -180,7 +180,6 @@ defmodule Mix.Tasks.Kaguya.MergeVns do
       :release_date,
       :length_minutes,
       :length_category,
-      :min_age,
       :original_language,
       :primary_image_id,
       :featured_screenshot_id,

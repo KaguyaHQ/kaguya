@@ -351,20 +351,6 @@ defmodule KaguyaWeb.VNLive.Edit.Sections do
 
         <label class="contents">
           <span class="pt-2 text-sm font-medium text-[rgb(var(--foreground-primary))]">
-            Minimum age
-          </span>
-          <input
-            type="number"
-            min="0"
-            max="99"
-            name="vn[min_age]"
-            value={@form["min_age"]}
-            class="bg-surface-elevated border-border-divider h-10 rounded-[6px] border px-3 py-2 text-[rgb(var(--foreground-primary))] outline-none md:max-w-[220px]"
-          />
-        </label>
-
-        <label class="contents">
-          <span class="pt-2 text-sm font-medium text-[rgb(var(--foreground-primary))]">
             Category
           </span>
           <select

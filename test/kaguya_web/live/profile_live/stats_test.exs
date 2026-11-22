@@ -21,16 +21,14 @@ defmodule KaguyaWeb.ProfileLive.StatsTest do
         insert_vn!("Release Year VN",
           release_date: ~D[2024-01-01],
           length_minutes: 180,
-          original_language: "en",
-          min_age: 12
+          original_language: "en"
         )
 
       vn_2025 =
         insert_vn!("Read Year VN",
           release_date: ~D[2025-01-01],
           length_minutes: 900,
-          original_language: "ja",
-          min_age: 18
+          original_language: "ja"
         )
 
       insert_status!(user, vn_2024, ~D[2024-02-03])
@@ -72,8 +70,7 @@ defmodule KaguyaWeb.ProfileLive.StatsTest do
           insert_vn!("Digit Regression VN #{index}",
             release_date: ~D[2026-01-01],
             length_minutes: 60,
-            original_language: "en",
-            min_age: 12
+            original_language: "en"
           )
 
         insert_status!(user, vn, ~D[2026-01-01])
@@ -100,8 +97,8 @@ defmodule KaguyaWeb.ProfileLive.StatsTest do
 
   test "H factor buckets and library links agree, including missing release data", %{conn: conn} do
     user = UserFixtures.insert_user!()
-    mixed = insert_vn!("Mixed editions", has_ero: false, min_age: 0)
-    without = insert_vn!("No H-scenes", has_ero: false, min_age: 18)
+    mixed = insert_vn!("Mixed editions", has_ero: false)
+    without = insert_vn!("No H-scenes", has_ero: false)
     unknown = insert_vn!("Missing releases", has_ero: false)
     positive = insert_vn!("Confirmed VN flag", has_ero: true)
     hidden = insert_vn!("Only hidden releases", has_ero: false)

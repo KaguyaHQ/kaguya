@@ -99,7 +99,6 @@ defmodule Kaguya.PublicDump.Tables do
         :length_minutes,
         :original_language,
         :release_date,
-        :min_age,
         :has_ero,
         :is_avn,
         :is_image_nsfw,

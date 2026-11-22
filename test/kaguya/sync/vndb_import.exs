@@ -126,7 +126,7 @@ defmodule ImportTest do
       {"error: invalid vndb_id", &test_invalid_vndb_id/0},
       {"error: not found", &test_not_found/0},
       {"error: existing VN returns without re-import", &test_existing_vn/0},
-      {"v61344: JA title + has_ero + min_age + relation + existing producer", &test_v61344/0},
+      {"v61344: JA title + has_ero + relation + existing producer", &test_v61344/0},
       {"v61349: NSFW + has_ero + JA latin title + length_minutes", &test_v61349/0},
       {"v61386: 26 tags + 8 new characters (all roles) + spoiler atoms", &test_v61386/0},
       {"v61532: long length + Chinese + 0 devs + 5 chars", &test_v61532/0},
@@ -248,7 +248,6 @@ defmodule ImportTest do
     assert!(vn.title == "Yarasete! Teacher Returns 4", "Title mismatch: #{vn.title}")
     assert!(vn.original_language == "ja", "Language mismatch: #{vn.original_language}")
     assert!(vn.has_ero == true, "has_ero should be true")
-    assert!(vn.min_age == 18, "min_age should be 18, got #{inspect(vn.min_age)}")
     assert!(vn.slug != nil and vn.slug != "", "Slug missing")
 
     # Relation to existing v54203
@@ -279,7 +278,6 @@ defmodule ImportTest do
     assert!(vn.is_image_nsfw == true, "Should be NSFW")
     assert!(vn.is_image_suggestive == false, "Should not be suggestive (it's NSFW)")
     assert!(vn.has_ero == true, "has_ero should be true")
-    assert!(vn.min_age == 18, "min_age should be 18")
     assert!(vn.title == "shinyuu×jyunai=", "Title mismatch: #{vn.title}")
     assert!(vn.length_category == "short", "Length should be short, got #{vn.length_category}")
     assert!(vn.length_minutes == 135, "Minutes should be 135, got #{vn.length_minutes}")

@@ -567,11 +567,11 @@ defmodule Kaguya.Sync.VndbEnrichment do
   # ── Releases ──────────────────────────────────────────────────────────────
 
   @doc """
-  Import releases: update has_ero/min_age for specified VNs, link publishers,
+  Import releases: update has_ero for specified VNs, link publishers,
   and upsert vn_releases + vn_release_extlinks rows.
 
   - `releases` — already-fetched release API data
-  - `vndb_ids` — which VNs to update has_ero/min_age for
+  - `vndb_ids` — which VNs to update has_ero for
   - `vn_id_map` — vndb_id → uuid mapping (used for publisher junctions)
   """
   def import_releases([], _vndb_ids, _vn_id_map), do: :ok
@@ -589,7 +589,7 @@ defmodule Kaguya.Sync.VndbEnrichment do
         end)
       end)
 
-    # Update has_ero and min_age per VN
+    # Update has_ero per VN
     Enum.each(vndb_ids, fn vndb_id ->
       vn_uuid = Map.get(vn_id_map, vndb_id)
       rels = Map.get(vn_release_map, vndb_id, [])
@@ -597,17 +597,8 @@ defmodule Kaguya.Sync.VndbEnrichment do
       if vn_uuid && rels != [] do
         has_ero = Enum.any?(rels, & &1["has_ero"])
 
-        # TODO: DumpSync.VNs uses MIN release age; this API path uses MAX.
-        # Define VN-level min_age semantics before aligning them. It is not an
-        # H-content classification; use has_ero for that distinction.
-        min_age =
-          rels
-          |> Enum.map(& &1["minage"])
-          |> Enum.reject(&is_nil/1)
-          |> Enum.max(fn -> nil end)
-
         from(v in VisualNovel, where: v.id == ^vn_uuid)
-        |> Repo.update_all(set: [has_ero: has_ero, min_age: min_age, updated_at: now])
+        |> Repo.update_all(set: [has_ero: has_ero, updated_at: now])
       end
     end)
 

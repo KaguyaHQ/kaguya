@@ -55,6 +55,8 @@ defmodule Kaguya.Sync.ReleaseCreditsTest do
 
     assert {:ok, _} = ReleaseSync.run(ctx)
     release = Repo.get_by!(Release, vndb_id: "r90000001", visual_novel_id: vn.id)
+    assert release.minage == 18
+    assert "18+" in KaguyaWeb.VNLive.PageData.Normalizer.release_flags(release)
     assert credit_ids(vn) == MapSet.new([old.id])
 
     assert {:ok, correction} =
@@ -237,7 +239,7 @@ defmodule Kaguya.Sync.ReleaseCreditsTest do
   defp add_dump_release(source, id, vn_id, producer_id) do
     Postgrex.query!(
       source,
-      "INSERT INTO releases VALUES ($1, 'en', 20200101, 0, 0, false, false, false, false, true, NULL, '', 0, 0)",
+      "INSERT INTO releases VALUES ($1, 'en', 20200101, 0, 18, false, false, false, false, true, NULL, '', 0, 0)",
       [id]
     )
 

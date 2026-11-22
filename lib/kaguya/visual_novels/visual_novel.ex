@@ -30,7 +30,6 @@ defmodule Kaguya.VisualNovels.VisualNovel do
     field :length_minutes, :integer
     field :original_language, :string
     field :release_date, :date
-    field :min_age, :integer
     field :has_ero, :boolean, default: false
     field :is_avn, :boolean, default: false
     field :is_image_nsfw, :boolean, default: false
@@ -100,7 +99,6 @@ defmodule Kaguya.VisualNovels.VisualNovel do
       # in the schema + vn_hist so revert restores it when present.
       :original_language,
       :release_date,
-      :min_age,
       :has_ero,
       :is_avn,
       :is_image_nsfw,

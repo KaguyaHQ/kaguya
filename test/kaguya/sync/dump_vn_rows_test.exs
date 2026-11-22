@@ -118,7 +118,7 @@ defmodule Kaguya.Sync.DumpVnRowsTest do
                "Curated title"
 
       new_vn = Repo.get_by!(VisualNovel, vndb_id: "v89950002")
-      assert %{title: "Dump v89950002", min_age: 12, has_ero: true} = new_vn
+      assert %{title: "Dump v89950002", has_ero: true} = new_vn
       refute Repo.get_by(VisualNovel, vndb_id: "v89950003")
 
       assert Repo.get_by!(VNTitle, visual_novel_id: new_vn.id, lang: "en").title ==

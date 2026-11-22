@@ -934,7 +934,7 @@ defmodule Kaguya.VisualNovels do
   end
 
   @edit_scalar_fields ~w(title description development_status length_category
-                         original_language release_date min_age has_ero is_avn
+                         original_language release_date has_ero is_avn
                          title_category aliases)a
 
   defp update_vn_fields(vn, changes) do

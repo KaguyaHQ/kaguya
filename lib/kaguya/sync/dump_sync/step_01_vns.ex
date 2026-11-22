@@ -1,7 +1,7 @@
 defmodule Kaguya.Sync.DumpSync.VNs do
   @moduledoc """
   Syncs VN core data from VNDB dump: titles, ratings, descriptions, image flags,
-  release-derived fields (has_ero, release_date, min_age).
+  release-derived fields (has_ero, release_date).
 
   Step 1: Updates existing VNs and imports new VNs (excluding banned).
   Reads in batches of 5000 from the dump, transforms fields to match Kaguya schema,
@@ -47,7 +47,6 @@ defmodule Kaguya.Sync.DumpSync.VNs do
     :length_minutes,
     :original_language,
     :release_date,
-    :min_age,
     :has_ero,
     :is_avn,
     :aliases
@@ -581,7 +580,6 @@ defmodule Kaguya.Sync.DumpSync.VNs do
     # Release-derived fields (from release_stats CTE)
     rs = Map.get(release_stats_map, vn.id, %{})
     release_date = Map.get(rs, :release_date)
-    min_age = Map.get(rs, :min_age)
     has_ero = Map.get(rs, :has_ero, false)
 
     is_avn = olang == "en" and has_ero and MapSet.member?(avn_styled_ids, vn.id)
@@ -605,7 +603,6 @@ defmodule Kaguya.Sync.DumpSync.VNs do
       length_minutes: length_min,
       original_language: olang,
       release_date: release_date,
-      min_age: min_age,
       has_ero: has_ero,
       is_avn: is_avn,
       is_image_nsfw: is_nsfw,
@@ -798,9 +795,6 @@ defmodule Kaguya.Sync.DumpSync.VNs do
 
   defp load_release_stats_for(_vndb, []), do: %{}
 
-  # TODO: This dump path uses MIN release age; VndbEnrichment uses MAX.
-  # Define VN-level min_age semantics before aligning them. It is not an
-  # H-content classification; use has_ero for that distinction.
   defp load_release_stats_for(vndb, vn_ids) do
     placeholders = Enum.map_join(1..length(vn_ids), ", ", &"$#{&1}")
 
@@ -810,7 +804,6 @@ defmodule Kaguya.Sync.DumpSync.VNs do
         """
         SELECT rv.vid,
                MIN(r.released) AS first_release_raw,
-               MIN(r.minage) AS min_age,
                BOOL_OR(r.has_ero) AS has_ero
         FROM releases_vn rv
         JOIN releases r ON r.id = rv.id
@@ -824,7 +817,6 @@ defmodule Kaguya.Sync.DumpSync.VNs do
       {r.vid,
        %{
          release_date: DumpSync.parse_vndb_date(r.first_release_raw),
-         min_age: r.min_age,
          has_ero: r.has_ero || false
        }}
     end)

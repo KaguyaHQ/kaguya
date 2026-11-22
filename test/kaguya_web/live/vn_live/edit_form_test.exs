@@ -4,6 +4,15 @@ defmodule KaguyaWeb.VNLive.Edit.FormTest do
   alias KaguyaWeb.VNLive.Edit.Form
 
   describe "normalize/2" do
+    test "ignores the retired VN minimum-age field" do
+      original = Form.empty_form()
+      normalized = Form.normalize(%{"min_age" => "18"}, original)
+
+      refute Map.has_key?(normalized, "min_age")
+      refute Map.has_key?(Form.to_create_attrs(normalized), :min_age)
+      assert Form.build_changes(original, normalized) == %{}
+    end
+
     test "normalizes scalar fields and booleans" do
       current = Form.empty_form()
 
@@ -14,7 +23,6 @@ defmodule KaguyaWeb.VNLive.Edit.FormTest do
             "has_ero" => "true",
             "is_avn" => "on",
             "length_category" => "short",
-            "min_age" => "18",
             "release_date" => "2024-12-31",
             "titles" => %{
               "0" => %{
@@ -47,7 +55,6 @@ defmodule KaguyaWeb.VNLive.Edit.FormTest do
       assert normalized["has_ero"] == true
       assert normalized["is_avn"] == true
       assert normalized["length_category"] == "short"
-      assert normalized["min_age"] == "18"
       assert normalized["release_date"] == "2024-12-31"
 
       assert normalized["titles"] == [
@@ -155,7 +162,6 @@ defmodule KaguyaWeb.VNLive.Edit.FormTest do
       original =
         Form.empty_form()
         |> Map.put("description", "Old description")
-        |> Map.put("min_age", "18")
         |> Map.put("titles", [
           %{"lang" => "ja", "title" => "Old VN", "latin" => "", "official" => true}
         ])
@@ -175,7 +181,6 @@ defmodule KaguyaWeb.VNLive.Edit.FormTest do
       form =
         original
         |> Map.put("description", "New description")
-        |> Map.put("min_age", "")
         |> Map.put("titles", [
           %{"lang" => "ja", "title" => "New VN", "latin" => "", "official" => true}
         ])
@@ -189,7 +194,6 @@ defmodule KaguyaWeb.VNLive.Edit.FormTest do
 
       assert %{
                description: "New description",
-               min_age: nil,
                titles: [%{lang: "ja", title: "New VN", latin: nil, official: true}],
                relations: [],
                covers: [%{cover_id: "cover-2", is_image_nsfw: true}],

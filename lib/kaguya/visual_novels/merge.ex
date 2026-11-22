@@ -209,7 +209,6 @@ defmodule Kaguya.VisualNovels.Merge do
       release_date: pick_min(all, :release_date),
       length_minutes: sum(all, :length_minutes),
       length_category: nil,
-      min_age: pick_max(all, :min_age),
       vndb_rating: weighted_avg_decimal(all, :vndb_rating, :vndb_vote_count),
       vndb_vote_count: sum(all, :vndb_vote_count),
       primary_image_id: pick_first_non_nil([canonical | sources], :primary_image_id),
@@ -1001,7 +1000,6 @@ defmodule Kaguya.VisualNovels.Merge do
     :length_category,
     :original_language,
     :release_date,
-    :min_age,
     :has_ero,
     :is_avn,
     :is_image_nsfw,
@@ -1372,16 +1370,6 @@ defmodule Kaguya.VisualNovels.Merge do
       |> Enum.map(&Map.get(&1, key))
       |> Enum.reject(&is_nil/1)
       |> Enum.min(fn -> nil end)
-  end
-
-  defp pick_max(rows, key) do
-    rows
-    |> Enum.map(&Map.get(&1, key))
-    |> Enum.reject(&is_nil/1)
-    |> case do
-      [] -> nil
-      vals -> Enum.max(vals)
-    end
   end
 
   defp sum(rows, key) do

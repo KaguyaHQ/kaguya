@@ -232,7 +232,7 @@ defmodule Kaguya.Sync.VndbApiClient do
   end
 
   @doc """
-  Fetch all releases for a VN. Used to derive has_ero and min_age.
+  Fetch all releases for a VN. Used to derive has_ero.
   """
   def list_releases_for_vn(vndb_id, opts \\ []) do
     paginate_all("/release", ["vn", "=", ["id", "=", vndb_id]], @release_fields, opts)

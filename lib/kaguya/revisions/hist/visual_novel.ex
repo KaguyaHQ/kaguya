@@ -37,7 +37,7 @@ defmodule Kaguya.Revisions.Hist.VisualNovel do
   # Intentionally excluded — sync-managed external identifier: vndb_id
   # Intentionally excluded — transient upload-staging field: temp_image_url
   @vn_hist_fields ~w(title slug description aliases development_status length_category
-                     length_minutes original_language release_date min_age has_ero is_avn
+                     length_minutes original_language release_date has_ero is_avn
                      title_category primary_image_id is_image_nsfw is_image_suggestive
                      primary_vn_series_id primary_series_position featured_screenshot_id
                      is_cover_pinned hidden_at is_locked)a
@@ -56,7 +56,6 @@ defmodule Kaguya.Revisions.Hist.VisualNovel do
       :length_minutes,
       :original_language,
       :release_date,
-      :min_age,
       :has_ero,
       :is_avn,
       :title_category

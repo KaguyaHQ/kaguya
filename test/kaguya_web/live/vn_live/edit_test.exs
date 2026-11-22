@@ -49,6 +49,8 @@ defmodule KaguyaWeb.VNLive.EditTest do
 
     expected_path = "/vn/#{vn.slug}"
 
+    refute has_element?(view, ~s(input[name="vn[min_age]"]))
+
     assert {:error, {:live_redirect, %{to: ^expected_path}}} =
              view
              |> element("form#vn-edit-form")
@@ -60,7 +62,6 @@ defmodule KaguyaWeb.VNLive.EditTest do
                  "length_category" => "long",
                  "original_language" => "ja",
                  "release_date" => "2024-12-13",
-                 "min_age" => "18",
                  "has_ero" => "true",
                  "is_avn" => "false",
                  "title_category" => "vn",
@@ -83,7 +84,6 @@ defmodule KaguyaWeb.VNLive.EditTest do
     assert updated.length_category == "long"
     assert updated.original_language == "ja"
     assert updated.release_date == ~D[2024-12-13]
-    assert updated.min_age == 18
     assert updated.has_ero == true
     assert updated.is_avn == false
 
@@ -136,7 +136,6 @@ defmodule KaguyaWeb.VNLive.EditTest do
                  "length_category" => "",
                  "original_language" => "",
                  "release_date" => "",
-                 "min_age" => "",
                  "has_ero" => "false",
                  "is_avn" => "false",
                  "title_category" => "vn",
@@ -254,7 +253,6 @@ defmodule KaguyaWeb.VNLive.EditTest do
                  "length_category" => "",
                  "original_language" => "",
                  "release_date" => "",
-                 "min_age" => "",
                  "has_ero" => "false",
                  "is_avn" => "false",
                  "title_category" => "vn",
@@ -525,6 +523,8 @@ defmodule KaguyaWeb.VNLive.EditTest do
     # The form step now renders, pre-filled from the AVN branch: title
     # carried over and is_avn flagged; language and official status remain explicit.
     assert has_element?(view, "form#vn-edit-form")
+
+    refute has_element?(view, ~s(input[name="vn[min_age]"]))
     assert html =~ "Eternum Test"
     assert has_element?(view, ~s(input[name="vn[is_avn]"][checked]))
     assert has_element?(view, ~s(select[name="vn[titles][0][lang]"] option[value=""][selected]))
@@ -563,7 +563,6 @@ defmodule KaguyaWeb.VNLive.EditTest do
                  "length_category" => "medium",
                  "original_language" => "en",
                  "release_date" => "2025-01-02",
-                 "min_age" => "18",
                  "has_ero" => "false",
                  "is_avn" => "false",
                  "title_category" => "vn",
@@ -587,7 +586,6 @@ defmodule KaguyaWeb.VNLive.EditTest do
     assert created.length_category == "medium"
     assert created.original_language == "en"
     assert created.release_date == ~D[2025-01-02]
-    assert created.min_age == 18
 
     titles =
       Repo.all(

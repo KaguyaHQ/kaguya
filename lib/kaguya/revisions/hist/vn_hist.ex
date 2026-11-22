@@ -14,7 +14,6 @@ defmodule Kaguya.Revisions.Hist.VnHist do
     field :length_minutes, :integer
     field :original_language, :string
     field :release_date, :date
-    field :min_age, :integer
     field :has_ero, :boolean, default: false
     field :is_avn, :boolean, default: false
     field :title_category, :string, default: "vn"

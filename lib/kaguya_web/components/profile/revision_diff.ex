@@ -73,7 +73,6 @@ defmodule KaguyaWeb.Components.Profile.RevisionDiff do
     "is_image_suggestive" => "Cover suggestive",
     "is_cover_pinned" => "Cover pinned",
     "has_ero" => "Erotic content",
-    "min_age" => "Minimum age",
     "minage" => "Age rating",
     "length_category" => "Length",
     "length_minutes" => "Length (minutes)",
@@ -101,7 +100,7 @@ defmodule KaguyaWeb.Components.Profile.RevisionDiff do
 
   @scalar_fields MapSet.new(~w(
     title description aliases development_status length_category length_minutes
-    original_language release_date min_age has_ero title_category primary_image_id
+    original_language release_date has_ero title_category primary_image_id
     is_image_nsfw is_image_suggestive is_cover_pinned featured_screenshot_id
     primary_vn_series_id primary_series_position hidden_at is_locked name sex
     spoiler_sex gender spoiler_gender blood_type height weight age birthday bust
@@ -113,7 +112,7 @@ defmodule KaguyaWeb.Components.Profile.RevisionDiff do
   @field_order %{
     visual_novel: ~w(
       title description aliases original_language release_date length_category
-      length_minutes development_status title_category min_age has_ero is_image_nsfw
+      length_minutes development_status title_category has_ero is_image_nsfw
       is_image_suggestive primary_vn_series_id primary_series_position is_cover_pinned
     ),
     character: ~w(

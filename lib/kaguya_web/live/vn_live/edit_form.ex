@@ -14,7 +14,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       "length_category" => "",
       "original_language" => "",
       "release_date" => "",
-      "min_age" => "",
       "has_ero" => false,
       "is_avn" => false,
       "title_category" => "vn",
@@ -44,7 +43,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       "length_category" => vn.length_category || "",
       "original_language" => vn.original_language || "",
       "release_date" => if(vn.release_date, do: Date.to_iso8601(vn.release_date), else: ""),
-      "min_age" => if(vn.min_age, do: Integer.to_string(vn.min_age), else: ""),
       "has_ero" => vn.has_ero == true,
       "is_avn" => vn.is_avn == true,
       "title_category" => if(vn.title_category, do: to_string(vn.title_category), else: "vn"),
@@ -114,7 +112,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
         normalize_text(Map.get(attrs, "original_language", current_form["original_language"])),
       "release_date" =>
         normalize_text(Map.get(attrs, "release_date", current_form["release_date"])),
-      "min_age" => normalize_text(Map.get(attrs, "min_age", current_form["min_age"])),
       "has_ero" => truthy?(Map.get(attrs, "has_ero", current_form["has_ero"])),
       "is_avn" => truthy?(Map.get(attrs, "is_avn", current_form["is_avn"])),
       "title_category" =>
@@ -187,7 +184,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       length_category: blank_nil(form["length_category"]),
       original_language: blank_nil(form["original_language"]),
       release_date: parse_date(form["release_date"]),
-      min_age: parse_integer(form["min_age"]),
       has_ero: form["has_ero"] == true,
       is_avn: form["is_avn"] == true,
       title_category: parse_title_category(form["title_category"]),
@@ -231,7 +227,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
         {"length_category", "length"},
         {"original_language", "original language"},
         {"release_date", "release date"},
-        {"min_age", "minimum age"},
         {"has_ero", "has erotic content"},
         {"is_avn", "is avn"},
         {"title_category", "category"}
@@ -356,7 +351,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
       length_category: blank_nil(form["length_category"]),
       original_language: blank_nil(form["original_language"]),
       release_date: parse_date(form["release_date"]),
-      min_age: parse_integer(form["min_age"]),
       has_ero: form["has_ero"] == true,
       is_avn: form["is_avn"] == true,
       title_category: parse_title_category(form["title_category"]),
@@ -573,17 +567,6 @@ defmodule KaguyaWeb.VNLive.Edit.Form do
   defp parse_date(value) do
     case Date.from_iso8601(value) do
       {:ok, date} -> date
-      _ -> nil
-    end
-  end
-
-  defp parse_integer(""), do: nil
-  defp parse_integer(nil), do: nil
-  defp parse_integer(value) when is_integer(value), do: value
-
-  defp parse_integer(value) do
-    case Integer.parse(to_string(value)) do
-      {int, ""} -> int
       _ -> nil
     end
   end
