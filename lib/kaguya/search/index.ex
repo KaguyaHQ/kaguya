@@ -1,12 +1,17 @@
 defmodule Kaguya.SearchIndex do
   @moduledoc """
-  Handles incremental add-or-update of documents in Meilisearch.
+  Handles guarded incremental writes and full reindexing in Meilisearch.
   """
 
-  alias Req
-  alias Kaguya.VisualNovels.VisualNovel
+  import Ecto.Query
+
+  require Logger
+
   alias Kaguya.Characters.Character
   alias Kaguya.Producers.Producer
+  alias Kaguya.Repo
+  alias Kaguya.Search.Client
+  alias Kaguya.VisualNovels.VisualNovel
 
   # read once at compile time
   @enabled Application.compile_env!(:kaguya, :enable_meili_indexing)
@@ -41,55 +46,51 @@ defmodule Kaguya.SearchIndex do
   # ───────────────
 
   @doc "Apply searchable attributes and ranking rules for the visual_novels index."
-  def configure_visual_novels_index do
-    if @enabled do
-      Req.patch!(meili_client(),
-        url: "/indexes/visual_novels/settings",
-        json: %{
-          searchableAttributes: [
-            "prefix_1",
-            "prefix_2",
-            "prefix_3",
-            "prefix_4",
-            "title",
-            "original_titles",
-            "aliases",
-            "producers"
-          ],
-          rankingRules: [
-            "words",
-            "typo",
-            "attribute",
-            "proximity",
-            "vndb_vote_count:desc",
-            "exactness"
-          ],
-          filterableAttributes: ["title_category"]
-        }
-      )
-    end
-
-    :ok
+  def configure_visual_novels_index(opts \\ []) do
+    write(
+      :patch,
+      "/indexes/visual_novels/settings",
+      %{
+        searchableAttributes: [
+          "prefix_1",
+          "prefix_2",
+          "prefix_3",
+          "prefix_4",
+          "title",
+          "original_titles",
+          "aliases",
+          "producers"
+        ],
+        rankingRules: [
+          "words",
+          "typo",
+          "attribute",
+          "proximity",
+          "vndb_vote_count:desc",
+          "exactness"
+        ],
+        filterableAttributes: ["title_category"]
+      },
+      opts
+    )
   end
 
   @doc "Apply searchable attributes and ranking rules for the producers index."
-  def configure_producers_index do
-    if @enabled do
-      Req.patch!(meili_client(),
-        url: "/indexes/producers/settings",
-        json: %{
-          searchableAttributes: ["name"],
-          rankingRules: [
-            "words",
-            "typo",
-            "proximity",
-            "exactness"
-          ]
-        }
-      )
-    end
-
-    :ok
+  def configure_producers_index(opts \\ []) do
+    write(
+      :patch,
+      "/indexes/producers/settings",
+      %{
+        searchableAttributes: ["name"],
+        rankingRules: [
+          "words",
+          "typo",
+          "proximity",
+          "exactness"
+        ]
+      },
+      opts
+    )
   end
 
   # ───────────────
@@ -116,42 +117,147 @@ defmodule Kaguya.SearchIndex do
   https://www.meilisearch.com/docs/reference/api/documents#add-or-update-documents
   """
   def add_or_update_documents(index_name, documents) when is_list(documents) do
-    client = meili_client()
-    # PUT /indexes/:index_uid/documents => Add or Update documents
-    Req.put!(client, url: "/indexes/#{index_name}/documents", json: documents)
-    :ok
+    write(:put, "/indexes/#{index_name}/documents?primaryKey=id", documents)
   end
 
-  # ───────────────
-  # INTERNAL
-  # ───────────────
+  @doc "Whether indexing is enabled and the runtime destination is safe to write to."
+  def writable? do
+    config = Application.fetch_env!(:kaguya, :meilisearch)
+    local_only = Application.get_env(:kaguya, :meili_indexing_local_only, false)
+    url = config[:base_url]
+
+    configured = is_binary(url) and String.trim(url) != ""
+    local = configured and URI.parse(String.trim(url)).host in ["localhost", "127.0.0.1"]
+
+    if local_only and configured and not local do
+      warn_once()
+    end
+
+    @enabled and configured and (not local_only or local)
+  end
+
+  @doc "Configure and rebuild all search indexes, waiting for every task to finish."
+  def reindex_all do
+    Map.new(["visual_novels", "characters", "producers"], &{&1, reindex(&1)})
+  end
+
+  @doc "Rebuild an index in keyset batches, returning the number of submitted documents."
+  def reindex(index) when index in ["visual_novels", "characters", "producers"] do
+    unless writable?(),
+      do: raise("Meilisearch indexing is disabled, unconfigured, or non-local in dev")
+
+    configure_index(index)
+    {query, transform} = reindex_query(index)
+    reindex_batches(index, query, transform, nil, {0, []})
+  end
+
+  defp configure_index("visual_novels"), do: configure_visual_novels_index(wait: true)
+  defp configure_index("producers"), do: configure_producers_index(wait: true)
+  defp configure_index("characters"), do: :ok
+
+  defp reindex_query("visual_novels") do
+    {from(vn in VisualNovel, preload: [:vn_titles, vn_producers: :producer]),
+     &transform_visual_novel/1}
+  end
+
+  defp reindex_query("characters"), do: {Character, &transform_character/1}
+  defp reindex_query("producers"), do: {Producer, &transform_producer/1}
+
+  defp reindex_batches(index, query, transform, last_id, {count, tasks}) do
+    page = if last_id, do: where(query, [r], r.id > ^last_id), else: query
+    batch = Repo.all(from(r in page, order_by: r.id, limit: 1_000), timeout: 60_000, log: false)
+
+    case batch do
+      [] ->
+        tasks |> Enum.reverse() |> Enum.each(&wait_for_task!/1)
+        count
+
+      rows ->
+        {:ok, task} =
+          write(:put, "/indexes/#{index}/documents?primaryKey=id", Enum.map(rows, transform),
+            return_task: true
+          )
+
+        reindex_batches(
+          index,
+          query,
+          transform,
+          List.last(rows).id,
+          {count + length(rows), [task | tasks]}
+        )
+    end
+  end
 
   defp do_index(index_name, structs, transform_fun) do
-    if @enabled do
-      docs = Enum.map(structs, transform_fun)
-      Req.put!(meili_client(), url: "/indexes/#{index_name}/documents", json: docs)
-    end
-
-    :ok
-  end
-
-  defp delete_document(index_name, id) do
-    if @enabled do
-      Req.delete!(meili_client(), url: "/indexes/#{index_name}/documents/#{id}")
-    end
-
-    :ok
-  end
-
-  defp delete_documents(index_name, ids) do
-    if @enabled do
-      Req.post!(meili_client(),
-        url: "/indexes/#{index_name}/documents/delete-batch",
-        json: ids
+    if writable?() do
+      write(
+        :put,
+        "/indexes/#{index_name}/documents?primaryKey=id",
+        Enum.map(structs, transform_fun)
       )
     end
 
     :ok
+  end
+
+  defp delete_document(index_name, id),
+    do: write(:delete, "/indexes/#{index_name}/documents/#{id}")
+
+  defp delete_documents(index_name, ids),
+    do: write(:post, "/indexes/#{index_name}/documents/delete-batch", ids)
+
+  defp write(method, url, body \\ nil, opts \\ []) do
+    if writable?() do
+      {:ok, client} = Client.new()
+      request = [method: method, url: url]
+      request = if is_nil(body), do: request, else: Keyword.put(request, :json, body)
+      response = Req.request!(client, Keyword.put(request, :receive_timeout, 30_000))
+      handle_write_response(response, opts)
+    else
+      :ok
+    end
+  end
+
+  defp handle_write_response(%{status: 202, body: %{"taskUid" => uid}}, opts) do
+    if opts[:wait], do: wait_for_task!(uid)
+    if opts[:return_task], do: {:ok, uid}, else: :ok
+  end
+
+  defp handle_write_response(%{status: status, body: error}, _opts) do
+    raise "Meilisearch write failed (#{status}): #{inspect(error)}"
+  end
+
+  @doc false
+  def wait_for_task!(uid) do
+    {:ok, client} = Client.new()
+    await_task!(client, uid, System.monotonic_time(:millisecond) + 600_000)
+  end
+
+  defp await_task!(client, uid, deadline) do
+    case Req.get!(client, url: "/tasks/#{uid}") do
+      %{status: 200, body: %{"status" => "succeeded"}} ->
+        :ok
+
+      %{status: 200, body: %{"status" => status}} when status in ["enqueued", "processing"] ->
+        if System.monotonic_time(:millisecond) >= deadline do
+          raise "Timed out waiting for Meilisearch task #{uid}"
+        end
+
+        Process.sleep(250)
+        await_task!(client, uid, deadline)
+
+      response ->
+        raise "Meilisearch task #{uid} failed: #{inspect(response.body)}"
+    end
+  end
+
+  defp warn_once do
+    key = {__MODULE__, :non_local_warning}
+
+    unless :persistent_term.get(key, false) do
+      :persistent_term.put(key, true)
+      Logger.warning("Skipping Meilisearch writes: dev requires localhost or 127.0.0.1")
+    end
   end
 
   # -------------------
@@ -389,27 +495,9 @@ defmodule Kaguya.SearchIndex do
     }
   end
 
-  # -------------
-  # Meili Client
-  # -------------
-
-  defp meili_client do
-    config = Application.fetch_env!(:kaguya, :meilisearch)
-    meili_url = config[:base_url]
-    meili_key = config[:master_key]
-
-    Req.new(
-      base_url: meili_url,
-      headers: [
-        {"Authorization", "Bearer #{meili_key}"},
-        {"Content-Type", "application/json"}
-      ]
-    )
-  end
-
   @dialyzer [
-    {:nowarn_function, configure_visual_novels_index: 0},
-    {:nowarn_function, configure_producers_index: 0},
+    {:nowarn_function, configure_visual_novels_index: 1},
+    {:nowarn_function, configure_producers_index: 1},
     {:nowarn_function, transform_visual_novel: 1},
     {:nowarn_function, transform_character: 1},
     {:nowarn_function, transform_producer: 1},

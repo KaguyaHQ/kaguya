@@ -97,26 +97,13 @@ defmodule Kaguya.Sync.DumpSync.PostSync do
     {:ok, series_count} = Kaguya.VisualNovels.SeriesGenerator.regenerate()
     Logger.info("VN series regenerated: #{series_count} series")
 
-    # 6. Configure Meilisearch index settings (searchable attributes, ranking)
-    Logger.info("Configuring Meilisearch visual_novels index settings...")
-    Kaguya.SearchIndex.configure_visual_novels_index()
-    Logger.info("Configuring Meilisearch producers index settings...")
-    Kaguya.SearchIndex.configure_producers_index()
+    # 6–9. Configure and rebuild search indexes using the shared operation.
+    Logger.info("Re-indexing Meilisearch...")
 
-    # 7. Re-index VNs in Meilisearch
-    Logger.info("Re-indexing VNs in Meilisearch...")
-    reindex_vns()
-    Logger.info("VN re-indexing complete")
-
-    # 8. Re-index characters in Meilisearch
-    Logger.info("Re-indexing characters in Meilisearch...")
-    reindex_characters()
-    Logger.info("Character re-indexing complete")
-
-    # 9. Re-index producers in Meilisearch
-    Logger.info("Re-indexing producers in Meilisearch...")
-    reindex_producers()
-    Logger.info("Producer re-indexing complete")
+    if Kaguya.SearchIndex.writable?() do
+      counts = Kaguya.SearchIndex.reindex_all()
+      Logger.info("Search re-indexing complete: #{inspect(counts)}")
+    end
 
     # 10. Recompute content score for every visible VN (bulk sync writes
     #     bypass Revisions.submit_edit, so the on-edit hook never fires).
@@ -205,68 +192,6 @@ defmodule Kaguya.Sync.DumpSync.PostSync do
     Cachex.clear(:vn_browse_cache)
     Kaguya.VisualNovels.VNPageCache.clear_all()
     count
-  end
-
-  # ── Search Reindex ────────────────────────────────────────────────────────
-
-  defp reindex_vns do
-    import Ecto.Query
-
-    # Stream in ID-ordered batches to avoid loading all 59K+ VNs into memory
-    stream_in_batches(
-      Kaguya.VisualNovels.VisualNovel
-      |> preload([:vn_titles, :vn_producers, vn_producers: :producer])
-      |> order_by(:id),
-      500,
-      &Kaguya.SearchIndex.index_visual_novels/1
-    )
-  end
-
-  defp reindex_characters do
-    import Ecto.Query
-
-    stream_in_batches(
-      Kaguya.Characters.Character |> order_by(:id),
-      500,
-      &Kaguya.SearchIndex.index_characters/1
-    )
-  end
-
-  defp reindex_producers do
-    import Ecto.Query
-
-    stream_in_batches(
-      Kaguya.Producers.Producer |> order_by(:id),
-      500,
-      &Kaguya.SearchIndex.index_producers/1
-    )
-  end
-
-  defp stream_in_batches(query, batch_size, index_fn) do
-    import Ecto.Query
-
-    do_batch(query, batch_size, index_fn, nil, 0)
-  end
-
-  defp do_batch(query, batch_size, index_fn, last_id, count) do
-    import Ecto.Query
-
-    page_query =
-      if last_id do
-        where(query, [r], r.id > ^last_id)
-      else
-        query
-      end
-
-    batch = page_query |> limit(^batch_size) |> Repo.all()
-
-    if batch == [] do
-      count
-    else
-      index_fn.(batch)
-      new_last_id = List.last(batch).id
-      do_batch(query, batch_size, index_fn, new_last_id, count + length(batch))
-    end
   end
 
   # ── Targeted Helpers ─────────────────────────────────────────────────────

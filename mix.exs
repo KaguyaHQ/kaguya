@@ -121,7 +121,13 @@ defmodule Kaguya.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup", "assets.setup", "cmd sh scripts/setup-git-hooks.sh"],
+      setup: [
+        "deps.get",
+        "ecto.setup",
+        "assets.setup",
+        "cmd sh scripts/setup-git-hooks.sh",
+        "search.reindex --if-available"
+      ],
       "ecto.setup": ["ecto.create", "ecto.load --skip-if-loaded", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: [

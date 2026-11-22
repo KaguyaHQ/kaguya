@@ -66,8 +66,9 @@ config :phoenix, :stacktrace_depth, 20
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
 
-# Disable meili indexing since this is prod meili
-config :kaguya, :enable_meili_indexing, false
+# Dev may only write to a local Meilisearch, even with a stale production URL.
+config :kaguya, :enable_meili_indexing, true
+config :kaguya, :meili_indexing_local_only, true
 
 # # Enable origin header protection since this is prod API behind Cloudflare
 config :kaguya, :protect_origin_header, false

@@ -1,3 +1,14 @@
 [tools]
 erlang = "27.3.4.17"
 elixir = "1.20.4-otp-27"
+"github:meilisearch/meilisearch" = { version = "1.12.8", exe = "meilisearch" }
+
+[env]
+_.file = ".env"
+
+[tasks.search]
+description = "Start local Meilisearch"
+run = """
+mkdir -p tmp/meilisearch
+exec meilisearch --http-addr 127.0.0.1:7700 --db-path tmp/meilisearch --master-key "${MEILI_MASTER_KEY:?Set a local key of at least 16 bytes in .env}" --no-analytics
+"""

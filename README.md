@@ -208,14 +208,38 @@ Search documents are indexed into Meilisearch. VN documents include normalized
 title prefixes, aliases, original titles, producers, and ranking metadata so
 search works across romanized/native titles and common punctuation variants.
 
-The VNDB dump `post_sync` step reindexes search after large imports.
+Development uses its own local Meilisearch, populated from your local database.
+Set `MEILI_BASE_URL=http://127.0.0.1:7700` and a local `MEILI_MASTER_KEY` of at
+least 16 bytes in `.env` (see `.env.example`). Never use a production key in dev.
+
+```sh
+mise install
+mise run search
+# In another terminal:
+mix search.reindex
+# Or rebuild one index:
+mix search.reindex --only visual_novels
+```
+
+The pinned GitHub release supports Linux and macOS. The search task loads `.env`,
+listens on `127.0.0.1:7700`, and keeps its data in gitignored `tmp/meilisearch/`.
+Reindexing reports counts and waits for Meilisearch tasks to complete. Local
+catalog edits update the local indexes automatically. Dev refuses all index
+writes to hosts other than `localhost` and `127.0.0.1`, including settings and
+deletions; redirects are disabled.
+
+`mix setup` reindexes only when the local search service is available; otherwise
+it prints the commands to run later. Without a configured URL, search returns an
+unavailable or empty state and the rest of the app remains usable.
+
+The VNDB dump `post_sync` step uses the same reindexing operation after large imports.
 
 ## Environment
 
 Runtime config is loaded from `.env` plus process environment via Dotenvy.
 See `.env.example` for the full list with placeholders.
 
-Required (outside test):
+Required in production (development boots with placeholders or disabled integrations):
 
 | Variable | Purpose |
 |---|---|
@@ -224,8 +248,8 @@ Required (outside test):
 | `R2_APPLICATION_KEY_ID` | R2/S3 access key |
 | `R2_APPLICATION_KEY` | R2/S3 secret |
 | `R2_BUCKET_NAME` | Upload bucket |
-| `MEILI_BASE_URL` | Meilisearch endpoint |
-| `MEILI_MASTER_KEY` | Meilisearch key |
+| `MEILI_BASE_URL` | Meilisearch endpoint; use `http://127.0.0.1:7700` in dev |
+| `MEILI_MASTER_KEY` | Local dev key of at least 16 bytes; never reuse a production key |
 
 Optional integrations:
 
