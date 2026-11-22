@@ -55,10 +55,13 @@ defmodule Kaguya.Lists.List do
     |> validate_length(:description, max: 500)
     |> validate_inclusion(:display_mode, ["grid", "tier"])
     |> validate_inclusion(:item_type, @item_types)
+    # Slugs are unique per owner, matching /@username/list/:slug URLs.
     |> Utils.put_unique_slug(:name)
-    |> unique_constraint(:slug)
     |> unique_constraint([:user_id, :slug])
-    |> unique_constraint([:user_id, :name])
+    |> unique_constraint([:user_id, :name],
+      error_key: :name,
+      message: "is already used by another of your lists"
+    )
     |> maybe_touch_last_activity()
   end
 

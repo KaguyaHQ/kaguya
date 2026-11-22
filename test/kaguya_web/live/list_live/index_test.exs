@@ -19,9 +19,12 @@ defmodule KaguyaWeb.ListLive.IndexTest do
         vn_ids: [vn.id]
       })
 
+    # Staff picks are pinned to their curator's account.
+    curator = Kaguya.Test.UserFixtures.insert_user!(username: "lovelyz")
+
     {:ok, _staff_pick} =
       Lists.create_list(%{
-        user_id: owner.id,
+        user_id: curator.id,
         name: "Yuri",
         vn_ids: [vn.id]
       })

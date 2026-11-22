@@ -91,9 +91,7 @@ defmodule KaguyaWeb.ListLive.Data do
     viewer_id = viewer_id(viewer)
     comments_page = Keyword.get(opts, :comments_page, 1)
 
-    with {:ok, list} <- Lists.get_list_by_slug_for_view(slug, viewer_id),
-         list <- Repo.preload(list, :user),
-         :ok <- verify_username(list, username),
+    with {:ok, list} <- Lists.get_user_list_for_view(username, slug, viewer_id),
          hidden? <- hidden_for_viewer?(list, viewer),
          {:ok, tiers} <- load_tiers(list, hidden?),
          {:ok, items} <- load_items(list, page, viewer, hidden?),
@@ -123,9 +121,7 @@ defmodule KaguyaWeb.ListLive.Data do
     viewer_id = viewer_id(viewer)
 
     with viewer_id when is_binary(viewer_id) <- viewer_id,
-         {:ok, list} <- Lists.get_list_by_slug_for_view(slug, viewer_id),
-         list <- Repo.preload(list, :user),
-         :ok <- verify_username(list, username),
+         {:ok, list} <- Lists.get_user_list_for_view(username, slug, viewer_id),
          :ok <- verify_owner(list, viewer_id),
          {:ok, tiers} <- Lists.list_tiers_for_list(list),
          {:ok, items} <- load_all_items(list, viewer_id, nil) do
@@ -311,15 +307,6 @@ defmodule KaguyaWeb.ListLive.Data do
       |> Map.put(:thumbnails, Map.get(thumbnails, list.id))
     end)
   end
-
-  defp verify_username(%{user: %{username: username}}, username_param)
-       when is_binary(username) and is_binary(username_param) do
-    if String.downcase(username) == String.downcase(username_param),
-      do: :ok,
-      else: {:error, :not_found}
-  end
-
-  defp verify_username(_list, _username), do: {:error, :not_found}
 
   defp verify_owner(%{user_id: user_id}, user_id), do: :ok
   defp verify_owner(_list, _viewer_id), do: {:error, :not_found}

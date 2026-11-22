@@ -22,12 +22,19 @@ defmodule Kaguya.Lists do
 
   @min_search_length 2
 
-  @curated_list_slugs ["vndb-top-50", "egs-top-50", "top-50", "2ch-hk-vn-rec-list"]
+  # Featured lists, pinned by {owner username, slug}. Slugs are only unique
+  # per owner, so a bare slug would let anyone's same-named list in.
+  @curated_lists [
+    {"tropeguy", "vndb-top-50"},
+    {"tropeguy", "egs-top-50"},
+    {"tropeguy", "top-50"},
+    {"tropeguy", "2ch-hk-vn-rec-list"}
+  ]
 
-  @staff_pick_slugs [
-    "hopium-of-translation-and-or-i-learn-enough",
-    "yuri",
-    "denpa-and-or-horror"
+  @staff_pick_lists [
+    {"superange128", "hopium-of-translation-and-or-i-learn-enough"},
+    {"lovelyz", "yuri"},
+    {"lovelyz", "denpa-and-or-horror"}
   ]
 
   # Trending
@@ -73,18 +80,6 @@ defmodule Kaguya.Lists do
   end
 
   @doc """
-  Gets a list by slug (viewer-aware).
-
-  Note: VN list slugs are expected to be globally unique (client routes use `/lists/:slug`).
-  """
-  def get_list_by_slug(slug, viewer_id \\ nil, viewer \\ %{}) do
-    case Repo.get_by(List, slug: slug) do
-      nil -> {:error, :not_found}
-      %List{} = list -> authorize_list_visibility(list, viewer_id, viewer)
-    end
-  end
-
-  @doc """
   View-only fetchers for the single-list page. Hidden lists are returned
   (so direct links keep working); private lists are still gated to owner.
   """
@@ -95,8 +90,19 @@ defmodule Kaguya.Lists do
     end
   end
 
-  def get_list_by_slug_for_view(slug, viewer_id \\ nil) do
-    case Repo.get_by(List, slug: slug) do
+  @doc """
+  The list at `/@username/list/:slug`, with its owner preloaded. Slugs are
+  unique per owner, so the username is part of the key.
+  """
+  def get_user_list_for_view(username, slug, viewer_id \\ nil) do
+    query =
+      from(l in List,
+        join: u in assoc(l, :user),
+        where: u.username == ^username and l.slug == ^slug,
+        preload: [user: u]
+      )
+
+    case Repo.one(query) do
       nil -> {:error, :not_found}
       %List{} = list -> authorize_list_view(list, viewer_id)
     end
@@ -104,37 +110,6 @@ defmodule Kaguya.Lists do
 
   defp authorize_list_view(%{user_id: owner_id, is_public: is_public} = list, viewer_id) do
     if is_public or viewer_id == owner_id, do: {:ok, list}, else: {:error, :not_found}
-  end
-
-  @doc """
-  Gets multiple lists by slugs (viewer-aware). Returns only visible lists.
-  """
-  def get_lists_by_slugs(slugs, viewer_id \\ nil, viewer \\ %{}) when is_list(slugs) do
-    List
-    |> where([l], l.slug in ^slugs and is_nil(l.hidden_at))
-    |> Repo.all()
-    |> Enum.filter(fn list ->
-      case authorize_list_visibility(list, viewer_id, viewer) do
-        {:ok, _} -> true
-        _ -> false
-      end
-    end)
-    |> sort_by_input_order(slugs)
-  end
-
-  defp sort_by_input_order(lists, slugs) do
-    index = slugs |> Enum.with_index() |> Map.new()
-    Enum.sort_by(lists, fn l -> Map.get(index, l.slug, 999) end)
-  end
-
-  @doc """
-  Gets a list by user + slug (viewer-aware).
-  """
-  def get_list_by_user_slug(owner_id, slug, viewer_id \\ nil, viewer \\ %{}) do
-    case Repo.get_by(List, user_id: owner_id, slug: slug) do
-      nil -> {:error, :not_found}
-      %List{} = list -> authorize_list_visibility(list, viewer_id, viewer)
-    end
   end
 
   @doc """
@@ -525,21 +500,12 @@ defmodule Kaguya.Lists do
     end
   end
 
-  def list_hidden_gem_lists do
-    list_hidden_gem_lists_for_viewer(nil)
-  end
-
   def curated_list_progress(user_id, opts \\ []) do
     allowed = Keyword.get(opts, :allowed_categories)
 
     lists =
-      from(l in List,
-        where: l.slug in ^@curated_list_slugs and l.is_public == true
-      )
-      |> Repo.all()
-      |> Enum.sort_by(fn list ->
-        Enum.find_index(@curated_list_slugs, &(&1 == list.slug))
-      end)
+      @curated_lists
+      |> featured_lists()
       |> Enum.map(fn list ->
         {read_count, total} = count_read_in_list(user_id, list.id, allowed)
         %{list: %{list | vns_count: total}, read_count: read_count}
@@ -572,16 +538,25 @@ defmodule Kaguya.Lists do
   end
 
   def list_hidden_gem_lists_for_viewer(_viewer_id) do
-    lists =
+    {:ok, featured_lists(@staff_pick_lists)}
+  end
+
+  # Public featured lists in the given {username, slug} order. Lists that were
+  # deleted, made private or renamed are skipped.
+  defp featured_lists(pins) do
+    usernames = Enum.map(pins, &elem(&1, 0))
+    slugs = Enum.map(pins, &elem(&1, 1))
+
+    found =
       from(l in List,
-        where: l.slug in ^@staff_pick_slugs and l.is_public == true
+        join: u in assoc(l, :user),
+        where: u.username in ^usernames and l.slug in ^slugs and l.is_public == true,
+        select: {{u.username, l.slug}, l}
       )
       |> Repo.all()
-      |> Enum.sort_by(fn list ->
-        Enum.find_index(@staff_pick_slugs, &(&1 == list.slug))
-      end)
+      |> Map.new()
 
-    {:ok, lists}
+    pins |> Enum.map(&Map.get(found, &1)) |> Enum.reject(&is_nil/1)
   end
 
   def list_recently_liked_lists do
