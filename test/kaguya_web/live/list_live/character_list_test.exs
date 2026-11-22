@@ -29,7 +29,7 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       assert has_element?(view, "#list-form-item-type [aria-selected='true']", "Characters")
       refute has_element?(view, "#list-form-display-grid")
 
-      render_click(view, "pick_cast_vn", %{"id" => ctx.vn.id})
+      render_click(view, "add_item", %{"id" => ctx.vn.id})
 
       assert has_element?(view, "#cast-picker-character-#{ctx.hero.id}")
       assert has_element?(view, "#cast-picker-character-#{ctx.rival.id}")
@@ -81,12 +81,90 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       assert has_element?(view, "#list_name[value='Draft name']")
     end
 
-    test "VN search results don't add VNs to a character list", ctx do
+    test "switching to characters swaps in the character search", ctx do
+      {:ok, view, _html} = live(conn_for(ctx.user), ~p"/list/new")
+      assert has_element?(view, "#desktop-list-vn-search")
+
+      view |> element("#list-form-item-type button", "Characters") |> render_click()
+
+      assert has_element?(view, "#desktop-list-character-search")
+      refute has_element?(view, "#desktop-list-vn-search")
+    end
+
+    test "searching by name tells same-named characters apart and adds the pick", ctx do
+      other_vn = insert_vn!()
+      namesake = insert_character!("Hero")
+      link!(namesake, other_vn, :main)
+
+      stub_search(
+        characters: [hit(ctx.hero, ctx.vn.title), hit(namesake, other_vn.title)],
+        visual_novels: [%{id: ctx.vn.id, title: ctx.vn.title, slug: ctx.vn.slug}]
+      )
+
       {:ok, view, _html} = live(conn_for(ctx.user), ~p"/list/new?type=character")
 
-      render_click(view, "add_item", %{"id" => ctx.vn.id})
+      view
+      |> element("#desktop-list-character-search-form")
+      |> render_change(%{"search" => %{"query" => "hero"}})
 
-      refute has_element?(view, "#list-layout-island")
+      assert has_element?(view, "#picker-character-#{ctx.hero.id}", ctx.vn.title)
+      assert has_element?(view, "#picker-character-#{namesake.id}", other_vn.title)
+      assert has_element?(view, "#picker-vn-#{ctx.vn.id}")
+
+      view |> element("#picker-character-#{namesake.id}") |> render_click()
+
+      # Picking closes the results and puts the character on the board.
+      refute has_element?(view, "#desktop-list-character-search-results")
+      assert has_element?(view, "#list-layout-island")
+      assert has_element?(view, "#list-form-item-type [aria-selected='true']", "Characters")
+
+      view |> element("form#list-form") |> render_submit(%{"list" => %{"name" => "Best girls"}})
+
+      list = Repo.get_by!(List, user_id: ctx.user.id, name: "Best girls")
+
+      assert [namesake.id] ==
+               Repo.all(
+                 from(li in ListCharacterItem,
+                   where: li.list_id == ^list.id,
+                   select: li.character_id
+                 )
+               )
+    end
+
+    test "a VN search result opens its cast", ctx do
+      stub_search(
+        characters: [],
+        visual_novels: [%{id: ctx.vn.id, title: ctx.vn.title, slug: ctx.vn.slug}]
+      )
+
+      {:ok, view, _html} = live(conn_for(ctx.user), ~p"/list/new?type=character")
+
+      view
+      |> element("#desktop-list-character-search-form")
+      |> render_change(%{"search" => %{"query" => "cast vn"}})
+
+      view |> element("#picker-vn-#{ctx.vn.id}") |> render_click()
+
+      assert has_element?(view, "#lists-cast-picker")
+      assert has_element?(view, "#cast-picker-character-#{ctx.hero.id}")
+    end
+
+    test "Escape closes the search results", ctx do
+      stub_search(characters: [hit(ctx.hero, ctx.vn.title)], visual_novels: [])
+
+      {:ok, view, _html} = live(conn_for(ctx.user), ~p"/list/new?type=character")
+
+      view
+      |> element("#desktop-list-character-search-form")
+      |> render_change(%{"search" => %{"query" => "hero"}})
+
+      assert has_element?(view, "#desktop-list-character-search-results")
+
+      view
+      |> element("#desktop-list-character-search-input")
+      |> render_keydown(%{"key" => "Escape"})
+
+      refute has_element?(view, "#desktop-list-character-search-results")
     end
 
     test "edits an existing character list without offering the type switch", ctx do
@@ -97,7 +175,7 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
 
       refute has_element?(view, "#list-form-item-type")
 
-      render_click(view, "pick_cast_vn", %{"id" => ctx.vn.id})
+      render_click(view, "add_item", %{"id" => ctx.vn.id})
       # Already-listed characters aren't offered again.
       refute has_element?(view, "#cast-picker-character-#{ctx.hero.id}")
       view |> element("#cast-picker-character-#{ctx.rival.id}") |> render_click()
@@ -131,6 +209,36 @@ defmodule KaguyaWeb.ListLive.CharacterListTest do
       assert html =~ list.name
       assert html =~ ctx.hero.name
     end
+  end
+
+  # Stubs Meilisearch for the editor's combined search. The LiveView and its
+  # search tasks run in other processes, so the stub is shared.
+  defp stub_search(characters: characters, visual_novels: vns) do
+    previous = Application.fetch_env!(:kaguya, :meilisearch)
+    on_exit(fn -> Application.put_env(:kaguya, :meilisearch, previous) end)
+
+    Req.Test.set_req_test_to_shared()
+    on_exit(fn -> Req.Test.set_req_test_to_private() end)
+
+    Req.Test.stub(__MODULE__, fn conn ->
+      hits =
+        case conn.request_path do
+          "/indexes/characters/search" -> characters
+          "/indexes/visual_novels/search" -> vns
+        end
+
+      Req.Test.json(conn, %{hits: hits, totalHits: length(hits), totalPages: 1})
+    end)
+
+    Application.put_env(:kaguya, :meilisearch, %{
+      base_url: "http://localhost:7700",
+      master_key: "test",
+      req_options: [plug: {Req.Test, __MODULE__}]
+    })
+  end
+
+  defp hit(character, vn_title) do
+    %{id: character.id, name: character.name, slug: character.slug, vn_titles: [vn_title]}
   end
 
   defp character_list!(user, characters) do

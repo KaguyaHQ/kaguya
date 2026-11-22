@@ -390,8 +390,10 @@ defmodule KaguyaWeb.Lists.FormComponents do
   attr :results, :list, default: []
   attr :error, :string, default: nil
   attr :loading, :boolean, default: false
-  attr :select_event, :string, default: "add_item", doc: "Event pushed with a picked VN's id."
   attr :placeholder, :string, default: "Search visual novels…"
+
+  slot :custom_results,
+    doc: "Replaces the VN result list (character lists show grouped results)."
 
   def mobile_search_overlay(assigns) do
     ~H"""
@@ -436,7 +438,11 @@ defmodule KaguyaWeb.Lists.FormComponents do
         </.form>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-4">
+      <div :if={@custom_results != []} class="flex-1 overflow-y-auto p-4">
+        {render_slot(@custom_results)}
+      </div>
+
+      <div :if={@custom_results == []} class="flex-1 overflow-y-auto p-4">
         <div
           :if={@loading and @results == [] and !@error}
           class="flex h-[280px] items-center justify-center"
@@ -465,7 +471,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
           <button
             :for={result <- @results}
             type="button"
-            phx-click={@select_event}
+            phx-click="add_item"
             phx-value-id={result.id}
             class="flex w-full items-center gap-4 rounded-lg p-3 text-left transition-colors hover:bg-[rgb(var(--surface-menu-item-hover))] active:bg-[rgb(var(--surface-menu-item-pressed))]"
           >
@@ -485,6 +491,155 @@ defmodule KaguyaWeb.Lists.FormComponents do
         </div>
       </div>
     </KaguyaWeb.UI.Dialog.dialog>
+    """
+  end
+
+  attr :query, :string, default: ""
+  attr :results, :map, required: true, doc: "`%{characters: [...], visual_novels: [...]}`"
+  attr :error, :string, default: nil
+  attr :class, :any, default: nil
+
+  @doc """
+  Desktop search for character lists. Server-rendered (not an ignored JS
+  hook), so it always reflects the current list type. Escape or a click
+  outside closes the results.
+  """
+  def character_search(assigns) do
+    assigns = assign(assigns, :open?, String.trim(assigns.query || "") != "")
+
+    ~H"""
+    <div id="desktop-list-character-search" class={["relative", @class]} phx-click-away="close_search">
+      <.form
+        for={%{}}
+        as={:search}
+        id="desktop-list-character-search-form"
+        phx-change="search"
+        phx-submit="search"
+      >
+        <.icon
+          name={:search}
+          class="text-foreground-primary pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+        />
+        <input
+          id="desktop-list-character-search-input"
+          type="search"
+          name="search[query]"
+          value={@query}
+          placeholder="Search characters or VNs…"
+          aria-label="Search characters or visual novels"
+          aria-controls="desktop-list-character-search-results"
+          aria-expanded={to_string(@open?)}
+          autocomplete="off"
+          spellcheck="false"
+          phx-debounce="250"
+          phx-keydown="close_search"
+          phx-key="Escape"
+          class="bg-surface-elevated border-border-divider focus:border-text-field-border-focus placeholder:text-foreground-primary/40 text-foreground-primary h-11 w-full rounded-[8px] border pr-3 pl-9 text-sm placeholder:text-sm focus:ring-0 focus:outline-none"
+        />
+      </.form>
+
+      <div
+        :if={@open?}
+        id="desktop-list-character-search-results"
+        class="bg-surface-menu-item-default border-border-divider absolute top-[48px] left-0 z-30 max-h-[420px] w-full max-w-[500px] overflow-y-auto rounded-b-[8px] border p-2 shadow-2xl"
+      >
+        <.character_picker_results results={@results} query={@query} error={@error} />
+      </div>
+    </div>
+    """
+  end
+
+  attr :results, :map, required: true
+  attr :query, :string, default: ""
+  attr :error, :string, default: nil
+
+  @doc """
+  Grouped picker results: characters (with the VN they're best known from,
+  to tell same-named characters apart) and VNs (which open their cast).
+  """
+  def character_picker_results(assigns) do
+    assigns =
+      assign(assigns,
+        short_query?: String.length(String.trim(assigns.query || "")) < 2,
+        empty?: assigns.results.characters == [] and assigns.results.visual_novels == []
+      )
+
+    ~H"""
+    <p :if={@error} class="text-foreground-tertiary text-style-body2Regular px-3 py-4 text-center">
+      {@error}
+    </p>
+    <p
+      :if={!@error and @short_query?}
+      class="text-foreground-tertiary text-style-body2Regular px-3 py-4 text-center"
+    >
+      Type a character's name, or a VN to add its cast
+    </p>
+    <p
+      :if={!@error and !@short_query? and @empty?}
+      class="text-foreground-tertiary text-style-body2Regular px-3 py-4 text-center"
+    >
+      No characters or VNs found
+    </p>
+
+    <section :if={!@error and @results.characters != []} aria-label="Characters">
+      <p class="text-foreground-tertiary text-style-captionMedium px-3 pt-1 pb-1.5">Characters</p>
+      <button
+        :for={character <- @results.characters}
+        id={"picker-character-#{character.id}"}
+        type="button"
+        phx-click="add_searched_character"
+        phx-value-id={character.id}
+        class="focus-visible:bg-surface-menu-item-hover hover:bg-surface-menu-item-hover flex w-full items-center gap-3 rounded-[6px] px-3 py-2 text-left focus-visible:outline-none"
+      >
+        <Cards.character_image
+          character={character}
+          sizes="40px"
+          class="aspect-2/3 w-9 shrink-0 rounded-[4px] object-cover object-top"
+        />
+        <span class="min-w-0 flex-1">
+          <span class="text-foreground-primary text-style-body2Medium block truncate">
+            {character.name}
+          </span>
+          <span
+            :if={character[:vn_title]}
+            class="text-foreground-tertiary text-style-captionRegular block truncate"
+          >
+            {character.vn_title}
+          </span>
+        </span>
+        <.icon name={:plus} class="text-foreground-tertiary size-4 shrink-0" />
+      </button>
+    </section>
+
+    <section :if={!@error and @results.visual_novels != []} aria-label="Visual novels" class="mt-1">
+      <p class="text-foreground-tertiary text-style-captionMedium px-3 pt-2 pb-1.5">
+        Add a VN's cast
+      </p>
+      <button
+        :for={vn <- @results.visual_novels}
+        id={"picker-vn-#{vn.id}"}
+        type="button"
+        phx-click="add_item"
+        phx-value-id={vn.id}
+        class="focus-visible:bg-surface-menu-item-hover hover:bg-surface-menu-item-hover flex w-full items-center gap-3 rounded-[6px] px-3 py-2 text-left focus-visible:outline-none"
+      >
+        <div class="aspect-2/3 w-9 shrink-0 overflow-hidden rounded-[4px] bg-[rgb(var(--surface-elevated))]">
+          <img
+            :if={image_url(vn)}
+            src={image_url(vn)}
+            alt=""
+            class="size-full object-cover"
+            loading="lazy"
+            data-nsfw-blur={if item_cover_needs_blur?(vn), do: "1"}
+            style={if item_cover_needs_blur?(vn), do: "--nsfw-blur-size: 40;"}
+          />
+        </div>
+        <span class="text-foreground-primary text-style-body2Medium min-w-0 flex-1 truncate">
+          {vn.title}
+        </span>
+        <span class="text-foreground-tertiary text-style-captionRegular shrink-0">Cast</span>
+      </button>
+    </section>
     """
   end
 
@@ -595,7 +750,7 @@ defmodule KaguyaWeb.Lists.FormComponents do
             <div class="flex items-center justify-center py-20 lg:py-28">
               <span class="text-sm text-[rgb(var(--foreground-secondary))]">
                 {if @item_type == "character",
-                  do: "Find a VN, then pick characters from its cast",
+                  do: "Search for characters, or a VN to add its cast",
                   else: "Add visual novels that belong on this list"}
               </span>
             </div>

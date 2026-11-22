@@ -364,7 +364,9 @@ defmodule Kaguya.VisualNovels do
           vndb_image_id: hit["vndb_image_id"]
         }),
       is_image_nsfw: hit["is_image_nsfw"] || false,
-      is_image_suggestive: hit["is_image_suggestive"] || false
+      is_image_suggestive: hit["is_image_suggestive"] || false,
+      # Best-known VN, shown under the name to tell same-named characters apart.
+      vn_title: List.first(hit["vn_titles"] || [])
     }
   end
 

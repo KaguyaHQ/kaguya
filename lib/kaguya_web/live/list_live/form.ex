@@ -6,12 +6,15 @@ defmodule KaguyaWeb.ListLive.Form do
   alias Kaguya.Repo
   alias Kaguya.Users
   alias Kaguya.VisualNovels
+  alias Kaguya.Characters.Character
   alias Kaguya.VisualNovels.VisualNovel
   alias KaguyaWeb.Components.Shared.NotFoundPage
   alias KaguyaWeb.ListLive.Data
   alias KaguyaWeb.Lists.FormComponents
 
   @search_page_size 5
+  @min_character_query 2
+  @empty_picker_results %{characters: [], visual_novels: []}
   @max_tier_count 10
   @tier_color_options [
     "#f87171",
@@ -40,6 +43,7 @@ defmodule KaguyaWeb.ListLive.Form do
      |> assign(:not_found?, false)
      |> assign(:search_query, "")
      |> assign(:search_results, [])
+     |> assign(:picker_results, @empty_picker_results)
      |> assign(:search_error, nil)
      |> assign(:searching?, false)
      |> assign(:mobile_search_open?, false)
@@ -92,24 +96,24 @@ defmodule KaguyaWeb.ListLive.Form do
     end
   end
 
-  def handle_event("pick_cast_vn", %{"id" => vn_id}, socket) do
-    case Repo.get(VisualNovel, vn_id) do
-      %VisualNovel{} = vn when socket.assigns.item_type == "character" ->
-        {:noreply,
-         socket
-         |> assign(:mobile_search_open?, false)
-         |> assign(:cast_picker, %{
-           vn: %{id: vn.id, title: vn.title},
-           cast: load_cast(vn.id, Enum.map(socket.assigns.selected_items, & &1.id))
-         })}
+  def handle_event("close_cast_picker", _params, socket) do
+    {:noreply, assign(socket, :cast_picker, nil)}
+  end
 
-      _ ->
-        {:noreply, socket}
+  def handle_event("add_searched_character", %{"id" => id}, socket) do
+    with nil <- find_item(socket.assigns.selected_items, id),
+         %Character{} = character <- Characters.get_visible_character(id) do
+      {:noreply,
+       socket
+       |> append_items([item_from_character(Data.normalize_character(character))])
+       |> clear_search()}
+    else
+      _ -> {:noreply, clear_search(socket)}
     end
   end
 
-  def handle_event("close_cast_picker", _params, socket) do
-    {:noreply, assign(socket, :cast_picker, nil)}
+  def handle_event("close_search", _params, socket) do
+    {:noreply, clear_search(socket)}
   end
 
   def handle_event("add_character", %{"id" => id}, socket) do
@@ -275,11 +279,11 @@ defmodule KaguyaWeb.ListLive.Form do
   end
 
   def handle_event("add_vn", %{"id" => vn_id}, socket) do
-    add_item_by_id(socket, vn_id)
+    pick_search_vn(socket, vn_id)
   end
 
   def handle_event("add_item", %{"id" => vn_id}, socket) do
-    add_item_by_id(socket, vn_id)
+    pick_search_vn(socket, vn_id)
   end
 
   def handle_event("remove_vn", %{"id" => vn_id}, socket) do
@@ -390,21 +394,35 @@ defmodule KaguyaWeb.ListLive.Form do
     end
   end
 
-  defp add_item_by_id(%{assigns: %{item_type: "vn"}} = socket, vn_id) do
-    with nil <- find_item(socket.assigns.selected_items, vn_id),
-         %VisualNovel{} = vn <- Repo.get(VisualNovel, vn_id) do
-      {:noreply,
-       socket
-       |> append_items([item_from_vn(vn)])
-       |> assign(:mobile_search_open?, false)
-       |> assign(:search_query, "")
-       |> assign(:search_results, [])}
-    else
-      _ -> {:noreply, socket}
+  # Both search boxes send the picked VN here. The list type decides what a
+  # pick means, so the (phx-update="ignore") search hook never has to know:
+  # VN lists add the VN, character lists open its cast picker.
+  defp pick_search_vn(socket, vn_id) do
+    case Repo.get(VisualNovel, vn_id) do
+      %VisualNovel{} = vn ->
+        socket =
+          socket
+          |> assign(:mobile_search_open?, false)
+          |> clear_search()
+
+        {:noreply, use_picked_vn(socket, vn)}
+
+      nil ->
+        {:noreply, socket}
     end
   end
 
-  defp add_item_by_id(socket, _id), do: {:noreply, socket}
+  defp use_picked_vn(%{assigns: %{item_type: "character"}} = socket, vn) do
+    excluded_ids = Enum.map(socket.assigns.selected_items, & &1.id)
+    picker = %{vn: %{id: vn.id, title: vn.title}, cast: load_cast(vn.id, excluded_ids)}
+    assign(socket, :cast_picker, picker)
+  end
+
+  defp use_picked_vn(socket, vn) do
+    if find_item(socket.assigns.selected_items, vn.id),
+      do: socket,
+      else: append_items(socket, [item_from_vn(vn)])
+  end
 
   # Adds the picked cast members not already on the list, and drops them from
   # the picker so it shows only who's left.
@@ -445,11 +463,7 @@ defmodule KaguyaWeb.ListLive.Form do
   defp default_mode("character"), do: "tier"
   defp default_mode(_item_type), do: "grid"
 
-  # Character lists pick a VN first, then choose from its cast.
-  defp search_select_event("character"), do: "pick_cast_vn"
-  defp search_select_event(_item_type), do: "add_item"
-
-  defp search_placeholder("character"), do: "Find a VN to add its characters…"
+  defp search_placeholder("character"), do: "Search characters or VNs…"
   defp search_placeholder(_item_type), do: "Search visual novels…"
 
   defp item_noun("character"), do: "character"
@@ -507,9 +521,16 @@ defmodule KaguyaWeb.ListLive.Form do
             results={@search_results}
             error={@search_error}
             loading={@searching?}
-            select_event={search_select_event(@item_type)}
             placeholder={search_placeholder(@item_type)}
-          />
+          >
+            <:custom_results :if={@item_type == "character"}>
+              <FormComponents.character_picker_results
+                results={@picker_results}
+                query={@search_query}
+                error={@search_error}
+              />
+            </:custom_results>
+          </FormComponents.mobile_search_overlay>
 
           <FormComponents.cast_picker picker={@cast_picker} />
 
@@ -562,11 +583,19 @@ defmodule KaguyaWeb.ListLive.Form do
             <div class="sticky -top-10 z-20 bg-[rgb(var(--surface-base))]">
               <div class="mt-6 mb-4 hidden h-px scroll-mt-[92px] bg-white/5 lg:block"></div>
               <div class="mb-3 hidden items-center justify-between gap-3 lg:flex">
+                <FormComponents.character_search
+                  :if={@item_type == "character"}
+                  query={@search_query}
+                  results={@picker_results}
+                  error={@search_error}
+                  class="flex-1"
+                />
                 <KaguyaWeb.SharedComponents.Search.vn_select_search
+                  :if={@item_type == "vn"}
                   id="desktop-list-vn-search"
-                  select_event={search_select_event(@item_type)}
+                  select_event="add_item"
                   page_size={5}
-                  placeholder={search_placeholder(@item_type)}
+                  placeholder="Search visual novels…"
                   class="flex-1"
                   popover_class="lg:!top-[48px] lg:!left-0 lg:!max-w-[500px] lg:rounded-t-none lg:border-t-0"
                 />
@@ -869,6 +898,37 @@ defmodule KaguyaWeb.ListLive.Form do
       color
     else
       Enum.at(@tier_color_options, rem(max(position - 1, 0), length(@tier_color_options)))
+    end
+  end
+
+  defp clear_search(socket) do
+    assign(socket,
+      search_query: "",
+      search_results: [],
+      picker_results: @empty_picker_results,
+      search_error: nil
+    )
+  end
+
+  # Character lists search characters (by name or VN title) and VNs (to add
+  # a cast) together; VN lists search VNs only.
+  defp assign_search(%{assigns: %{item_type: "character"}} = socket, query) do
+    socket = assign(socket, :search_query, query)
+    trimmed = String.trim(query || "")
+
+    if String.length(trimmed) < @min_character_query do
+      assign(socket, picker_results: @empty_picker_results, search_error: nil)
+    else
+      case Data.search_character_picker(trimmed, socket.assigns.current_user) do
+        {:ok, results} ->
+          assign(socket, picker_results: results, search_error: nil)
+
+        {:error, _reason} ->
+          assign(socket,
+            picker_results: @empty_picker_results,
+            search_error: "Search is temporarily unavailable"
+          )
+      end
     end
   end
 

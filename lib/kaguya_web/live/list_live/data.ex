@@ -181,6 +181,29 @@ defmodule KaguyaWeb.ListLive.Data do
     )
   end
 
+  @doc """
+  Search for the character list editor: characters by name (or by their VN's
+  title), plus VNs whose cast can be added. Both searches run concurrently.
+  Returns `{:ok, %{characters: [...], visual_novels: [...]}}`.
+  """
+  def search_character_picker(query, viewer) do
+    searches = [
+      characters: fn -> VisualNovels.search_characters(query, 1, 8) end,
+      visual_novels: fn -> search_visual_novels(query, viewer, page_size: 3) end
+    ]
+
+    searches
+    |> Task.async_stream(fn {key, search} -> {key, search.()} end,
+      max_concurrency: 2,
+      timeout: 10_000,
+      on_timeout: :kill_task
+    )
+    |> Enum.reduce_while({:ok, %{}}, fn
+      {:ok, {key, {:ok, %{items: items}}}}, {:ok, acc} -> {:cont, {:ok, Map.put(acc, key, items)}}
+      _failed, _acc -> {:halt, {:error, :search_unavailable}}
+    end)
+  end
+
   def layout_payload(list, tiers, items) do
     %{
       display_mode: list.display_mode || "grid",

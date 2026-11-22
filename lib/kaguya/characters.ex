@@ -196,6 +196,13 @@ defmodule Kaguya.Characters do
     do: order_by(query, [c], desc: c.inserted_at, asc: c.id)
 
   @doc """
+  Gets a character that can be shown (not hidden by moderators), or nil.
+  """
+  def get_visible_character(id) do
+    Repo.one(from(c in Character, where: c.id == ^id and is_nil(c.hidden_at)))
+  end
+
+  @doc """
   A VN's cast for character pickers (profile favorites, character lists),
   ordered by role then name. Appearances marked as spoilers and hidden
   characters are left out. Returns `[%{character: %Character{}, role: role}]`.

@@ -7,7 +7,7 @@ defmodule Kaguya.SearchIndex do
 
   require Logger
 
-  alias Kaguya.Characters.Character
+  alias Kaguya.Characters.{Character, VNCharacter}
   alias Kaguya.Producers.Producer
   alias Kaguya.Repo
   alias Kaguya.Search.Client
@@ -31,8 +31,13 @@ defmodule Kaguya.SearchIndex do
   def index_characters(%Character{} = c), do: index_characters([c])
   def index_characters([]), do: :ok
 
-  def index_characters(characters) when is_list(characters),
-    do: do_index("characters", characters, &transform_character/1)
+  def index_characters(characters) when is_list(characters) do
+    if writable?() do
+      write(:put, "/indexes/characters/documents?primaryKey=id", character_documents(characters))
+    end
+
+    :ok
+  end
 
   @doc "Add or update one *or* many Producer structs."
   def index_producers(%Producer{} = p), do: index_producers([p])
@@ -70,6 +75,32 @@ defmodule Kaguya.SearchIndex do
           "exactness"
         ],
         filterableAttributes: ["title_category"]
+      },
+      opts
+    )
+  end
+
+  @doc """
+  Apply searchable attributes and ranking rules for the characters index.
+
+  Names rank above VN titles, so "mary" finds characters named Mary, while
+  "mary eternum" narrows to the one from Eternum. Among equal matches the
+  most-favorited character comes first, since many characters share a name.
+  """
+  def configure_characters_index(opts \\ []) do
+    write(
+      :patch,
+      "/indexes/characters/settings",
+      %{
+        searchableAttributes: ["name", "vn_titles"],
+        rankingRules: [
+          "words",
+          "typo",
+          "attribute",
+          "proximity",
+          "favorites_count:desc",
+          "exactness"
+        ]
       },
       opts
     )
@@ -147,23 +178,27 @@ defmodule Kaguya.SearchIndex do
       do: raise("Meilisearch indexing is disabled, unconfigured, or non-local in dev")
 
     configure_index(index)
-    {query, transform} = reindex_query(index)
-    reindex_batches(index, query, transform, nil, {0, []})
+    {query, documents} = reindex_query(index)
+    reindex_batches(index, query, documents, nil, {0, []})
   end
 
   defp configure_index("visual_novels"), do: configure_visual_novels_index(wait: true)
   defp configure_index("producers"), do: configure_producers_index(wait: true)
-  defp configure_index("characters"), do: :ok
+  defp configure_index("characters"), do: configure_characters_index(wait: true)
 
+  # Each index pairs a query with a function that turns a batch of rows into
+  # documents (characters need one extra batch query for their VN titles).
   defp reindex_query("visual_novels") do
     {from(vn in VisualNovel, preload: [:vn_titles, vn_producers: :producer]),
-     &transform_visual_novel/1}
+     &Enum.map(&1, fn vn -> transform_visual_novel(vn) end)}
   end
 
-  defp reindex_query("characters"), do: {Character, &transform_character/1}
-  defp reindex_query("producers"), do: {Producer, &transform_producer/1}
+  defp reindex_query("characters"), do: {Character, &character_documents/1}
 
-  defp reindex_batches(index, query, transform, last_id, {count, tasks}) do
+  defp reindex_query("producers"),
+    do: {Producer, &Enum.map(&1, fn p -> transform_producer(p) end)}
+
+  defp reindex_batches(index, query, documents, last_id, {count, tasks}) do
     page = if last_id, do: where(query, [r], r.id > ^last_id), else: query
     batch = Repo.all(from(r in page, order_by: r.id, limit: 1_000), timeout: 60_000, log: false)
 
@@ -174,14 +209,14 @@ defmodule Kaguya.SearchIndex do
 
       rows ->
         {:ok, task} =
-          write(:put, "/indexes/#{index}/documents?primaryKey=id", Enum.map(rows, transform),
+          write(:put, "/indexes/#{index}/documents?primaryKey=id", documents.(rows),
             return_task: true
           )
 
         reindex_batches(
           index,
           query,
-          transform,
+          documents,
           List.last(rows).id,
           {count + length(rows), [task | tasks]}
         )
@@ -472,16 +507,58 @@ defmodule Kaguya.SearchIndex do
   defp build_vn_image_url(image_id, _temp),
     do: "https://images.kaguya.io/visual_novels/#{image_id}-256w.webp"
 
-  defp transform_character(character) do
-    %{
-      id: character.id,
-      name: character.name,
-      slug: character.slug,
-      primary_image_id: character.primary_image_id,
-      vndb_image_id: character.vndb_image_id,
-      is_image_nsfw: character.is_image_nsfw || false,
-      is_image_suggestive: character.is_image_suggestive || false
-    }
+  @max_vn_titles 5
+
+  @doc """
+  Search documents for characters. Besides the name, each carries up to
+  #{@max_vn_titles} titles of VNs the character appears in (searchable, and
+  shown in results to tell same-named characters apart) and
+  `favorites_count` for ranking.
+  """
+  def character_documents(characters) do
+    titles = vn_titles_by_character(Enum.map(characters, & &1.id))
+
+    Enum.map(characters, fn character ->
+      %{
+        id: character.id,
+        name: character.name,
+        slug: character.slug,
+        primary_image_id: character.primary_image_id,
+        vndb_image_id: character.vndb_image_id,
+        is_image_nsfw: character.is_image_nsfw || false,
+        is_image_suggestive: character.is_image_suggestive || false,
+        favorites_count: character.favorites_count || 0,
+        vn_titles: Map.get(titles, character.id, [])
+      }
+    end)
+  end
+
+  # Titles of the VNs each character appears in, best-known first: their
+  # biggest role, then the most-rated VN. The first title is what search
+  # results show under the name. Appearances marked as spoilers are left out
+  # so a search result never reveals one.
+  defp vn_titles_by_character([]), do: %{}
+
+  defp vn_titles_by_character(character_ids) do
+    from(vc in VNCharacter,
+      join: vn in VisualNovel,
+      on: vn.id == vc.visual_novel_id,
+      where: vc.character_id in ^character_ids and vc.spoiler_level == 0,
+      order_by: [
+        asc: vc.character_id,
+        asc:
+          fragment(
+            "CASE ? WHEN 'main' THEN 0 WHEN 'primary' THEN 1 WHEN 'side' THEN 2 ELSE 3 END",
+            vc.role
+          ),
+        desc: vn.ratings_count,
+        asc: vn.title
+      ],
+      select: {vc.character_id, vn.title}
+    )
+    |> Repo.all(log: false)
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Map.new(fn {id, titles} -> {id, titles |> Enum.uniq() |> Enum.take(@max_vn_titles)} end)
   end
 
   defp transform_producer(producer) do
@@ -499,7 +576,7 @@ defmodule Kaguya.SearchIndex do
     {:nowarn_function, configure_visual_novels_index: 1},
     {:nowarn_function, configure_producers_index: 1},
     {:nowarn_function, transform_visual_novel: 1},
-    {:nowarn_function, transform_character: 1},
+    {:nowarn_function, configure_characters_index: 1},
     {:nowarn_function, transform_producer: 1},
     {:nowarn_function, prefix_fields: 1},
     {:nowarn_function, prefix_join: 2},
