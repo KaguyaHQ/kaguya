@@ -56,6 +56,8 @@ export function attachVnLinkAutocomplete(textarea, panel) {
   let timer = null
   let controller = null
   let lastQuery = null
+  let searchFailed = false
+  let requestId = 0
   // Offset of a `[[` the user dismissed with Escape; it stays quiet until a
   // new trigger is typed.
   let dismissedAt = null
@@ -82,11 +84,13 @@ export function attachVnLinkAutocomplete(textarea, panel) {
   }
 
   const close = () => {
+    requestId++
     clearTimeout(timer)
     controller?.abort()
     match = null
     items = []
     lastQuery = null
+    searchFailed = false
     if (isOpen()) {
       if (native) panel.hidePopover()
       else panel.hidden = true
@@ -136,6 +140,20 @@ export function attachVnLinkAutocomplete(textarea, panel) {
     let body
     if (match[1].trim() === "") {
       body = message("Type a title to search")
+    } else if (searchFailed) {
+      body = message("Search is temporarily unavailable.")
+      body.setAttribute("role", "status")
+      const retry = document.createElement("button")
+      retry.type = "button"
+      retry.id = `${panel.id}-retry`
+      retry.tabIndex = -1
+      retry.className = "text-foreground-link ml-2 rounded underline underline-offset-2"
+      retry.textContent = "Try again"
+      retry.title = "Retry search (Enter)"
+      retry.addEventListener("click", () => {
+        if (match) search(match[1].trim())
+      })
+      body.appendChild(retry)
     } else if (items.length === 0) {
       body = message(lastQuery === null ? "Searching…" : "No visual novels found")
     } else {
@@ -156,8 +174,13 @@ export function attachVnLinkAutocomplete(textarea, panel) {
   }
 
   const search = query => {
+    const currentRequest = ++requestId
     clearTimeout(timer)
     controller?.abort()
+    items = []
+    lastQuery = null
+    searchFailed = false
+    render()
     timer = setTimeout(async () => {
       controller = new AbortController()
       try {
@@ -168,15 +191,16 @@ export function attachVnLinkAutocomplete(textarea, panel) {
         })
         if (!response.ok) throw new Error(`search failed: ${response.status}`)
         const data = await response.json()
-        if (!match || match[1] !== query) return
+        if (currentRequest !== requestId || !match || match[1].trim() !== query) return
         items = (data.items || []).slice(0, MAX_RESULTS)
         lastQuery = query
         active = 0
         render()
       } catch (error) {
-        if (error.name === "AbortError" || !match) return
+        if (error.name === "AbortError" || currentRequest !== requestId || !match) return
         items = []
         lastQuery = query
+        searchFailed = true
         render()
       }
     }, SEARCH_DELAY_MS)
@@ -195,15 +219,17 @@ export function attachVnLinkAutocomplete(textarea, panel) {
 
     const queryChanged = !match || match[1] !== next[1]
     match = next
-    if (!queryChanged && isOpen()) return
+    if (!queryChanged && isOpen() && !searchFailed) return
 
     if (next[1].trim() === "") {
+      requestId++
       clearTimeout(timer)
       controller?.abort()
       items = []
+      lastQuery = null
+      searchFailed = false
       render()
     } else {
-      if (lastQuery === null) render()
       search(next[1].trim())
     }
   }
@@ -217,6 +243,10 @@ export function attachVnLinkAutocomplete(textarea, panel) {
       event.stopPropagation()
       dismissedAt = match?.index ?? null
       close()
+    } else if (searchFailed && event.key === "Enter" && !event.metaKey && !event.ctrlKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      search(match[1].trim())
     } else if (items.length > 0 && event.key === "ArrowDown") {
       event.preventDefault()
       highlight(active + 1)
