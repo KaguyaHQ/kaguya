@@ -329,6 +329,46 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
     refute has_element?(second_page, "#comment-#{parent.id}")
   end
 
+  test "a newly posted top-level comment shows first and is marked until the sort changes", %{
+    conn: conn
+  } do
+    author = UserFixtures.insert_user!()
+
+    {:ok, post} =
+      Discussions.create_post(author.id, %{
+        title: "Where did my comment go",
+        content: "It should land in view.",
+        category_type: :general
+      })
+
+    for index <- 1..21 do
+      {:ok, _comment} =
+        Discussions.create_comment(%{
+          post_id: post.id,
+          user_id: author.id,
+          content: "Root #{index}"
+        })
+    end
+
+    conn = Plug.Test.init_test_session(conn, %{"current_user_id" => author.id})
+    path = "/discussions/p/#{post.short_id}/#{post.slug}"
+    {:ok, view, _html} = live(conn, path <> "?comment_sort=oldest")
+
+    render_submit(element(view, "#comments-top-form"), %{"content" => "Fresh off the press"})
+    fresh = Repo.get_by!(Kaguya.Discussions.Comment, content: "Fresh off the press")
+
+    # Oldest-first would put it on page 2; it stays first on this page instead.
+    assert has_element?(view, ".comments-list > div:first-child #comment-#{fresh.id}")
+    assert has_element?(view, "#comment-#{fresh.id}[data-just-posted]")
+
+    render_patch(view, path <> "?comment_sort=newest")
+    assert has_element?(view, "#comment-#{fresh.id}")
+    refute has_element?(view, "#comment-#{fresh.id}[data-just-posted]")
+
+    render_patch(view, path <> "?comment_sort=oldest")
+    refute has_element?(view, "#comment-#{fresh.id}")
+  end
+
   test "comment sorts rank roots, preserve pins and reply order, and survive pagination", %{
     conn: conn
   } do

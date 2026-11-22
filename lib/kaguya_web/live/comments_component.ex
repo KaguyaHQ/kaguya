@@ -24,6 +24,10 @@ defmodule KaguyaWeb.CommentsComponent do
         Map.get(assigns, :comment_sort, socket.assigns.comment_sort) !=
           socket.assigns.comment_sort
 
+    page_changed? =
+      Map.has_key?(socket.assigns, :page) and
+        Map.get(assigns, :page, socket.assigns.page) != socket.assigns.page
+
     socket =
       socket
       |> assign_new(:adapter, fn -> ListAdapter end)
@@ -51,6 +55,8 @@ defmodule KaguyaWeb.CommentsComponent do
       |> assign_new(:report_success, fn -> false end)
       |> assign_new(:error_message, fn -> nil end)
       |> assign_new(:hide_header, fn -> false end)
+      |> assign_new(:fresh_comments, fn -> [] end)
+      |> assign_new(:just_posted_id, fn -> nil end)
       |> assign(assigns)
 
     socket =
@@ -64,6 +70,11 @@ defmodule KaguyaWeb.CommentsComponent do
       else
         socket
       end
+
+    socket =
+      if sort_changed? or page_changed?,
+        do: forget_fresh_comments(socket),
+        else: socket
 
     {:ok, load_comments(socket)}
   end
@@ -261,6 +272,7 @@ defmodule KaguyaWeb.CommentsComponent do
     socket =
       socket
       |> assign(page: int(page, socket.assigns.page), active_reply_id: nil, editing_id: nil)
+      |> forget_fresh_comments()
       |> load_comments()
 
     {:noreply, socket}
@@ -279,7 +291,8 @@ defmodule KaguyaWeb.CommentsComponent do
       {:ok, comment} ->
         {:noreply,
          socket
-         |> assign(active_reply_id: nil, error_message: nil)
+         |> assign(active_reply_id: nil, error_message: nil, just_posted_id: comment.id)
+         |> remember_fresh_comment(comment)
          |> load_comments()
          |> reveal_comment(comment.id)
          |> clear_editor(editor_id)}
@@ -313,7 +326,10 @@ defmodule KaguyaWeb.CommentsComponent do
     case socket.assigns.adapter.delete(id, socket.assigns.current_user) do
       {:ok, true} ->
         {:noreply,
-         socket |> assign(error_message: nil, pending_delete_id: nil) |> load_comments()}
+         socket
+         |> assign(error_message: nil, pending_delete_id: nil)
+         |> assign(fresh_comments: Enum.reject(socket.assigns.fresh_comments, &(&1.id == id)))
+         |> load_comments()}
 
       {:error, reason} ->
         {:noreply, assign(socket, error_message: error_message(reason))}
@@ -470,6 +486,11 @@ defmodule KaguyaWeb.CommentsComponent do
            focus_comment_id: socket.assigns.focus_comment_id
          }) do
       {:ok, %{items: comments, pagination: pagination, comments_count: comments_count} = result} ->
+        comments =
+          comments
+          |> pin_fresh_comments(socket.assigns.fresh_comments)
+          |> mark_just_posted(socket.assigns.just_posted_id)
+
         assign(socket,
           comments: comments,
           tree: Tree.build(comments),
@@ -497,6 +518,34 @@ defmodule KaguyaWeb.CommentsComponent do
         )
     end
   end
+
+  # Top-level comments the viewer posted during this visit stay at the top,
+  # whatever the sort, so posting never sends their comment out of sight.
+  # Replies already render under their parent. Forgotten on sort/page change.
+  defp remember_fresh_comment(socket, %{parent_comment_id: parent_id})
+       when is_binary(parent_id) and parent_id != "",
+       do: socket
+
+  defp remember_fresh_comment(socket, comment),
+    do: assign(socket, fresh_comments: [comment | socket.assigns.fresh_comments])
+
+  defp forget_fresh_comments(socket),
+    do: assign(socket, fresh_comments: [], just_posted_id: nil)
+
+  defp pin_fresh_comments(comments, []), do: comments
+
+  defp pin_fresh_comments(comments, fresh) do
+    loaded = Map.new(comments, &{&1.id, &1})
+    fresh_ids = MapSet.new(fresh, & &1.id)
+    # Prefer the freshly loaded copy (current likes, share URL) when on this page.
+    Enum.map(fresh, &Map.get(loaded, &1.id, &1)) ++
+      Enum.reject(comments, &MapSet.member?(fresh_ids, &1.id))
+  end
+
+  defp mark_just_posted(comments, nil), do: comments
+
+  defp mark_just_posted(comments, id),
+    do: Enum.map(comments, &if(&1.id == id, do: Map.put(&1, :just_posted, true), else: &1))
 
   defp comment_sort("top"), do: :most_liked
   defp comment_sort("newest"), do: :newest

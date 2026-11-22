@@ -765,6 +765,23 @@ html body[data-modal-scroll-locked] {
   100% { transform: scale(1); }
 }
 
+/* A comment the viewer just posted: brief tint so they can see where it
+ * landed. Plays once, when the element is inserted or first marked. */
+[data-just-posted] {
+  animation: kaguya-just-posted 1600ms ease-out both;
+}
+
+@keyframes kaguya-just-posted {
+  0%, 35% {
+    background-color: rgb(var(--foreground-primary) / 0.07);
+    box-shadow: 0 0 0 8px rgb(var(--foreground-primary) / 0.07);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kaguya-button-loader-bar,
   .kaguya-toast,
@@ -773,7 +790,8 @@ html body[data-modal-scroll-locked] {
   .kaguya-like-unpop,
   .kaguya-like-count-up,
   .kaguya-like-count-down,
-  .kaguya-status-pop {
+  .kaguya-status-pop,
+  [data-just-posted] {
     animation: none;
   }
 }

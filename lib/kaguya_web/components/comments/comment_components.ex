@@ -298,6 +298,7 @@ defmodule KaguyaWeb.Components.Comments do
     <div
       id={"comment-#{@comment.id}"}
       class="flex w-full gap-[11px] rounded-lg transition-colors"
+      data-just-posted={Map.get(@comment, :just_posted, false)}
     >
       <.avatar user={@comment.user} size="size-[26px] lg:size-[36px]" linked />
 
