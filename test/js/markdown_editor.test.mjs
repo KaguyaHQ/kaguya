@@ -2,8 +2,21 @@ import assert from "node:assert/strict"
 import {readFile} from "node:fs/promises"
 import test from "node:test"
 
+// Hooks are bundled by esbuild, so their relative imports have no extension
+// and can't resolve from a data: URL. These tests stub the code that uses
+// them, so each named import becomes a no-op function.
+const stubImports = source =>
+  source.replace(/^import \{([^}]+)\} from "[^"]+"\s*$/gm, (_line, names) =>
+    names
+      .split(",")
+      .map(name => `const ${name.trim()} = () => () => {}`)
+      .join("\n")
+  )
+
 async function loadHook(name) {
-  const source = await readFile(new URL(`../../assets/js/hooks/${name}.js`, import.meta.url))
+  const source = stubImports(
+    await readFile(new URL(`../../assets/js/hooks/${name}.js`, import.meta.url), "utf8")
+  )
   const namedSource = `${source}\n//# sourceURL=${name}.js`
   return (await import(`data:text/javascript;base64,${Buffer.from(namedSource).toString("base64")}`)).default
 }

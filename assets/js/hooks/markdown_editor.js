@@ -147,7 +147,8 @@ const MarkdownEditor = {
     this._unbindTextarea()
     this.textarea = nextTextarea
     // Attach autocomplete first so its Enter/Escape handling runs before ours.
-    const vnPanel = document.getElementById(this.el.dataset.vnLinksPanel)
+    const panelId = this.el.dataset.vnLinksPanel
+    const vnPanel = panelId ? document.getElementById(panelId) : null
     this._detachVnLinks = vnPanel ? attachVnLinkAutocomplete(this.textarea, vnPanel) : null
     this.textarea?.addEventListener("input", this._onInput)
     this.textarea?.addEventListener("keydown", this._onKeyDown)
