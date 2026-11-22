@@ -780,45 +780,27 @@ defmodule KaguyaWeb.Lists.FormComponents do
 
   def confirm_dialog(assigns) do
     ~H"""
+    <KaguyaWeb.UI.ConfirmDialog.confirm_dialog
+      :if={@dialog == :discard}
+      id="lists-confirm-dialog"
+      title="Discard changes?"
+      tone={:guard}
+      confirm_label="Discard"
+      confirm_event="discard_changes"
+      cancel_label="Keep editing"
+      cancel_event="close_dialog"
+    >
+      Your changes haven't been saved.
+    </KaguyaWeb.UI.ConfirmDialog.confirm_dialog>
+
     <KaguyaWeb.UI.Dialog.dialog
-      :if={@dialog}
+      :if={@dialog == :delete}
       class="flex items-center justify-center bg-black/60 px-5"
       id="lists-confirm-dialog"
       viewport
       on_close={Phoenix.LiveView.JS.push("close_dialog")}
-      aria-labelledby={
-        if @dialog == :discard, do: "discard-dialog-title", else: "delete-dialog-title"
-      }
+      aria-labelledby="delete-dialog-title"
     >
-      <div
-        :if={@dialog == :discard}
-        class="w-full max-w-[360px] rounded-[16px] bg-[rgb(var(--surface-base))] p-6 shadow-2xl"
-      >
-        <p id="discard-dialog-title" class="text-lg font-medium text-[rgb(var(--foreground-primary))]">
-          Discard changes?
-        </p>
-        <p class="mt-2 text-sm font-normal text-[rgb(var(--foreground-secondary))]">
-          Your changes haven't been saved.
-        </p>
-
-        <div class="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            phx-click="discard_changes"
-            class="h-[41px] min-w-[74px] rounded-[8px] bg-[rgb(var(--button-background-destructive-default))] px-4 py-3 text-sm font-normal text-white transition hover:bg-[rgb(var(--button-background-destructive-hover))]"
-          >
-            Discard
-          </button>
-          <button
-            type="button"
-            data-dialog-close
-            class="h-[41px] rounded-[8px] bg-[rgb(var(--surface-elevated))] px-4 py-3 text-sm font-normal text-[rgb(var(--foreground-primary))] transition hover:bg-white/8"
-          >
-            Keep editing
-          </button>
-        </div>
-      </div>
-
       <div
         :if={@dialog == :delete}
         class="w-full max-w-[437px] overflow-hidden rounded-t-[12px] rounded-b-[16px] bg-[rgb(var(--surface-base))] shadow-2xl"

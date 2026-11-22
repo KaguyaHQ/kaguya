@@ -98,7 +98,19 @@ defmodule KaguyaWeb.ListLive.FormTest do
         }
       })
 
-      assert render_click(view, "cancel") =~ "Discard changes?"
+      render_click(view, "cancel")
+
+      assert has_element?(view, "#lists-confirm-dialog[role=alertdialog]", "Discard changes?")
+
+      assert has_element?(
+               view,
+               "#lists-confirm-dialog button[data-dialog-close][data-dialog-initial-focus]",
+               "Keep editing"
+             )
+
+      render_click(view, "close_dialog")
+      refute has_element?(view, "#lists-confirm-dialog")
+      assert has_element?(view, ~s(input[name="list[name]"][value="Draft"]))
     end
   end
 
