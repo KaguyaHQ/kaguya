@@ -48,40 +48,46 @@ defmodule Kaguya.Revisions do
   Returns `{:ok, change}` or `{:error, reason}`.
   """
   def submit_edit(entity_type, entity_id, changes, summary, user, opts \\ []) do
-    base_revision = Keyword.get(opts, :base_revision)
-    source = Keyword.get(opts, :source, :user)
-    action_override = Keyword.get(opts, :action)
+    edit_options = %{
+      base_revision: Keyword.get(opts, :base_revision),
+      source: Keyword.get(opts, :source, :user),
+      action: Keyword.get(opts, :action)
+    }
 
     with {:ok, context} <- fetch_context(entity_type) do
       result =
         Repo.transact(fn ->
-          lock_release_parent(entity_type, entity_id)
-
-          with {:ok, original} <- fetch_entity(context, entity_id),
-               changes <- sanitize_mod_fields(changes, user),
-               :ok <- check_not_hidden(original, user),
-               :ok <- check_not_locked(original, user),
-               :ok <- check_base_revision(entity_type, entity_id, base_revision),
-               changed <- compute_changed_fields(entity_type, original, changes),
-               :ok <- validate_has_changes(changed),
-               :ok <- ensure_initial_revision(entity_type, entity_id, context),
-               {:ok, entity} <- apply_mod_field_changes(original, changes),
-               {:ok, entity} <- context.apply_edit(entity, changes),
-               action <- action_override || classify_action(changed, original, changes),
-               {:ok, change} <-
-                 create_change(entity_type, entity_id, action, changed, summary, source, user) do
-            # Reload with preloads for accurate _hist snapshot
-            entity = context.get_for_edit(entity.id)
-            context.write_hist(change.id, entity)
-            increment_edit_count(user)
-            record_revision_activity(change, user)
-            {:ok, change}
-          end
+          apply_entity_edit(context, entity_type, entity_id, changes, summary, user, edit_options)
         end)
 
       maybe_update_search_index_after_mod(entity_type, entity_id, result)
       maybe_recompute_content_score(entity_type, entity_id, result)
       result
+    end
+  end
+
+  defp apply_entity_edit(context, entity_type, entity_id, changes, summary, user, opts) do
+    lock_release_parent(entity_type, entity_id)
+
+    with {:ok, original} <- fetch_entity(context, entity_id),
+         changes <- sanitize_mod_fields(changes, user),
+         :ok <- check_not_hidden(original, user),
+         :ok <- check_not_locked(original, user),
+         :ok <- check_base_revision(entity_type, entity_id, opts.base_revision),
+         changed <- compute_changed_fields(entity_type, original, changes),
+         :ok <- validate_has_changes(changed),
+         :ok <- ensure_initial_revision(entity_type, entity_id, context),
+         {:ok, entity} <- apply_mod_field_changes(original, changes),
+         {:ok, entity} <- context.apply_edit(entity, changes),
+         action <- opts.action || classify_action(changed, original, changes),
+         {:ok, change} <-
+           create_change(entity_type, entity_id, action, changed, summary, opts.source, user) do
+      # Reload with preloads for accurate _hist snapshot
+      entity = context.get_for_edit(entity.id)
+      context.write_hist(change.id, entity)
+      increment_edit_count(user)
+      record_revision_activity(change, user)
+      {:ok, change}
     end
   end
 
@@ -211,33 +217,37 @@ defmodule Kaguya.Revisions do
     if has_any do
       :ok
     else
-      preloaded = context.get_for_edit(entity_id)
+      insert_initial_revision(entity_type, entity_id, context)
+    end
+  end
 
-      inserted_at =
-        (preloaded && Map.get(preloaded, :inserted_at)) ||
-          DateTime.utc_now() |> DateTime.truncate(:second)
+  defp insert_initial_revision(entity_type, entity_id, context) do
+    preloaded = context.get_for_edit(entity_id)
 
-      changeset =
-        Change.changeset(%Change{}, %{
-          entity_type: entity_type,
-          entity_id: entity_id,
-          revision_number: 1,
-          action: :create,
-          changed_fields: [],
-          summary: "Imported from VNDB dump",
-          source: :vndb_sync,
-          user_id: nil
-        })
+    inserted_at =
+      (preloaded && Map.get(preloaded, :inserted_at)) ||
+        DateTime.utc_now() |> DateTime.truncate(:second)
 
-      with {:ok, change} <- Repo.insert(changeset) do
-        # Backdate inserted_at to the entity's creation so the feed
-        # chronology stays honest.
-        from(c in Change, where: c.id == ^change.id)
-        |> Repo.update_all(set: [inserted_at: DateTime.truncate(inserted_at, :second)])
+    changeset =
+      Change.changeset(%Change{}, %{
+        entity_type: entity_type,
+        entity_id: entity_id,
+        revision_number: 1,
+        action: :create,
+        changed_fields: [],
+        summary: "Imported from VNDB dump",
+        source: :vndb_sync,
+        user_id: nil
+      })
 
-        if preloaded, do: context.write_hist(change.id, preloaded)
-        :ok
-      end
+    with {:ok, change} <- Repo.insert(changeset) do
+      # Backdate inserted_at to the entity's creation so the feed
+      # chronology stays honest.
+      from(c in Change, where: c.id == ^change.id)
+      |> Repo.update_all(set: [inserted_at: DateTime.truncate(inserted_at, :second)])
+
+      if preloaded, do: context.write_hist(change.id, preloaded)
+      :ok
     end
   end
 
@@ -252,36 +262,40 @@ defmodule Kaguya.Revisions do
 
       result =
         Repo.transact(fn ->
-          lock_release_parent(change.entity_type, change.entity_id)
-
-          Repo.query!("SELECT pg_advisory_xact_lock(hashtext($1))", [
-            advisory_lock_key(change.entity_type, change.entity_id)
-          ])
-
-          with {:ok, entity} <- fetch_entity(context, change.entity_id),
-               :ok <- check_not_hidden(entity, user),
-               :ok <- check_not_locked(entity, user),
-               {:ok, entity} <- context.apply_hist(entity, hist_data),
-               {:ok, new_change} <-
-                 create_change(
-                   change.entity_type,
-                   change.entity_id,
-                   :revert,
-                   [],
-                   summary,
-                   :user,
-                   user
-                 ) do
-            entity = context.get_for_edit(entity.id)
-            context.write_hist(new_change.id, entity)
-            increment_edit_count(user)
-            record_revision_activity(new_change, user)
-            {:ok, new_change}
-          end
+          apply_revision_revert(context, change, hist_data, summary, user)
         end)
 
       maybe_recompute_content_score(change.entity_type, change.entity_id, result)
       result
+    end
+  end
+
+  defp apply_revision_revert(context, change, hist_data, summary, user) do
+    lock_release_parent(change.entity_type, change.entity_id)
+
+    Repo.query!("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      advisory_lock_key(change.entity_type, change.entity_id)
+    ])
+
+    with {:ok, entity} <- fetch_entity(context, change.entity_id),
+         :ok <- check_not_hidden(entity, user),
+         :ok <- check_not_locked(entity, user),
+         {:ok, entity} <- context.apply_hist(entity, hist_data),
+         {:ok, new_change} <-
+           create_change(
+             change.entity_type,
+             change.entity_id,
+             :revert,
+             [],
+             summary,
+             :user,
+             user
+           ) do
+      entity = context.get_for_edit(entity.id)
+      context.write_hist(new_change.id, entity)
+      increment_edit_count(user)
+      record_revision_activity(new_change, user)
+      {:ok, new_change}
     end
   end
 
@@ -292,17 +306,7 @@ defmodule Kaguya.Revisions do
     with {:ok, context} <- fetch_context(entity_type) do
       result =
         Repo.transact(fn ->
-          with {:ok, entity} <- context.create_from_edit(attrs) do
-            entity = context.get_for_edit(entity.id)
-
-            with {:ok, change} <-
-                   create_change(entity_type, entity.id, :create, [], summary, :user, user) do
-              context.write_hist(change.id, entity)
-              increment_edit_count(user)
-              record_revision_activity(change, user)
-              {:ok, %{change: change, entity: entity}}
-            end
-          end
+          create_entity_revision(context, entity_type, attrs, summary, user)
         end)
 
       case result do
@@ -311,6 +315,18 @@ defmodule Kaguya.Revisions do
       end
 
       result
+    end
+  end
+
+  defp create_entity_revision(context, entity_type, attrs, summary, user) do
+    with {:ok, entity} <- context.create_from_edit(attrs),
+         entity <- context.get_for_edit(entity.id),
+         {:ok, change} <-
+           create_change(entity_type, entity.id, :create, [], summary, :user, user) do
+      context.write_hist(change.id, entity)
+      increment_edit_count(user)
+      record_revision_activity(change, user)
+      {:ok, %{change: change, entity: entity}}
     end
   end
 
@@ -324,13 +340,33 @@ defmodule Kaguya.Revisions do
 
     with {:ok, context} <- fetch_context(entity_type) do
       Repo.transact(fn ->
-        with {:ok, change} <-
-               create_change(entity_type, entity_id, action, changed_fields, summary, source, nil) do
-          entity = context.get_for_edit(entity_id)
-          context.write_hist(change.id, entity)
-          {:ok, change}
-        end
+        write_system_revision(
+          context,
+          entity_type,
+          entity_id,
+          action,
+          changed_fields,
+          summary,
+          source
+        )
       end)
+    end
+  end
+
+  defp write_system_revision(
+         context,
+         entity_type,
+         entity_id,
+         action,
+         changed_fields,
+         summary,
+         source
+       ) do
+    with {:ok, change} <-
+           create_change(entity_type, entity_id, action, changed_fields, summary, source, nil) do
+      entity = context.get_for_edit(entity_id)
+      context.write_hist(change.id, entity)
+      {:ok, change}
     end
   end
 

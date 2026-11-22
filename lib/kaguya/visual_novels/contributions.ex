@@ -11,13 +11,17 @@ defmodule Kaguya.VisualNovels.Contributions do
 
       result =
         Repo.transact(fn ->
-          with {:ok, result} <- Revisions.create_entity(:visual_novel, attrs, summary, user),
-               :ok <- save_releases(result.entity, release_edits, summary, user) do
-            {:ok, result}
-          end
+          create_contribution(attrs, release_edits, summary, user)
         end)
 
       refresh(result)
+    end
+  end
+
+  defp create_contribution(attrs, release_edits, summary, user) do
+    with {:ok, result} <- Revisions.create_entity(:visual_novel, attrs, summary, user),
+         :ok <- save_releases(result.entity, release_edits, summary, user) do
+      {:ok, result}
     end
   end
 
@@ -27,27 +31,31 @@ defmodule Kaguya.VisualNovels.Contributions do
 
       result =
         Repo.transact(fn ->
-          lock_entity(:visual_novel, vn_id)
-          vn = VisualNovels.get_visual_novel(vn_id, include_hidden: true)
-
-          with :ok <- editable_vn(vn, user),
-               true <- Revisions.latest_revision_number(:visual_novel, vn_id) == base_revision,
-               :ok <- update_vn(vn_id, changes, summary, user, base_revision),
-               :ok <-
-                 save_releases(
-                   VisualNovels.get_visual_novel(vn.id, include_hidden: true),
-                   release_edits,
-                   summary,
-                   user
-                 ) do
-            {:ok, %{entity: vn}}
-          else
-            false -> {:error, :edit_conflict}
-            error -> error
-          end
+          update_contribution(vn_id, changes, release_edits, summary, user, base_revision)
         end)
 
       refresh(result)
+    end
+  end
+
+  defp update_contribution(vn_id, changes, release_edits, summary, user, base_revision) do
+    lock_entity(:visual_novel, vn_id)
+    vn = VisualNovels.get_visual_novel(vn_id, include_hidden: true)
+
+    with :ok <- editable_vn(vn, user),
+         true <- Revisions.latest_revision_number(:visual_novel, vn_id) == base_revision,
+         :ok <- update_vn(vn_id, changes, summary, user, base_revision),
+         :ok <-
+           save_releases(
+             VisualNovels.get_visual_novel(vn.id, include_hidden: true),
+             release_edits,
+             summary,
+             user
+           ) do
+      {:ok, %{entity: vn}}
+    else
+      false -> {:error, :edit_conflict}
+      error -> error
     end
   end
 
@@ -74,41 +82,45 @@ defmodule Kaguya.VisualNovels.Contributions do
       |> Map.new(&{&1.id, &1})
 
     Enum.reduce_while(edits, :ok, fn edit, :ok ->
-      result =
-        if edit.id do
-          case Map.get(releases, edit.id) do
-            nil ->
-              {:error, "Release does not belong to this VN."}
-
-            release ->
-              with :ok <- validate_producers(edit.attrs, release.producers || []) do
-                Revisions.submit_edit(:release, edit.id, release_title(edit.attrs), summary, user,
-                  base_revision: edit.base_revision
-                )
-              end
-          end
-        else
-          attrs =
-            edit.attrs
-            |> Map.put(:visual_novel_id, vn.id)
-            |> Map.put(
-              :title,
-              if(edit.attrs[:title] in [nil, ""], do: vn.title, else: edit.attrs.title)
-            )
-            |> Map.put(:original_language, vn.original_language)
-            |> Map.put(:languages, if(vn.original_language, do: [vn.original_language], else: []))
-            |> Map.put(:has_ero, vn.has_ero)
-
-          with :ok <- validate_producers(attrs, []) do
-            Revisions.create_entity(:release, release_title(attrs), summary, user)
-          end
-        end
+      result = save_release_edit(vn, edit, releases, summary, user)
 
       case result do
         {:ok, _} -> {:cont, :ok}
         error -> {:halt, error}
       end
     end)
+  end
+
+  defp save_release_edit(_vn, %{id: id} = edit, releases, summary, user)
+       when id not in [nil, false] do
+    case Map.get(releases, edit.id) do
+      nil ->
+        {:error, "Release does not belong to this VN."}
+
+      release ->
+        with :ok <- validate_producers(edit.attrs, release.producers || []) do
+          Revisions.submit_edit(:release, edit.id, release_title(edit.attrs), summary, user,
+            base_revision: edit.base_revision
+          )
+        end
+    end
+  end
+
+  defp save_release_edit(vn, edit, _releases, summary, user) do
+    attrs =
+      edit.attrs
+      |> Map.put(:visual_novel_id, vn.id)
+      |> Map.put(
+        :title,
+        if(edit.attrs[:title] in [nil, ""], do: vn.title, else: edit.attrs.title)
+      )
+      |> Map.put(:original_language, vn.original_language)
+      |> Map.put(:languages, if(vn.original_language, do: [vn.original_language], else: []))
+      |> Map.put(:has_ero, vn.has_ero)
+
+    with :ok <- validate_producers(attrs, []) do
+      Revisions.create_entity(:release, release_title(attrs), summary, user)
+    end
   end
 
   defp release_title(%{title: title} = attrs), do: Map.put(attrs, :display_title, title)

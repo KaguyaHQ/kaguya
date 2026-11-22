@@ -45,18 +45,22 @@ defmodule Kaguya.Covers do
         end
       end)
 
-    with {:ok, {%Image{} = cover, changed?}} <- result do
-      record_liked_cover_activity(user_id, cover)
+    case result do
+      {:ok, {%Image{} = cover, changed?}} ->
+        record_liked_cover_activity(user_id, cover)
 
-      if changed? do
-        reindex_vn(cover.visual_novel_id)
-        purge_vn_cdn(cover.visual_novel_id)
-      end
+        if changed? do
+          reindex_vn(cover.visual_novel_id)
+          purge_vn_cdn(cover.visual_novel_id)
+        end
 
-      {:ok, true}
-    else
-      {:ok, :already_liked} -> {:ok, true}
-      other -> other
+        {:ok, true}
+
+      {:ok, :already_liked} ->
+        {:ok, true}
+
+      other ->
+        other
     end
   end
 
@@ -82,18 +86,22 @@ defmodule Kaguya.Covers do
         end
       end)
 
-    with {:ok, {:unliked, vn_id, changed?}} <- result do
-      Activities.delete_activity(user_id, :liked_cover, "cover", vn_image_id)
+    case result do
+      {:ok, {:unliked, vn_id, changed?}} ->
+        Activities.delete_activity(user_id, :liked_cover, "cover", vn_image_id)
 
-      if changed? do
-        reindex_vn(vn_id)
-        purge_vn_cdn(vn_id)
-      end
+        if changed? do
+          reindex_vn(vn_id)
+          purge_vn_cdn(vn_id)
+        end
 
-      {:ok, true}
-    else
-      {:ok, :not_liked} -> {:ok, true}
-      other -> other
+        {:ok, true}
+
+      {:ok, :not_liked} ->
+        {:ok, true}
+
+      other ->
+        other
     end
   end
 

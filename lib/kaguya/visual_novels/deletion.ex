@@ -364,6 +364,40 @@ defmodule Kaguya.VisualNovels.Deletion do
   defp execute_in_transaction(data, reasons, skip_blocklist) do
     vn_ids = data.vn_ids
 
+    record_deleted_vndb_ids(data, reasons, skip_blocklist)
+    clear_deleted_image_refs(data)
+
+    # Delete VN rows (CASCADE handles ~20 child tables)
+    {vn_count, _} =
+      from(vn in VisualNovel, where: vn.id in ^vn_ids)
+      |> Repo.delete_all()
+
+    Logger.info("  Deleted #{vn_count} VNs (+ cascaded children)")
+
+    delete_orphaned_entities(data)
+    adjust_deleted_user_ratings(data.ratings_by_user)
+    adjust_deleted_review_counts(data.reviews_by_user)
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    adjust_deleted_collection_counts(data, now)
+
+    binary_vn_ids = Enum.map(vn_ids, &Ecto.UUID.dump!/1)
+    clean_deleted_favorites(binary_vn_ids)
+
+    # 12. character_favorites rows — no explicit cleanup needed. The FK
+    # `on_delete: :delete_all` on character_favorites.character_id drops
+    # the rows automatically when a character row is deleted, and the
+    # characters.favorites_count counter goes with the character row
+    # itself, so there's nothing to decrement.
+
+    delete_stale_notifications(data)
+    delete_orphaned_activities(binary_vn_ids)
+
+    %{deleted_vns: vn_count}
+  end
+
+  defp record_deleted_vndb_ids(data, reasons, skip_blocklist) do
     # 0. Record deleted VNDB IDs for future import blocklist
     unless skip_blocklist do
       banned_at = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -385,7 +419,9 @@ defmodule Kaguya.VisualNovels.Deletion do
         Logger.info("  Recorded #{length(blocklist_rows)} VNDB IDs in blocklist")
       end
     end
+  end
 
+  defp clear_deleted_image_refs(data) do
     # 1. Nullify image FKs before CASCADE delete.
     #    visual_novels.primary_image_id → vn_images and
     #    visual_novels.featured_screenshot_id → vn_screenshots
@@ -401,14 +437,9 @@ defmodule Kaguya.VisualNovels.Deletion do
       from(vn in VisualNovel, where: vn.featured_screenshot_id in ^data.vn_screenshot_ids)
       |> Repo.update_all(set: [featured_screenshot_id: nil])
     end
+  end
 
-    # Delete VN rows (CASCADE handles ~20 child tables)
-    {vn_count, _} =
-      from(vn in VisualNovel, where: vn.id in ^vn_ids)
-      |> Repo.delete_all()
-
-    Logger.info("  Deleted #{vn_count} VNs (+ cascaded children)")
-
+  defp delete_orphaned_entities(data) do
     # 2. Delete orphaned characters
     if data.orphaned_char_ids != [] do
       {char_count, _} =
@@ -454,12 +485,14 @@ defmodule Kaguya.VisualNovels.Deletion do
         Logger.info("  Deleted #{tag_count} orphaned tags")
       end
     end
+  end
 
+  defp adjust_deleted_user_ratings(ratings_by_user) do
     # 6. Adjust user rating stats
-    rating_users = map_size(data.ratings_by_user)
+    rating_users = map_size(ratings_by_user)
 
     if rating_users > 0 do
-      user_ids = Map.keys(data.ratings_by_user)
+      user_ids = Map.keys(ratings_by_user)
 
       current_dists =
         from(u in User,
@@ -470,20 +503,7 @@ defmodule Kaguya.VisualNovels.Deletion do
         |> Map.new()
 
       json_data =
-        Enum.map(data.ratings_by_user, fn {user_id, ratings} ->
-          dist = Map.get(current_dists, user_id) || RatingDistribution.default_dist()
-
-          updated_dist =
-            Enum.reduce(ratings, dist, fn %{rating: r}, acc ->
-              RatingDistribution.adjust_bucket(acc, r, -1)
-            end)
-
-          total_count = Enum.sum(updated_dist)
-          total_sum = RatingDistribution.total_sum(updated_dist)
-          avg = if total_count > 0, do: total_sum / total_count, else: 0.0
-
-          %{id: user_id, dist: updated_dist, cnt: total_count, avg: avg}
-        end)
+        Enum.map(ratings_by_user, &rating_stats_after_deletion(&1, current_dists))
 
       json_str = Jason.encode!(json_data)
 
@@ -502,13 +522,30 @@ defmodule Kaguya.VisualNovels.Deletion do
 
       Logger.info("  Adjusted rating stats for #{rating_users} users")
     end
+  end
 
+  defp rating_stats_after_deletion({user_id, ratings}, current_dists) do
+    dist = Map.get(current_dists, user_id) || RatingDistribution.default_dist()
+
+    updated_dist =
+      Enum.reduce(ratings, dist, fn %{rating: rating}, acc ->
+        RatingDistribution.adjust_bucket(acc, rating, -1)
+      end)
+
+    total_count = Enum.sum(updated_dist)
+    total_sum = RatingDistribution.total_sum(updated_dist)
+    avg = if total_count > 0, do: total_sum / total_count, else: 0.0
+
+    %{id: user_id, dist: updated_dist, cnt: total_count, avg: avg}
+  end
+
+  defp adjust_deleted_review_counts(reviews_by_user) do
     # 7. Adjust user review counts
-    review_users = map_size(data.reviews_by_user)
+    review_users = map_size(reviews_by_user)
 
     if review_users > 0 do
       {bin_ids, decrements} =
-        data.reviews_by_user
+        reviews_by_user
         |> Enum.map(fn {user_id, reviews} -> {Ecto.UUID.dump!(user_id), length(reviews)} end)
         |> Enum.unzip()
 
@@ -523,9 +560,9 @@ defmodule Kaguya.VisualNovels.Deletion do
 
       Logger.info("  Adjusted review counts for #{review_users} users")
     end
+  end
 
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
+  defp adjust_deleted_collection_counts(data, now) do
     # 8. Decrement shelf vns_count
     if data.shelf_counts != [] do
       {bin_ids, decrements} = Enum.unzip(data.shelf_counts)
@@ -580,10 +617,10 @@ defmodule Kaguya.VisualNovels.Deletion do
 
       Logger.info("  Compacted positions in #{length(data.ranked_list_ids)} ranked lists")
     end
+  end
 
+  defp clean_deleted_favorites(binary_vn_ids) do
     # 11. Clean favorite_visual_novels arrays
-    binary_vn_ids = Enum.map(vn_ids, &Ecto.UUID.dump!/1)
-
     {fav_vn_count, _} =
       Repo.query!(
         """
@@ -601,13 +638,9 @@ defmodule Kaguya.VisualNovels.Deletion do
     if fav_vn_count > 0 do
       Logger.info("  Cleaned favorite_visual_novels for #{fav_vn_count} users")
     end
+  end
 
-    # 12. character_favorites rows — no explicit cleanup needed. The FK
-    # `on_delete: :delete_all` on character_favorites.character_id drops
-    # the rows automatically when a character row is deleted, and the
-    # characters.favorites_count counter goes with the character row
-    # itself, so there's nothing to decrement.
-
+  defp delete_stale_notifications(data) do
     # 13. Delete stale notifications (review + review comment)
     notif_deleted = 0
 
@@ -655,7 +688,9 @@ defmodule Kaguya.VisualNovels.Deletion do
         Logger.info("  Deleted #{list_notif_count} stale VN list notifications")
       end
     end
+  end
 
+  defp delete_orphaned_activities(binary_vn_ids) do
     # 15. Delete orphaned user_activities (references deleted VNs via metadata->>'vn_id')
     activity_deleted =
       Repo.query!(
@@ -683,8 +718,6 @@ defmodule Kaguya.VisualNovels.Deletion do
     if total_activities > 0 do
       Logger.info("  Deleted #{total_activities} orphaned user activities")
     end
-
-    %{deleted_vns: vn_count}
   end
 
   # ──────────────────────────────────

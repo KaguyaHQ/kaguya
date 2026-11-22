@@ -1,4 +1,11 @@
 defmodule Kaguya.Users.UserLibraryExport do
+  @moduledoc """
+  Tracks a queued library export and the object-store file produced by its worker.
+
+  Only one queued or processing export may exist per user. `expires_at/1`
+  measures file availability from the export's creation time, not its completion.
+  """
+
   use Kaguya.Schema
 
   alias Kaguya.Users.User

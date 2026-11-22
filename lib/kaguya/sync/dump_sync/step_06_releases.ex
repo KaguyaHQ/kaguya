@@ -106,23 +106,23 @@ defmodule Kaguya.Sync.DumpSync.Releases do
             "#{MapSet.size(protected_release_ids)} user-edited releases protected from content overwrite"
           )
 
+      batch_context = %{
+        release_vn_map: release_vn_map,
+        vn_mapping: vn_mapping,
+        engines: engines,
+        producers: producers,
+        existing_releases: existing_releases,
+        vn_titles: vn_titles,
+        protected_release_ids: protected_release_ids
+      }
+
       {total_releases, total_extlinks, new_rel_ids} =
         release_ids
         |> Enum.chunk_every(@batch_size)
         |> Enum.with_index(1)
         |> Enum.reduce({0, 0, []}, fn {batch_ids, batch_num}, {rel_acc, ext_acc, ids_acc} ->
           {rel_count, ext_count, batch_new_ids} =
-            process_batch(
-              vndb,
-              batch_ids,
-              release_vn_map,
-              vn_mapping,
-              engines,
-              producers,
-              existing_releases,
-              vn_titles,
-              protected_release_ids
-            )
+            process_batch(vndb, batch_ids, batch_context)
 
           Logger.info("Release batch #{batch_num}: #{rel_count} releases, #{ext_count} extlinks")
           {rel_acc + rel_count, ext_acc + ext_count, ids_acc ++ batch_new_ids}
@@ -157,62 +157,40 @@ defmodule Kaguya.Sync.DumpSync.Releases do
   defp process_batch(
          vndb,
          release_ids,
-         release_vn_map,
-         vn_mapping,
-         engines,
-         producers,
-         existing_releases,
-         vn_titles,
-         protected_release_ids
+         %{
+           release_vn_map: release_vn_map,
+           vn_mapping: vn_mapping,
+           existing_releases: existing_releases,
+           protected_release_ids: protected_release_ids
+         } = context
        ) do
-    titles = load_titles(vndb, release_ids)
-    platforms = load_platforms(vndb, release_ids)
+    batch_data = %{
+      titles: load_titles(vndb, release_ids),
+      platforms: load_platforms(vndb, release_ids),
+      producers: load_release_producers(vndb, release_ids),
+      media: load_media(vndb, release_ids)
+    }
+
     extlinks = load_extlinks(vndb, release_ids)
-    rel_producers = load_release_producers(vndb, release_ids)
-    media = load_media(vndb, release_ids)
     releases = load_releases(vndb, release_ids)
 
     now = DumpSync.now()
 
     # Build release rows — one per (release_id, vn_uuid) pair
     {release_rows, new_ids} =
-      Enum.reduce(releases, {[], []}, fn rel, {rows_acc, ids_acc} ->
-        release_id = rel.id
-        vn_vndb_ids = Map.get(release_vn_map, release_id, [])
+      for rel <- releases,
+          {vid, rtype} <- Map.get(release_vn_map, rel.id, []),
+          vn_uuid = Map.get(vn_mapping, vid),
+          not is_nil(vn_uuid),
+          reduce: {[], []} do
+        {rows_acc, ids_acc} ->
+          release_id = rel.id
+          row = build_release_row(rel, vn_uuid, rtype, batch_data, context, now)
 
-        Enum.reduce(vn_vndb_ids, {rows_acc, ids_acc}, fn {vid, rtype}, {r_acc, i_acc} ->
-          case Map.get(vn_mapping, vid) do
-            nil ->
-              {r_acc, i_acc}
-
-            vn_uuid ->
-              rel_titles = Map.get(titles, release_id, [])
-              {title, latin_title} = resolve_title(rel_titles, rel.olang)
-
-              row =
-                build_release_row(
-                  rel,
-                  release_id,
-                  vn_uuid,
-                  rtype,
-                  title,
-                  latin_title,
-                  Map.get(platforms, release_id, []),
-                  rel_titles,
-                  Map.get(rel_producers, release_id, []),
-                  Map.get(media, release_id, []),
-                  engines,
-                  producers,
-                  vn_titles,
-                  now
-                )
-
-              is_new = not MapSet.member?(existing_releases, {release_id, vn_uuid})
-              new_id = if is_new, do: [%{id: release_id, title: title, vn: vid}], else: []
-              {[Map.put(row, :id, UUIDv7.generate()) | r_acc], new_id ++ i_acc}
-          end
-        end)
-      end)
+          is_new = not MapSet.member?(existing_releases, {release_id, vn_uuid})
+          new_id = if is_new, do: [%{id: release_id, title: row.title, vn: vid}], else: []
+          {[Map.put(row, :id, UUIDv7.generate()) | rows_acc], new_id ++ ids_acc}
+      end
 
     rel_count = upsert_releases(release_rows, protected_release_ids)
 
@@ -326,20 +304,18 @@ defmodule Kaguya.Sync.DumpSync.Releases do
 
   defp build_release_row(
          rel,
-         release_id,
          vn_uuid,
          rtype,
-         title,
-         latin_title,
-         plats,
-         rel_titles,
-         rel_prods,
-         rel_media,
-         engines,
-         producers,
-         vn_titles,
+         batch_data,
+         %{engines: engines, producers: producers, vn_titles: vn_titles},
          now
        ) do
+    rel_titles = Map.get(batch_data.titles, rel.id, [])
+    rel_prods = Map.get(batch_data.producers, rel.id, [])
+    rel_media = Map.get(batch_data.media, rel.id, [])
+    plats = Map.get(batch_data.platforms, rel.id, [])
+    {title, latin_title} = resolve_title(rel_titles, rel.olang)
+
     engine_name = if rel.engine, do: Map.get(engines, rel.engine), else: nil
 
     vn_title_variants = Map.get(vn_titles, vn_uuid, [])
@@ -367,7 +343,7 @@ defmodule Kaguya.Sync.DumpSync.Releases do
       end)
 
     %{
-      vndb_id: release_id,
+      vndb_id: rel.id,
       visual_novel_id: vn_uuid,
       title: title,
       display_title: display_title,
@@ -422,49 +398,18 @@ defmodule Kaguya.Sync.DumpSync.Releases do
          now
        ) do
     rows =
-      Enum.flat_map(extlinks_by_release, fn {release_id, links} ->
-        # Skip extlinks for user-edited releases
-        if MapSet.member?(protected_release_ids, release_id) do
-          []
-        else
-          vn_vndb_ids = Map.get(release_vn_map, release_id, [])
-
-          Enum.flat_map(vn_vndb_ids, fn {vid, _rtype} ->
-            case Map.get(vn_mapping, vid) do
-              nil ->
-                []
-
-              vn_uuid ->
-                case Map.get(release_uuid_map, {release_id, vn_uuid}) do
-                  nil ->
-                    []
-
-                  release_uuid ->
-                    Enum.flat_map(links, fn {site, value} ->
-                      url = VndbStorefrontMapper.build_url(site, value)
-                      label = VndbStorefrontMapper.label(site)
-
-                      if url do
-                        base = [{release_uuid, site, label, url}]
-
-                        if site == "steam" do
-                          base ++
-                            [
-                              {release_uuid, "steamdb", "SteamDB",
-                               "https://steamdb.info/app/#{value}"}
-                            ]
-                        else
-                          base
-                        end
-                      else
-                        []
-                      end
-                    end)
-                end
-            end
-          end)
-        end
-      end)
+      for {release_id, links} <- extlinks_by_release,
+          # Skip extlinks for user-edited releases.
+          not MapSet.member?(protected_release_ids, release_id),
+          {vid, _rtype} <- Map.get(release_vn_map, release_id, []),
+          vn_uuid = Map.get(vn_mapping, vid),
+          not is_nil(vn_uuid),
+          release_uuid = Map.get(release_uuid_map, {release_id, vn_uuid}),
+          not is_nil(release_uuid),
+          link <- links,
+          row <- release_extlink_rows(release_uuid, link) do
+        row
+      end
       |> Enum.uniq_by(fn {release_uuid, site, _label, url} -> {release_uuid, site, url} end)
 
     insert_rows =
@@ -484,6 +429,24 @@ defmodule Kaguya.Sync.DumpSync.Releases do
       on_conflict: {:replace, [:label, :updated_at]},
       conflict_target: [:vn_release_id, :site, :url]
     )
+  end
+
+  defp release_extlink_rows(release_uuid, {site, value}) do
+    case VndbStorefrontMapper.build_url(site, value) do
+      url when url in [nil, false] ->
+        []
+
+      url ->
+        link = {release_uuid, site, VndbStorefrontMapper.label(site), url}
+
+        case site do
+          "steam" ->
+            [link, {release_uuid, "steamdb", "SteamDB", "https://steamdb.info/app/#{value}"}]
+
+          _ ->
+            [link]
+        end
+    end
   end
 
   # ── VN-Producer Junctions from Release Data ─────────────────────────────────

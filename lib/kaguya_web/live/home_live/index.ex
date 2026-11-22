@@ -225,7 +225,7 @@ defmodule KaguyaWeb.HomeLive.Index do
     end
   end
 
-  defp can_top_up?(_activity, _pages_loaded, _failed = true), do: false
+  defp can_top_up?(_activity, _pages_loaded, true), do: false
 
   defp can_top_up?(activity, pages_loaded, _failed) do
     pages_loaded < @bounded_max_pages and activity.has_next and

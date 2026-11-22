@@ -108,43 +108,51 @@ defmodule Kaguya.Comments do
       with {:ok, comment} <- Repo.insert(config.comment_changeset.(attrs)),
            {:ok, parent} <- {:ok, config.get_parent.(attrs)},
            :ok <- ensure_after_create(after_create, comment, parent) do
-        if should_run_side_effects.(comment) do
-          with {count, _} <-
-                 update_comment_count(config.parent_schema, config.parent_id_field.(attrs), 1),
-               true <- count > 0 do
-            if comment.parent_comment_id do
-              parent_comment = Repo.get!(config.comment_schema, comment.parent_comment_id)
-
-              Social.create_notification(%{
-                user_id: parent_comment.user_id,
-                action: :reply,
-                entity_type: Map.get(config, :reply_entity_type, :comment),
-                entity_id: parent_comment.id,
-                actor_id: comment.user_id,
-                metadata: config.build_metadata.(parent, comment),
-                idempotency_key: "comment:reply:" <> to_string(comment.id)
-              })
-            else
-              Social.create_notification(%{
-                user_id: config.get_parent_owner.(parent),
-                action: :new_comment,
-                entity_type: config.entity_type,
-                entity_id: parent.id,
-                actor_id: comment.user_id,
-                metadata: config.build_metadata.(parent, comment),
-                idempotency_key: "comment:new:" <> to_string(comment.id)
-              })
-            end
-          else
-            _ -> {:error, :no_update}
-          end
-        end
+        maybe_run_creation_side_effects(config, attrs, comment, parent, should_run_side_effects)
 
         {:ok, comment}
       else
         _ -> {:error, :no_update}
       end
     end)
+  end
+
+  defp maybe_run_creation_side_effects(config, attrs, comment, parent, should_run_side_effects) do
+    if should_run_side_effects.(comment) do
+      with {count, _} <-
+             update_comment_count(config.parent_schema, config.parent_id_field.(attrs), 1),
+           true <- count > 0 do
+        notify_comment_creation(config, comment, parent)
+      else
+        _ -> {:error, :no_update}
+      end
+    end
+  end
+
+  defp notify_comment_creation(config, comment, parent) do
+    if comment.parent_comment_id do
+      parent_comment = Repo.get!(config.comment_schema, comment.parent_comment_id)
+
+      Social.create_notification(%{
+        user_id: parent_comment.user_id,
+        action: :reply,
+        entity_type: Map.get(config, :reply_entity_type, :comment),
+        entity_id: parent_comment.id,
+        actor_id: comment.user_id,
+        metadata: config.build_metadata.(parent, comment),
+        idempotency_key: "comment:reply:" <> to_string(comment.id)
+      })
+    else
+      Social.create_notification(%{
+        user_id: config.get_parent_owner.(parent),
+        action: :new_comment,
+        entity_type: config.entity_type,
+        entity_id: parent.id,
+        actor_id: comment.user_id,
+        metadata: config.build_metadata.(parent, comment),
+        idempotency_key: "comment:new:" <> to_string(comment.id)
+      })
+    end
   end
 
   @doc """
@@ -167,16 +175,20 @@ defmodule Kaguya.Comments do
 
       comment ->
         Repo.transact(fn ->
-          with {:ok, delete_count} <- delete_comment_subtree(schema, comment.id),
-               {count, _} <-
-                 update_comment_count(
-                   parent_schema,
-                   Map.get(comment, parent_id_field),
-                   -delete_count
-                 ) do
-            if count > 0, do: {:ok, true}, else: {:error, :no_update}
-          end
+          delete_subtree_and_update_count(schema, parent_schema, comment, parent_id_field)
         end)
+    end
+  end
+
+  defp delete_subtree_and_update_count(schema, parent_schema, comment, parent_id_field) do
+    with {:ok, delete_count} <- delete_comment_subtree(schema, comment.id),
+         {count, _} <-
+           update_comment_count(
+             parent_schema,
+             Map.get(comment, parent_id_field),
+             -delete_count
+           ) do
+      if count > 0, do: {:ok, true}, else: {:error, :no_update}
     end
   end
 
@@ -265,42 +277,60 @@ defmodule Kaguya.Comments do
         comment ->
           {:ok, hidden_count} =
             Repo.transact(fn ->
-              {hidden_count, _} =
-                hide_visible_comments(
-                  comment_schema,
-                  subtree_ids,
-                  comment_id,
-                  now,
-                  reason,
-                  mod_note
-                )
-
-              if not is_nil(comment.hidden_at) do
-                restamp_hidden_comments(
-                  comment_schema,
-                  subtree_ids,
-                  comment_id,
-                  comment.hidden_at,
-                  now,
-                  reason,
-                  mod_note
-                )
-              end
-
-              if hidden_count > 0 do
-                update_comment_count(
-                  parent_schema,
-                  Map.get(comment, parent_id_field),
-                  -hidden_count
-                )
-              end
-
-              {:ok, hidden_count}
+              hide_subtree_rows(
+                comment_schema,
+                parent_schema,
+                comment,
+                parent_id_field,
+                subtree_ids,
+                %{at: now, reason: reason, mod_note: mod_note}
+              )
             end)
 
           {:ok, hidden_count}
       end
     end
+  end
+
+  defp hide_subtree_rows(
+         comment_schema,
+         parent_schema,
+         comment,
+         parent_id_field,
+         subtree_ids,
+         %{at: now, reason: reason, mod_note: mod_note}
+       ) do
+    {hidden_count, _} =
+      hide_visible_comments(
+        comment_schema,
+        subtree_ids,
+        comment.id,
+        now,
+        reason,
+        mod_note
+      )
+
+    if not is_nil(comment.hidden_at) do
+      restamp_hidden_comments(
+        comment_schema,
+        subtree_ids,
+        comment.id,
+        comment.hidden_at,
+        now,
+        reason,
+        mod_note
+      )
+    end
+
+    if hidden_count > 0 do
+      update_comment_count(
+        parent_schema,
+        Map.get(comment, parent_id_field),
+        -hidden_count
+      )
+    end
+
+    {:ok, hidden_count}
   end
 
   defp hide_visible_comments(comment_schema, subtree_ids, comment_id, now, reason, mod_note) do

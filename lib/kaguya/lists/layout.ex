@@ -499,66 +499,56 @@ defmodule Kaguya.Lists.Layout do
       existing_by_id = Map.new(existing, &{&1.id, &1})
       submitted_ids = attrs |> Enum.map(&db_tier_id/1) |> Enum.reject(&is_nil/1)
 
-      with :ok <- ensure_tier_ids_belong_to_list(submitted_ids, list_id) do
-        now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-        saved =
-          Enum.reduce_while(attrs, {:ok, []}, fn attrs, {:ok, acc} ->
-            attrs = Map.put(attrs, :list_id, list_id)
-            changeset_attrs = Map.drop(attrs, [:id, "id"])
-
-            result =
-              case Map.get(attrs, :id) do
-                nil ->
-                  %ListTier{} |> ListTier.changeset(changeset_attrs) |> Repo.insert()
-
-                id ->
-                  case Map.get(existing_by_id, id) do
-                    nil ->
-                      if binary_id?(id) do
-                        %ListTier{id: id} |> ListTier.changeset(changeset_attrs) |> Repo.insert()
-                      else
-                        %ListTier{} |> ListTier.changeset(changeset_attrs) |> Repo.insert()
-                      end
-
-                    %ListTier{} = tier ->
-                      tier |> ListTier.changeset(changeset_attrs) |> Repo.update()
-                  end
-              end
-
-            case result do
-              {:ok, tier} -> {:cont, {:ok, [tier | acc]}}
-              {:error, reason} -> {:halt, {:error, reason}}
-            end
-          end)
-
-        with {:ok, saved_tiers} <- saved do
-          saved_tiers = Enum.reverse(saved_tiers)
-          saved_ids = Enum.map(saved_tiers, & &1.id)
-
-          id_map =
-            attrs
-            |> Enum.zip(saved_tiers)
-            |> Map.new(fn {attrs, tier} -> {Map.get(attrs, :id, tier.id), tier.id} end)
-            |> Map.merge(Map.new(saved_tiers, &{&1.id, &1.id}))
-
-          from(li in ListItem,
-            where: li.list_id == ^list_id and li.tier_id not in ^saved_ids
-          )
-          |> Repo.update_all(set: [tier_id: nil, tier_position: nil, updated_at: now])
-
-          from(t in ListTier,
-            where: t.list_id == ^list_id and t.id not in ^saved_ids
-          )
-          |> Repo.delete_all()
-
-          {:ok, %{tiers: Enum.sort_by(saved_tiers, &{&1.position, &1.id}), id_map: id_map}}
-        end
+      with :ok <- ensure_tier_ids_belong_to_list(submitted_ids, list_id),
+           now <- DateTime.utc_now() |> DateTime.truncate(:second),
+           {:ok, saved_tiers} <- persist_layout_tiers(attrs, list_id, existing_by_id) do
+        finish_layout_tiers(list_id, attrs, Enum.reverse(saved_tiers), now)
       end
     end
   end
 
   defp save_layout_tiers(_list_id, "tier", _), do: {:error, :invalid_tiers}
+
+  defp persist_layout_tiers(attrs, list_id, existing_by_id) do
+    Enum.reduce_while(attrs, {:ok, []}, fn attrs, {:ok, acc} ->
+      case persist_layout_tier(attrs, list_id, existing_by_id) do
+        {:ok, tier} -> {:cont, {:ok, [tier | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp persist_layout_tier(attrs, list_id, existing_by_id) do
+    changeset_attrs = attrs |> Map.put(:list_id, list_id) |> Map.drop([:id, "id"])
+    id = Map.get(attrs, :id)
+
+    case Map.get(existing_by_id, id) do
+      %ListTier{} = tier ->
+        tier |> ListTier.changeset(changeset_attrs) |> Repo.update()
+
+      nil ->
+        tier = if binary_id?(id), do: %ListTier{id: id}, else: %ListTier{}
+        tier |> ListTier.changeset(changeset_attrs) |> Repo.insert()
+    end
+  end
+
+  defp finish_layout_tiers(list_id, attrs, saved_tiers, now) do
+    saved_ids = Enum.map(saved_tiers, & &1.id)
+
+    id_map =
+      attrs
+      |> Enum.zip(saved_tiers)
+      |> Map.new(fn {attrs, tier} -> {Map.get(attrs, :id, tier.id), tier.id} end)
+      |> Map.merge(Map.new(saved_tiers, &{&1.id, &1.id}))
+
+    from(li in ListItem, where: li.list_id == ^list_id and li.tier_id not in ^saved_ids)
+    |> Repo.update_all(set: [tier_id: nil, tier_position: nil, updated_at: now])
+
+    from(t in ListTier, where: t.list_id == ^list_id and t.id not in ^saved_ids)
+    |> Repo.delete_all()
+
+    {:ok, %{tiers: Enum.sort_by(saved_tiers, &{&1.position, &1.id}), id_map: id_map}}
+  end
 
   defp layout_tiers_result(tiers), do: %{tiers: tiers, id_map: Map.new(tiers, &{&1.id, &1.id})}
 

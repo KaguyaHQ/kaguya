@@ -3,7 +3,7 @@ defmodule Kaguya.Sync.ReleaseCreditsTest do
   import Ecto.Query
   alias Kaguya.{Repo, Revisions}
   alias Kaguya.Producers.{Producer, VNProducer}
-  alias Kaguya.Releases.Release
+  alias Kaguya.Releases.{Release, ReleaseExtlink}
   alias Kaguya.VisualNovels.VisualNovel
   alias Kaguya.Sync.DumpSync.Releases, as: ReleaseSync
 
@@ -89,6 +89,122 @@ defmodule Kaguya.Sync.ReleaseCreditsTest do
     assert {:ok, _} = ReleaseSync.run(ctx)
     assert credit_ids(vn) == MapSet.new([corrected.id, imported.id, local.id])
     assert Revisions.latest_revision_number(:release, release.id) == correction.revision_number
+  end
+
+  test "release links are deduplicated, expanded for Steam, and protected after an edit" do
+    source =
+      start_supervised!(
+        {Postgrex,
+         Keyword.take(Repo.config(), [:hostname, :port, :username, :password, :database])}
+      )
+
+    create_dump_tables(source)
+    user = Kaguya.Test.UserFixtures.insert_user!()
+
+    vn =
+      Repo.insert!(%VisualNovel{
+        title: "Release links VN",
+        slug: "release-links-vn",
+        vndb_id: "v90000002"
+      })
+
+    other_vn =
+      Repo.insert!(%VisualNovel{
+        title: "Shared release VN",
+        slug: "shared-release-vn",
+        vndb_id: "v90000003"
+      })
+
+    producer =
+      Repo.insert!(%Producer{
+        name: "Release links studio",
+        slug: "release-links-studio",
+        vndb_id: "p90000001"
+      })
+
+    Postgrex.query!(source, "INSERT INTO producers VALUES ($1, $2, NULL)", [
+      producer.vndb_id,
+      producer.name
+    ])
+
+    Postgrex.query!(source, "INSERT INTO vn_titles VALUES ($1, $2, NULL)", [vn.vndb_id, vn.title])
+    add_dump_release(source, "r90000001", vn.vndb_id, producer.vndb_id)
+
+    Postgrex.query!(
+      source,
+      "INSERT INTO releases_vn VALUES ($1, $2, 'partial'), ($1, $3, 'complete')",
+      [
+        "r90000001",
+        other_vn.vndb_id,
+        "v-unmapped"
+      ]
+    )
+
+    Postgrex.query!(
+      source,
+      "INSERT INTO extlinks VALUES (1, 'steam', '123'), (2, 'gog', 'game'), (3, 'unknown', 'ignored')",
+      []
+    )
+
+    Postgrex.query!(
+      source,
+      "INSERT INTO releases_extlinks VALUES ('r90000001', 1), ('r90000001', 1), ('r90000001', 2), ('r90000001', 3)",
+      []
+    )
+
+    ctx = %{
+      vndb: source,
+      dry_run: false,
+      vn_mapping: %{vn.vndb_id => vn.id, other_vn.vndb_id => other_vn.id},
+      producer_mapping: %{producer.vndb_id => producer.id},
+      target_vndb_ids: [vn.vndb_id, other_vn.vndb_id]
+    }
+
+    assert {:ok, _} = ReleaseSync.run(ctx)
+    release = Repo.get_by!(Release, vndb_id: "r90000001", visual_novel_id: vn.id)
+
+    other_release = Repo.get_by!(Release, vndb_id: "r90000001", visual_novel_id: other_vn.id)
+    assert release.release_type == "complete"
+    assert other_release.release_type == "partial"
+    assert Revisions.latest_revision_number(:release, release.id) == 1
+    assert Revisions.latest_revision_number(:release, other_release.id) == 1
+
+    expected_links = [
+      {"gog", "GOG", "https://www.gog.com/en/game/game"},
+      {"steam", "Steam", "https://store.steampowered.com/app/123/"},
+      {"steamdb", "SteamDB", "https://steamdb.info/app/123"}
+    ]
+
+    assert release_links(release) == expected_links
+    assert release_links(other_release) == expected_links
+    assert {:ok, _} = ReleaseSync.run(ctx)
+    assert release_links(release) == expected_links
+    assert release_links(other_release) == expected_links
+
+    assert {:ok, _} =
+             Revisions.submit_edit(
+               :release,
+               release.id,
+               %{title: "User-corrected edition"},
+               "Correct the release title",
+               user,
+               base_revision: 1
+             )
+
+    Postgrex.query!(source, "UPDATE extlinks SET value = '456' WHERE site = 'steam'", [])
+    assert {:ok, _} = ReleaseSync.run(ctx)
+    assert release_links(release) == expected_links
+    assert release_links(other_release) == expected_links
+  end
+
+  defp release_links(release) do
+    Repo.all(
+      from(link in ReleaseExtlink,
+        where: link.vn_release_id == ^release.id,
+        order_by: link.site,
+        select: {link.site, link.label, link.url}
+      )
+    )
   end
 
   defp credit_ids(vn),

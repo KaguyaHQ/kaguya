@@ -84,30 +84,28 @@ defmodule Kaguya.Utils.SlugUtils do
   # ---------------------------------------------------------------------------
 
   defp pick_year_slug(base, year, taken) do
-    if MapSet.member?(taken, base) do
-      if year do
+    cond do
+      not MapSet.member?(taken, base) ->
+        base
+
+      year ->
         year_slug = "#{base}-#{year}"
 
-        if MapSet.member?(taken, year_slug) do
-          n =
-            Stream.iterate(1, &(&1 + 1))
-            |> Enum.find(fn n -> not MapSet.member?(taken, "#{year_slug}-#{n}") end)
+        if MapSet.member?(taken, year_slug),
+          do: next_year_slug(year_slug, taken),
+          else: year_slug
 
-          "#{year_slug}-#{n}"
-        else
-          year_slug
-        end
-      else
-        # No year available — numeric fallback
-        n =
-          Stream.iterate(1, &(&1 + 1))
-          |> Enum.find(fn n -> not MapSet.member?(taken, "#{base}-#{n}") end)
-
-        "#{base}-#{n}"
-      end
-    else
-      base
+      true ->
+        next_year_slug(base, taken)
     end
+  end
+
+  defp next_year_slug(base, taken) do
+    n =
+      Stream.iterate(1, &(&1 + 1))
+      |> Enum.find(fn n -> not MapSet.member?(taken, "#{base}-#{n}") end)
+
+    "#{base}-#{n}"
   end
 
   defp fetch_existing_slug_set(_schema, _field, []), do: MapSet.new()
@@ -277,14 +275,8 @@ defmodule Kaguya.Utils.SlugUtils do
 
         start_index =
           case Map.get(next_per_base, base) do
-            nil ->
-              case slug_suffix(slug) do
-                nil -> 1
-                suffix -> suffix + 1
-              end
-
-            value ->
-              value
+            nil -> (slug_suffix(slug) || 0) + 1
+            value -> value
           end
 
         {new_slug, taken, next_index} = next_available_slug(base, start_index, taken)

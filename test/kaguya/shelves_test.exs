@@ -287,6 +287,59 @@ defmodule Kaguya.ShelvesTest do
     end
   end
 
+  test "vote-date fallback resolves old slugs and preserves existing dates and other users" do
+    user = UserFixtures.insert_user!()
+    other = UserFixtures.insert_user!()
+    vn = insert_vn!("fallback-canonical")
+    manual = insert_vn!("fallback-manual")
+
+    Repo.insert!(%Kaguya.SlugRedirects.SlugRedirect{
+      entity_type: :vn,
+      old_slug: "fallback-old-slug",
+      target_id: vn.id,
+      reason: :rename
+    })
+
+    for {owner, target, date} <- [
+          {user, vn, nil},
+          {user, manual, ~D[2020-01-01]},
+          {other, vn, nil}
+        ] do
+      Repo.insert!(%ReadingStatus{
+        user_id: owner.id,
+        visual_novel_id: target.id,
+        status: :read,
+        library_added_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        date_finished: date
+      })
+    end
+
+    items =
+      for {slug, date} <- [
+            {"fallback-old-slug", "2021-01-01"},
+            {"fallback-old-slug", "2022-01-01"},
+            {manual.slug, "2023-01-01"},
+            {"fallback-missing-slug", "2024-01-01"}
+          ] do
+        %{"slug" => slug, "status" => "read", "date_finished" => nil, "vote_date" => date}
+      end
+
+    import_record =
+      Repo.insert!(%Kaguya.Users.VndbImport{
+        id: Ecto.UUID.generate(),
+        user_id: user.id,
+        status: "completed",
+        result: %{"imported_items" => items}
+      })
+
+    assert {:error, :not_found} = Shelves.apply_vote_date_fallback(other.id, import_record.id)
+    assert {:ok, 1} = Shelves.apply_vote_date_fallback(user.id, import_record.id)
+    assert get_status(user.id, vn.id).date_finished == ~D[2022-01-01]
+    assert get_status(user.id, manual.id).date_finished == ~D[2020-01-01]
+    assert get_status(other.id, vn.id).date_finished == nil
+    assert {:ok, 0} = Shelves.apply_vote_date_fallback(user.id, import_record.id)
+  end
+
   defp insert_vn!(title) do
     Repo.insert!(%VisualNovel{
       id: Ecto.UUID.generate(),

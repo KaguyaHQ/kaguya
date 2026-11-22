@@ -91,30 +91,34 @@ defmodule Kaguya.Recommendations.Nx.Engine do
       if length(primary) >= @fallback_min_recs do
         primary
       else
-        case build_topn_pref_vector(prefs_rows, ctx) do
-          {fb_idx, fb_vals} ->
-            # Mask covers every pref the user has (not just the
-            # top-N we fed to scoring), so rank-N+1 items below the
-            # fallback cut can't come back as recs.
-            full_mask = Enum.uniq(mask_rows ++ Enum.map(prefs_rows, & &1.vndb_id))
+        score_fallback(prefs_rows, mask_rows, ctx, n_final, primary)
+      end
+    end
+  end
 
-            case score_with(ctx, fb_idx, fb_vals, full_mask, n_final) do
-              {:ok, rows} ->
-                # Rescale fallback scores so they mix cleanly into
-                # the percentile distribution (fallback raw is ~10x
-                # primary; without this their recs saturate at 99%+
-                # on display). Scale comes from pregen's meta and is
-                # cached in Percentiles.
-                rescale_fallback(rows, Percentiles.fallback_score_scale())
+  defp score_fallback(prefs_rows, mask_rows, ctx, n_final, primary) do
+    case build_topn_pref_vector(prefs_rows, ctx) do
+      {fb_idx, fb_vals} ->
+        # Mask covers every pref the user has (not just the
+        # top-N we fed to scoring), so rank-N+1 items below the
+        # fallback cut can't come back as recs.
+        full_mask = Enum.uniq(mask_rows ++ Enum.map(prefs_rows, & &1.vndb_id))
 
-              :no_positives ->
-                primary
-            end
+        case score_with(ctx, fb_idx, fb_vals, full_mask, n_final) do
+          {:ok, rows} ->
+            # Rescale fallback scores so they mix cleanly into
+            # the percentile distribution (fallback raw is ~10x
+            # primary; without this their recs saturate at 99%+
+            # on display). Scale comes from pregen's meta and is
+            # cached in Percentiles.
+            rescale_fallback(rows, Percentiles.fallback_score_scale())
 
-          nil ->
+          :no_positives ->
             primary
         end
-      end
+
+      nil ->
+        primary
     end
   end
 

@@ -129,23 +129,28 @@ defmodule Kaguya.VisualNovels.Browse do
     min_ratings = filters[:ratings_count_gte]
 
     has_non_tag_filters? =
-      not is_nil(filters[:average_rating_gte]) or
-        not is_nil(filters[:average_rating_lte]) or
-        not is_nil(filters[:ratings_count_lte]) or
-        not is_nil(filters[:released_after_year]) or
-        not is_nil(filters[:released_before_year]) or
-        not is_nil(filters[:vndb_rating_gte]) or
-        not is_nil(filters[:vndb_rating_lte]) or
-        not is_nil(filters[:development_status]) or
-        not is_nil(filters[:length_category]) or
-        not is_nil(filters[:original_languages]) or
-        not is_nil(filters[:available_languages]) or
-        not is_nil(filters[:available_platforms]) or
-        not is_nil(filters[:engines]) or
-        not is_nil(filters[:has_ero]) or
-        not is_nil(filters[:available_on_stores]) or
-        not is_nil(filters[:free_on_stores]) or
-        not is_nil(filters[:is_avn])
+      Enum.any?(
+        [
+          :average_rating_gte,
+          :average_rating_lte,
+          :ratings_count_lte,
+          :released_after_year,
+          :released_before_year,
+          :vndb_rating_gte,
+          :vndb_rating_lte,
+          :development_status,
+          :length_category,
+          :original_languages,
+          :available_languages,
+          :available_platforms,
+          :engines,
+          :has_ero,
+          :available_on_stores,
+          :free_on_stores,
+          :is_avn
+        ],
+        fn key -> not is_nil(filters[key]) end
+      )
 
     inc_slugs = Enum.uniq(filters[:include_tags] || [])
     exc_slugs = Enum.uniq(filters[:exclude_tags] || [])

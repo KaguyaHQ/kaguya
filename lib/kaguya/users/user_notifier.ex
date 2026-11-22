@@ -1,4 +1,11 @@
 defmodule Kaguya.Users.UserNotifier do
+  @moduledoc """
+  Builds and delivers account verification messages through `Kaguya.Mailer`.
+
+  Callers supply the login or email-change URL; token creation and validation
+  stay in the authentication context.
+  """
+
   import Swoosh.Email
 
   alias Kaguya.Mailer

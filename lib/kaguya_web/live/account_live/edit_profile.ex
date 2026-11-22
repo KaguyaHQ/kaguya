@@ -34,21 +34,23 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   @impl true
   def mount(_params, _session, socket) do
     if socket.assigns.current_user do
-      with {:ok, user} <- Users.get_user(socket.assigns.current_user.id) do
-        {:ok,
-         socket
-         |> assign(:page_title, "Edit Profile - Kaguya")
-         |> assign(:meta_description, "Edit profile")
-         |> assign(KaguyaWeb.SEO.noindex())
-         |> assign_user_state(user)
-         |> assign(:search, @empty_search)
-         |> assign(:upload_error, nil)
-         |> assign(:profile_image_uploads_in_progress, MapSet.new())
-         |> assign(:pending_avatar_upload_id, nil)
-         |> assign(:pending_banner_upload_id, nil)
-         |> assign(:delete_banner?, false)}
-      else
-        _ -> {:ok, redirect(socket, to: ~p"/login")}
+      case Users.get_user(socket.assigns.current_user.id) do
+        {:ok, user} ->
+          {:ok,
+           socket
+           |> assign(:page_title, "Edit Profile - Kaguya")
+           |> assign(:meta_description, "Edit profile")
+           |> assign(KaguyaWeb.SEO.noindex())
+           |> assign_user_state(user)
+           |> assign(:search, @empty_search)
+           |> assign(:upload_error, nil)
+           |> assign(:profile_image_uploads_in_progress, MapSet.new())
+           |> assign(:pending_avatar_upload_id, nil)
+           |> assign(:pending_banner_upload_id, nil)
+           |> assign(:delete_banner?, false)}
+
+        _ ->
+          {:ok, redirect(socket, to: ~p"/login")}
       end
     else
       {:ok, redirect(socket, to: ~p"/login")}
@@ -86,13 +88,15 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   end
 
   def handle_event("remove_favorite", %{"type" => raw_type, "id" => id}, socket) do
-    with {:ok, type} <- parse_type(raw_type) do
-      {:noreply,
-       update_draft(socket, type, fn favorites ->
-         Enum.reject(favorites, fn favorite -> to_string(favorite.id) == to_string(id) end)
-       end)}
-    else
-      _ -> {:noreply, socket}
+    case parse_type(raw_type) do
+      {:ok, type} ->
+        {:noreply,
+         update_draft(socket, type, fn favorites ->
+           Enum.reject(favorites, fn favorite -> to_string(favorite.id) == to_string(id) end)
+         end)}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -158,10 +162,12 @@ defmodule KaguyaWeb.AccountLive.EditProfile do
   end
 
   def handle_event("add_favorite", %{"type" => raw_type, "id" => id}, socket) do
-    with {:ok, type} <- parse_type(raw_type) do
-      add_favorite(socket, type, id)
-    else
-      _ -> {:noreply, socket}
+    case parse_type(raw_type) do
+      {:ok, type} ->
+        add_favorite(socket, type, id)
+
+      _ ->
+        {:noreply, socket}
     end
   end
 

@@ -42,13 +42,17 @@ defmodule Kaguya.Screenshots do
         end
       end)
 
-    with {:ok, {%Screenshot{} = screenshot, featured_changed}} <- result do
-      record_liked_screenshot_activity(user_id, screenshot)
-      if featured_changed, do: VNPageCache.invalidate(screenshot.visual_novel_id)
-      {:ok, true}
-    else
-      {:ok, :already_liked} -> {:ok, true}
-      other -> other
+    case result do
+      {:ok, {%Screenshot{} = screenshot, featured_changed}} ->
+        record_liked_screenshot_activity(user_id, screenshot)
+        if featured_changed, do: VNPageCache.invalidate(screenshot.visual_novel_id)
+        {:ok, true}
+
+      {:ok, :already_liked} ->
+        {:ok, true}
+
+      other ->
+        other
     end
   end
 
@@ -76,13 +80,17 @@ defmodule Kaguya.Screenshots do
         end
       end)
 
-    with {:ok, {:unliked, vn_id, featured_changed}} <- result do
-      Activities.delete_activity(user_id, :liked_screenshot, "screenshot", screenshot_id)
-      if featured_changed, do: VNPageCache.invalidate(vn_id)
-      {:ok, true}
-    else
-      {:ok, :not_liked} -> {:ok, true}
-      other -> other
+    case result do
+      {:ok, {:unliked, vn_id, featured_changed}} ->
+        Activities.delete_activity(user_id, :liked_screenshot, "screenshot", screenshot_id)
+        if featured_changed, do: VNPageCache.invalidate(vn_id)
+        {:ok, true}
+
+      {:ok, :not_liked} ->
+        {:ok, true}
+
+      other ->
+        other
     end
   end
 

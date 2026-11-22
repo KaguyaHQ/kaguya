@@ -166,29 +166,30 @@ defmodule Kaguya.Discussions.Moderation do
   defp maybe_create_removal_comment(_post, _attrs, nil), do: :ok
 
   defp maybe_create_removal_comment(post, attrs, reason) do
-    if truthy?(Map.get(attrs, :add_comment) || Map.get(attrs, "add_comment")) do
-      case Map.get(attrs, :actor_id) || Map.get(attrs, "actor_id") do
-        nil ->
-          :ok
+    add_comment = truthy?(Map.get(attrs, :add_comment) || Map.get(attrs, "add_comment"))
+    actor_id = Map.get(attrs, :actor_id) || Map.get(attrs, "actor_id")
 
-        actor_id ->
-          content = Map.get(attrs, :comment) || Map.get(attrs, "comment") || reason
+    if add_comment and not is_nil(actor_id) do
+      content = Map.get(attrs, :comment) || Map.get(attrs, "comment") || reason
 
-          case GenericComments.create_comment(SideEffects.post_comment_config(post), %{
-                 post_id: post.id,
-                 user_id: actor_id,
-                 is_pinned: false,
-                 content: content
-               }) do
-            {:ok, comment} ->
-              with {:ok, _comment} <- Comments.pin_comment(comment), do: :ok
-
-            {:error, reason} ->
-              {:error, reason}
-          end
-      end
+      create_pinned_removal_comment(post, actor_id, content)
     else
       :ok
+    end
+  end
+
+  defp create_pinned_removal_comment(post, actor_id, content) do
+    case GenericComments.create_comment(SideEffects.post_comment_config(post), %{
+           post_id: post.id,
+           user_id: actor_id,
+           is_pinned: false,
+           content: content
+         }) do
+      {:ok, comment} ->
+        with {:ok, _comment} <- Comments.pin_comment(comment), do: :ok
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

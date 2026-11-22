@@ -288,31 +288,7 @@ defmodule Kaguya.Sync.VndbEnrichment do
     # Build VN-character junction rows
     junction_rows =
       Enum.flat_map(characters, fn char ->
-        case Map.get(char_id_map, char["id"]) do
-          nil ->
-            []
-
-          char_uuid ->
-            (char["vns"] || [])
-            |> Enum.flat_map(fn va ->
-              case Map.get(vn_id_map, va["id"]) do
-                nil ->
-                  []
-
-                vn_uuid ->
-                  [
-                    %{
-                      character_id: char_uuid,
-                      visual_novel_id: vn_uuid,
-                      role: VndbFieldMapper.map_character_role(va["role"]),
-                      spoiler_level: va["spoiler"] || 0,
-                      inserted_at: now,
-                      updated_at: now
-                    }
-                  ]
-              end
-            end)
-        end
+        character_junction_rows(char, char_id_map, vn_id_map, now)
       end)
 
     chunked_insert(VNCharacter, junction_rows,
@@ -321,6 +297,23 @@ defmodule Kaguya.Sync.VndbEnrichment do
     )
 
     {count, char_vndb_ids}
+  end
+
+  defp character_junction_rows(char, char_id_map, vn_id_map, now) do
+    for char_uuid <- [Map.get(char_id_map, char["id"])],
+        not is_nil(char_uuid),
+        va <- char["vns"] || [],
+        vn_uuid <- [Map.get(vn_id_map, va["id"])],
+        not is_nil(vn_uuid) do
+      %{
+        character_id: char_uuid,
+        visual_novel_id: vn_uuid,
+        role: VndbFieldMapper.map_character_role(va["role"]),
+        spoiler_level: va["spoiler"] || 0,
+        inserted_at: now,
+        updated_at: now
+      }
+    end
   end
 
   defp build_character_row(char, now) do
@@ -388,37 +381,30 @@ defmodule Kaguya.Sync.VndbEnrichment do
 
     rows =
       Enum.flat_map(vn_data_list, fn vn ->
-        case Map.get(full_id_map, vn["id"]) do
-          nil ->
-            []
-
-          vn_uuid ->
-            (vn["relations"] || [])
-            |> Enum.flat_map(fn rel ->
-              case Map.get(full_id_map, rel["id"]) do
-                nil ->
-                  []
-
-                related_vn_id ->
-                  [
-                    %{
-                      visual_novel_id: vn_uuid,
-                      related_vn_id: related_vn_id,
-                      relation_type: VndbFieldMapper.map_relation_type(rel["relation"]),
-                      is_official: rel["relation_official"] == true,
-                      inserted_at: now,
-                      updated_at: now
-                    }
-                  ]
-              end
-            end)
-        end
+        relation_rows(vn, full_id_map, now)
       end)
 
     chunked_insert(Relation, rows,
       on_conflict: {:replace, [:relation_type, :is_official, :updated_at]},
       conflict_target: [:visual_novel_id, :related_vn_id]
     )
+  end
+
+  defp relation_rows(vn, id_map, now) do
+    for vn_uuid <- [Map.get(id_map, vn["id"])],
+        not is_nil(vn_uuid),
+        rel <- vn["relations"] || [],
+        related_vn_id <- [Map.get(id_map, rel["id"])],
+        not is_nil(related_vn_id) do
+      %{
+        visual_novel_id: vn_uuid,
+        related_vn_id: related_vn_id,
+        relation_type: VndbFieldMapper.map_relation_type(rel["relation"]),
+        is_official: rel["relation_official"] == true,
+        inserted_at: now,
+        updated_at: now
+      }
+    end
   end
 
   # ── Developers ────────────────────────────────────────────────────────────
@@ -721,90 +707,14 @@ defmodule Kaguya.Sync.VndbEnrichment do
         preload: [:vn_titles]
       )
       |> Repo.all()
-      |> Map.new(fn v ->
-        ja_latin =
-          Enum.find_value(v.vn_titles, fn t ->
-            if t.lang == "ja" and t.latin != nil, do: t.latin
-          end)
-
-        {v.id, {v.title, ja_latin}}
-      end)
+      |> Map.new(&release_title_source/1)
 
     release_rows =
-      Enum.flat_map(releases, fn rel ->
-        vn_entries = rel["vns"] || []
-
-        Enum.flat_map(vn_entries, fn vn_entry ->
-          vid = vn_entry["id"]
-
-          case Map.get(vn_id_map, vid) do
-            nil ->
-              []
-
-            vn_uuid ->
-              title = resolve_api_release_title(rel)
-              latin_title = rel["title"]
-              latin_title = if latin_title && latin_title != title, do: latin_title, else: nil
-
-              {vn_title, vn_latin_title} = Map.get(vn_titles, vn_uuid, {nil, nil})
-
-              display_title =
-                if vn_title,
-                  do: ReleaseTitleHelper.compute_display_title(title, vn_title, vn_latin_title),
-                  else: title
-
-              producers_json =
-                (rel["producers"] || [])
-                |> Enum.map(fn p ->
-                  %{
-                    "vndb_id" => p["id"],
-                    "name" => p["name"] || p["id"],
-                    "developer" => p["developer"] == true,
-                    "publisher" => p["publisher"] == true
-                  }
-                end)
-
-              [
-                %{
-                  id: UUIDv7.generate(),
-                  vndb_id: rel["id"],
-                  visual_novel_id: vn_uuid,
-                  title: title || "Unknown",
-                  display_title: display_title,
-                  latin_title: latin_title,
-                  original_language: rel["olang"],
-                  release_date: parse_api_release_date(rel["released"]),
-                  release_type: vn_entry["rtype"] || "complete",
-                  patch: rel["patch"] == true,
-                  freeware: rel["freeware"] == true,
-                  official: rel["official"] != false,
-                  has_ero: rel["has_ero"] == true,
-                  uncensored: rel["uncensored"],
-                  voiced: rel["voiced"],
-                  minage: rel["minage"],
-                  engine: rel["engine"],
-                  platforms: rel["platforms"] || [],
-                  languages: rel["languages"] || [],
-                  mtl_languages: extract_mtl_languages(rel),
-                  producers: producers_json,
-                  notes: VndbFieldMapper.clean_release_notes(rel["notes"]),
-                  reso_x: if(is_integer(rel["reso_x"]) && rel["reso_x"] > 0, do: rel["reso_x"]),
-                  reso_y: if(is_integer(rel["reso_y"]) && rel["reso_y"] > 0, do: rel["reso_y"]),
-                  media:
-                    Enum.map(rel["media"] || [], fn m ->
-                      %{
-                        "medium" => m["medium"],
-                        "label" => VndbStorefrontMapper.media_label(m["medium"]),
-                        "qty" => m["qty"]
-                      }
-                    end),
-                  inserted_at: now,
-                  updated_at: now
-                }
-              ]
-          end
-        end)
-      end)
+      for rel <- releases,
+          vn_entry <- rel["vns"] || [],
+          row <- release_rows_for_vn(rel, vn_entry, vn_id_map, vn_titles, now) do
+        row
+      end
 
     if release_rows != [] do
       chunked_insert(Release, release_rows,
@@ -814,6 +724,86 @@ defmodule Kaguya.Sync.VndbEnrichment do
 
       # Now upsert extlinks
       upsert_release_extlinks(releases, vn_id_map, now)
+    end
+  end
+
+  defp release_title_source(vn) do
+    ja_latin =
+      Enum.find_value(vn.vn_titles, fn t ->
+        if t.lang == "ja" and t.latin != nil, do: t.latin
+      end)
+
+    {vn.id, {vn.title, ja_latin}}
+  end
+
+  defp release_rows_for_vn(rel, vn_entry, vn_id_map, vn_titles, now) do
+    vid = vn_entry["id"]
+
+    case Map.get(vn_id_map, vid) do
+      nil ->
+        []
+
+      vn_uuid ->
+        title = resolve_api_release_title(rel)
+        latin_title = rel["title"]
+        latin_title = if latin_title && latin_title != title, do: latin_title, else: nil
+
+        {vn_title, vn_latin_title} = Map.get(vn_titles, vn_uuid, {nil, nil})
+
+        display_title =
+          if vn_title,
+            do: ReleaseTitleHelper.compute_display_title(title, vn_title, vn_latin_title),
+            else: title
+
+        producers_json =
+          (rel["producers"] || [])
+          |> Enum.map(fn p ->
+            %{
+              "vndb_id" => p["id"],
+              "name" => p["name"] || p["id"],
+              "developer" => p["developer"] == true,
+              "publisher" => p["publisher"] == true
+            }
+          end)
+
+        [
+          %{
+            id: UUIDv7.generate(),
+            vndb_id: rel["id"],
+            visual_novel_id: vn_uuid,
+            title: title || "Unknown",
+            display_title: display_title,
+            latin_title: latin_title,
+            original_language: rel["olang"],
+            release_date: parse_api_release_date(rel["released"]),
+            release_type: vn_entry["rtype"] || "complete",
+            patch: rel["patch"] == true,
+            freeware: rel["freeware"] == true,
+            official: rel["official"] != false,
+            has_ero: rel["has_ero"] == true,
+            uncensored: rel["uncensored"],
+            voiced: rel["voiced"],
+            minage: rel["minage"],
+            engine: rel["engine"],
+            platforms: rel["platforms"] || [],
+            languages: rel["languages"] || [],
+            mtl_languages: extract_mtl_languages(rel),
+            producers: producers_json,
+            notes: VndbFieldMapper.clean_release_notes(rel["notes"]),
+            reso_x: if(is_integer(rel["reso_x"]) && rel["reso_x"] > 0, do: rel["reso_x"]),
+            reso_y: if(is_integer(rel["reso_y"]) && rel["reso_y"] > 0, do: rel["reso_y"]),
+            media:
+              Enum.map(rel["media"] || [], fn m ->
+                %{
+                  "medium" => m["medium"],
+                  "label" => VndbStorefrontMapper.media_label(m["medium"]),
+                  "qty" => m["qty"]
+                }
+              end),
+            inserted_at: now,
+            updated_at: now
+          }
+        ]
     end
   end
 
@@ -831,68 +821,15 @@ defmodule Kaguya.Sync.VndbEnrichment do
       |> Map.new()
 
     extlink_rows =
-      Enum.flat_map(releases, fn rel ->
-        extlinks = rel["extlinks"] || []
-        vn_entries = rel["vns"] || []
-
-        Enum.flat_map(vn_entries, fn vn_entry ->
-          vid = vn_entry["id"]
-          vn_uuid = Map.get(vn_id_map, vid)
-
-          case vn_uuid && Map.get(release_uuid_map, {rel["id"], vn_uuid}) do
-            nil ->
-              []
-
-            release_uuid ->
-              Enum.flat_map(extlinks, fn link ->
-                site = link["name"] || link["label"]
-                url = link["url"]
-
-                if site && url do
-                  label = VndbStorefrontMapper.label(site)
-
-                  base = [
-                    %{
-                      id: UUIDv7.generate(),
-                      vn_release_id: release_uuid,
-                      site: site,
-                      label: label,
-                      url: String.slice(url, 0, 2000),
-                      inserted_at: now,
-                      updated_at: now
-                    }
-                  ]
-
-                  # Generate synthetic SteamDB link from Steam URL
-                  if site == "steam" do
-                    case Regex.run(~r"/app/(\d+)", url) do
-                      [_, app_id] ->
-                        base ++
-                          [
-                            %{
-                              id: UUIDv7.generate(),
-                              vn_release_id: release_uuid,
-                              site: "steamdb",
-                              label: "SteamDB",
-                              url: "https://steamdb.info/app/#{app_id}",
-                              inserted_at: now,
-                              updated_at: now
-                            }
-                          ]
-
-                      _ ->
-                        base
-                    end
-                  else
-                    base
-                  end
-                else
-                  []
-                end
-              end)
-          end
-        end)
-      end)
+      for rel <- releases,
+          vn_entry <- rel["vns"] || [],
+          vn_uuid <- [Map.get(vn_id_map, vn_entry["id"])],
+          release_uuid <- [vn_uuid && Map.get(release_uuid_map, {rel["id"], vn_uuid})],
+          not is_nil(release_uuid),
+          link <- rel["extlinks"] || [],
+          row <- release_extlink_rows(link, release_uuid, now) do
+        row
+      end
       |> Enum.uniq_by(fn r -> {r.vn_release_id, r.site, r.url} end)
 
     if extlink_rows != [] do
@@ -902,6 +839,49 @@ defmodule Kaguya.Sync.VndbEnrichment do
       )
     end
   end
+
+  defp release_extlink_rows(link, release_uuid, now) do
+    site = link["name"] || link["label"]
+    url = link["url"]
+
+    if site && url do
+      base = %{
+        id: UUIDv7.generate(),
+        vn_release_id: release_uuid,
+        site: site,
+        label: VndbStorefrontMapper.label(site),
+        url: String.slice(url, 0, 2000),
+        inserted_at: now,
+        updated_at: now
+      }
+
+      [base | steamdb_links(site, url, release_uuid, now)]
+    else
+      []
+    end
+  end
+
+  defp steamdb_links("steam", url, release_uuid, now) do
+    case Regex.run(~r"/app/(\d+)", url) do
+      [_, app_id] ->
+        [
+          %{
+            id: UUIDv7.generate(),
+            vn_release_id: release_uuid,
+            site: "steamdb",
+            label: "SteamDB",
+            url: "https://steamdb.info/app/#{app_id}",
+            inserted_at: now,
+            updated_at: now
+          }
+        ]
+
+      _ ->
+        []
+    end
+  end
+
+  defp steamdb_links(_site, _url, _release_uuid, _now), do: []
 
   defp resolve_api_release_title(rel) do
     # API returns `title` as the main display title

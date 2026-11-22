@@ -46,10 +46,7 @@ defmodule Kaguya.Sync.DumpSync.Relations do
             existing_pairs,
             protected_vn_uuids,
             0,
-            0,
-            0,
-            0,
-            []
+            {0, 0, 0, []}
           )
 
         Report.record(:relations, new_count, updated_count, new_ids)
@@ -83,26 +80,7 @@ defmodule Kaguya.Sync.DumpSync.Relations do
     existing_pairs = load_existing_pairs()
 
     {insert_rows, new_ids} =
-      Enum.reduce(rows, {[], []}, fn r, {rows_acc, ids} ->
-        with vn_uuid when not is_nil(vn_uuid) <- Map.get(vn_mapping, r.id),
-             false <- MapSet.member?(protected_vn_uuids, vn_uuid),
-             related_uuid when not is_nil(related_uuid) <- Map.get(vn_mapping, r.vid) do
-          row = %{
-            visual_novel_id: vn_uuid,
-            related_vn_id: related_uuid,
-            relation_type: VndbFieldMapper.map_relation_type(r.relation),
-            is_official: r.official,
-            inserted_at: now,
-            updated_at: now
-          }
-
-          is_new = not MapSet.member?(existing_pairs, {vn_uuid, related_uuid})
-          new_id = if is_new, do: [%{id: "#{r.id}→#{r.vid}", relation: r.relation}], else: []
-          {[row | rows_acc], new_id ++ ids}
-        else
-          _ -> {rows_acc, ids}
-        end
-      end)
+      build_relation_rows(rows, vn_mapping, protected_vn_uuids, existing_pairs, now)
 
     count =
       DumpSync.chunked_insert(Relation, insert_rows,
@@ -127,10 +105,7 @@ defmodule Kaguya.Sync.DumpSync.Relations do
          existing_pairs,
          protected_vn_uuids,
          offset,
-         acc,
-         new_acc,
-         updated_acc,
-         ids_acc
+         {acc, new_acc, updated_acc, ids_acc}
        ) do
     rows =
       DumpSync.query_vndb!(vndb, """
@@ -148,26 +123,7 @@ defmodule Kaguya.Sync.DumpSync.Relations do
 
       # Build rows and track new vs existing
       {insert_rows, batch_new_ids} =
-        Enum.reduce(rows, {[], []}, fn r, {rows_acc, ids} ->
-          with vn_uuid when not is_nil(vn_uuid) <- Map.get(vn_mapping, r.id),
-               false <- MapSet.member?(protected_vn_uuids, vn_uuid),
-               related_uuid when not is_nil(related_uuid) <- Map.get(vn_mapping, r.vid) do
-            row = %{
-              visual_novel_id: vn_uuid,
-              related_vn_id: related_uuid,
-              relation_type: VndbFieldMapper.map_relation_type(r.relation),
-              is_official: r.official,
-              inserted_at: now,
-              updated_at: now
-            }
-
-            is_new = not MapSet.member?(existing_pairs, {vn_uuid, related_uuid})
-            new_id = if is_new, do: [%{id: "#{r.id}→#{r.vid}", relation: r.relation}], else: []
-            {[row | rows_acc], new_id ++ ids}
-          else
-            _ -> {rows_acc, ids}
-          end
-        end)
+        build_relation_rows(rows, vn_mapping, protected_vn_uuids, existing_pairs, now)
 
       batch_new = length(batch_new_ids)
       batch_updated = length(insert_rows) - batch_new
@@ -184,11 +140,32 @@ defmodule Kaguya.Sync.DumpSync.Relations do
         existing_pairs,
         protected_vn_uuids,
         offset + @batch_size,
-        acc + count,
-        new_acc + batch_new,
-        updated_acc + batch_updated,
-        ids_acc ++ batch_new_ids
+        {acc + count, new_acc + batch_new, updated_acc + batch_updated, ids_acc ++ batch_new_ids}
       )
+    end
+  end
+
+  defp build_relation_rows(rows, vn_mapping, protected_vn_uuids, existing_pairs, now) do
+    for r <- rows,
+        vn_uuid = Map.get(vn_mapping, r.id),
+        not is_nil(vn_uuid),
+        not MapSet.member?(protected_vn_uuids, vn_uuid),
+        related_uuid = Map.get(vn_mapping, r.vid),
+        not is_nil(related_uuid),
+        reduce: {[], []} do
+      {rows_acc, ids} ->
+        row = %{
+          visual_novel_id: vn_uuid,
+          related_vn_id: related_uuid,
+          relation_type: VndbFieldMapper.map_relation_type(r.relation),
+          is_official: r.official,
+          inserted_at: now,
+          updated_at: now
+        }
+
+        is_new = not MapSet.member?(existing_pairs, {vn_uuid, related_uuid})
+        new_id = if is_new, do: [%{id: "#{r.id}→#{r.vid}", relation: r.relation}], else: []
+        {[row | rows_acc], new_id ++ ids}
     end
   end
 

@@ -93,33 +93,31 @@ defmodule KaguyaWeb.SettingsLive.Index do
     socket = refresh_exports(socket)
     latest_export = socket.assigns.latest_export
 
-    cond do
-      export_busy?(latest_export) ->
-        {:noreply,
-         socket
-         |> assign(:latest_export, latest_export)
-         |> maybe_schedule_export_poll()}
+    if export_busy?(latest_export) do
+      {:noreply,
+       socket
+       |> assign(:latest_export, latest_export)
+       |> maybe_schedule_export_poll()}
+    else
+      case KaguyaCsv.enqueue(user_id) do
+        {:ok, export} ->
+          {:noreply,
+           socket
+           |> assign(:latest_export, export)
+           |> assign(:active_export_id, export.id)
+           |> maybe_schedule_export_poll()
+           |> put_flash(:info, "Export started.")}
 
-      true ->
-        case KaguyaCsv.enqueue(user_id) do
-          {:ok, export} ->
-            {:noreply,
-             socket
-             |> assign(:latest_export, export)
-             |> assign(:active_export_id, export.id)
-             |> maybe_schedule_export_poll()
-             |> put_flash(:info, "Export started.")}
+        {:error, :export_in_progress} ->
+          {:noreply,
+           socket
+           |> refresh_exports()
+           |> maybe_schedule_export_poll()
+           |> put_flash(:error, "A library export is already queued or running.")}
 
-          {:error, :export_in_progress} ->
-            {:noreply,
-             socket
-             |> refresh_exports()
-             |> maybe_schedule_export_poll()
-             |> put_flash(:error, "A library export is already queued or running.")}
-
-          {:error, reason} ->
-            {:noreply, put_flash(socket, :error, "Could not start export: #{inspect(reason)}")}
-        end
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Could not start export: #{inspect(reason)}")}
+      end
     end
   end
 
@@ -166,12 +164,13 @@ defmodule KaguyaWeb.SettingsLive.Index do
   def handle_event("delete_account", _params, socket) do
     user_id = socket.assigns.current_user.id
 
-    with {:ok, _} <- Users.delete_user(user_id) do
-      {:noreply,
-       push_event(socket, "kaguya:submit-form", %{
-         selector: "#account-deleted-sign-out-form"
-       })}
-    else
+    case Users.delete_user(user_id) do
+      {:ok, _} ->
+        {:noreply,
+         push_event(socket, "kaguya:submit-form", %{
+           selector: "#account-deleted-sign-out-form"
+         })}
+
       {:error, reason} ->
         Logger.error("Account deletion failed for #{user_id}: #{inspect(reason)}")
 

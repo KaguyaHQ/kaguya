@@ -771,25 +771,7 @@ defmodule Kaguya.Users do
 
         Repo.delete!(locked_user)
 
-        # character_favorites rows were CASCADE-dropped with the user row,
-        # but the denormalized characters.favorites_count counter is on
-        # the character side and needs an explicit decrement.
-        if favorited_char_ids != [] do
-          from(c in Character,
-            where: c.id in ^favorited_char_ids and c.favorites_count > 0
-          )
-          |> Repo.update_all(inc: [favorites_count: -1])
-        end
-
-        # quote_favorites rows are also CASCADE-dropped with the user row,
-        # but vn_quotes.favorites_count is denormalized on the quote side
-        # and needs the same explicit decrement.
-        if favorited_quote_ids != [] do
-          from(q in Quote,
-            where: q.id in ^favorited_quote_ids and q.favorites_count > 0
-          )
-          |> Repo.update_all(inc: [favorites_count: -1])
-        end
+        decrement_deleted_user_favorites(favorited_char_ids, favorited_quote_ids)
 
         # Review comments_count (grouped by review, fixes old -1 bug)
         Enum.each(review_comment_counts, fn {review_id, cnt} ->
@@ -823,36 +805,7 @@ defmodule Kaguya.Users do
           end)
         end
 
-        # Stale notifications on others pointing to deleted reviews/lists
-        if own_review_ids != [] do
-          from(n in Notification,
-            where: n.entity_type == :review and n.entity_id in ^own_review_ids
-          )
-          |> Repo.delete_all()
-        end
-
-        if own_list_ids != [] do
-          from(n in Notification, where: n.entity_type == :list and n.entity_id in ^own_list_ids)
-          |> Repo.delete_all()
-        end
-
-        # Stale activities on others pointing to deleted reviews/lists
-        if own_review_ids != [] do
-          from(a in UserActivity,
-            where:
-              a.entity_type == "review" and a.entity_id in ^own_review_ids and
-                a.user_id != ^user_id
-          )
-          |> Repo.delete_all()
-        end
-
-        if own_list_ids != [] do
-          from(a in UserActivity,
-            where:
-              a.entity_type == "list" and a.entity_id in ^own_list_ids and a.user_id != ^user_id
-          )
-          |> Repo.delete_all()
-        end
+        delete_stale_user_content_references(user_id, own_review_ids, own_list_ids)
 
         # Notifications on others where this user is an actor (likes, follows, comments, etc.)
         uid_str = Ecto.UUID.cast!(user_id)
@@ -873,6 +826,60 @@ defmodule Kaguya.Users do
         {:error, :not_found} -> {:error, :not_found}
         error -> error
       end
+    end
+  end
+
+  defp decrement_deleted_user_favorites(favorited_char_ids, favorited_quote_ids) do
+    # character_favorites rows were CASCADE-dropped with the user row,
+    # but the denormalized characters.favorites_count counter is on
+    # the character side and needs an explicit decrement.
+    if favorited_char_ids != [] do
+      from(c in Character,
+        where: c.id in ^favorited_char_ids and c.favorites_count > 0
+      )
+      |> Repo.update_all(inc: [favorites_count: -1])
+    end
+
+    # quote_favorites rows are also CASCADE-dropped with the user row,
+    # but vn_quotes.favorites_count is denormalized on the quote side
+    # and needs the same explicit decrement.
+    if favorited_quote_ids != [] do
+      from(q in Quote,
+        where: q.id in ^favorited_quote_ids and q.favorites_count > 0
+      )
+      |> Repo.update_all(inc: [favorites_count: -1])
+    end
+  end
+
+  defp delete_stale_user_content_references(user_id, own_review_ids, own_list_ids) do
+    # Stale notifications on others pointing to deleted reviews/lists
+    if own_review_ids != [] do
+      from(n in Notification,
+        where: n.entity_type == :review and n.entity_id in ^own_review_ids
+      )
+      |> Repo.delete_all()
+    end
+
+    if own_list_ids != [] do
+      from(n in Notification, where: n.entity_type == :list and n.entity_id in ^own_list_ids)
+      |> Repo.delete_all()
+    end
+
+    # Stale activities on others pointing to deleted reviews/lists
+    if own_review_ids != [] do
+      from(a in UserActivity,
+        where:
+          a.entity_type == "review" and a.entity_id in ^own_review_ids and
+            a.user_id != ^user_id
+      )
+      |> Repo.delete_all()
+    end
+
+    if own_list_ids != [] do
+      from(a in UserActivity,
+        where: a.entity_type == "list" and a.entity_id in ^own_list_ids and a.user_id != ^user_id
+      )
+      |> Repo.delete_all()
     end
   end
 

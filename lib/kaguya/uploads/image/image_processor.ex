@@ -63,9 +63,8 @@ defmodule Kaguya.ImageProcessor do
 
     with {:ok, raw} <- ImageStorage.fetch_temp_image(temp_key),
          {:ok, meta} <- ImageStorage.get_image_metadata(raw),
-         {:ok, _context} <- generate_and_upload_variants(raw, upload_id, type, variants),
-         {:ok, result} <- swap_callback.(meta) do
-      {:ok, result}
+         {:ok, _context} <- generate_and_upload_variants(raw, upload_id, type, variants) do
+      swap_callback.(meta)
     end
   end
 

@@ -248,15 +248,15 @@ defmodule Kaguya.Revisions.Enrichment do
         snapshot
 
       hist ->
-        enriched_hist =
-          Enum.reduce(main_fields, hist, fn {id_field, url_field, image_type, suffix}, acc ->
-            case Map.get(acc, id_field) do
-              nil -> acc
-              id -> Map.put(acc, url_field, image_url(image_type, id, suffix))
-            end
-          end)
-
+        enriched_hist = Enum.reduce(main_fields, hist, &enrich_main_image_field/2)
         Map.put(snapshot, :hist, enriched_hist)
+    end
+  end
+
+  defp enrich_main_image_field({id_field, url_field, image_type, suffix}, hist) do
+    case Map.get(hist, id_field) do
+      nil -> hist
+      id -> Map.put(hist, url_field, image_url(image_type, id, suffix))
     end
   end
 

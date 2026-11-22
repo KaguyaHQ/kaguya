@@ -1,4 +1,11 @@
 defmodule KaguyaWeb.Plugs.VerifyOriginHeader do
+  @moduledoc """
+  Checks the upstream origin-signature header when origin protection is enabled.
+
+  `init/1` reads `:protect_origin_header`. When enabled, requests without the
+  expected signature receive a forbidden response and stop in this plug.
+  """
+
   import Plug.Conn
 
   @header "x-origin-sig"

@@ -27,41 +27,7 @@ defmodule Kaguya.Sync.VndbFieldMapper do
   "official" => true, "main" => true}
   """
   def resolve_title(titles, _olang) when is_list(titles) do
-    candidates =
-      Enum.flat_map(titles, fn t ->
-        lang = t["lang"]
-        title = t["title"]
-        latin = t["latin"]
-        official = t["official"] == true
-
-        cond do
-          # Priority 1: Official English title
-          official and lang == "en" and non_blank?(title) ->
-            [{1, title}]
-
-          # Priority 2 & 3: Official Japanese
-          official and lang == "ja" ->
-            entries = []
-            entries = if non_blank?(latin), do: [{2, latin} | entries], else: entries
-            entries = if non_blank?(title), do: [{3, title} | entries], else: entries
-            entries
-
-          # Priority 4 & 5: Official other-language
-          official ->
-            if is_nil(latin) or latin == "" do
-              if non_blank?(title), do: [{4, title}], else: []
-            else
-              if non_blank?(latin), do: [{5, latin}], else: []
-            end
-
-          # Priority 6 & 7: Non-official
-          true ->
-            entries = []
-            entries = if non_blank?(latin), do: [{6, latin} | entries], else: entries
-            entries = if non_blank?(title), do: [{7, title} | entries], else: entries
-            entries
-        end
-      end)
+    candidates = Enum.flat_map(titles, &title_candidates/1)
 
     case Enum.sort_by(candidates, &elem(&1, 0)) do
       [{_priority, title} | _] -> title
@@ -70,6 +36,26 @@ defmodule Kaguya.Sync.VndbFieldMapper do
   end
 
   def resolve_title(_, _), do: nil
+
+  defp title_candidates(%{"official" => true} = t) do
+    lang = t["lang"]
+    title = t["title"]
+    latin = t["latin"]
+
+    ranked =
+      cond do
+        lang == "en" and non_blank?(title) -> [{1, title}]
+        lang == "ja" -> [{3, title}, {2, latin}]
+        latin in [nil, ""] -> [{4, title}]
+        true -> [{5, latin}]
+      end
+
+    Enum.filter(ranked, fn {_priority, value} -> non_blank?(value) end)
+  end
+
+  defp title_candidates(t) do
+    Enum.filter([{7, t["title"]}, {6, t["latin"]}], fn {_priority, value} -> non_blank?(value) end)
+  end
 
   @doc """
   Extract the Japanese latin (romanized) title for the `latin_title` column.
@@ -82,13 +68,12 @@ defmodule Kaguya.Sync.VndbFieldMapper do
   """
   def resolve_latin_title(titles) when is_list(titles) do
     titles
+    |> Stream.filter(&(&1["lang"] == "ja"))
     |> Enum.find_value(fn t ->
-      if t["lang"] == "ja" do
-        cond do
-          non_blank?(t["latin"]) -> t["latin"]
-          non_blank?(t["title"]) and latin_script?(t["title"]) -> t["title"]
-          true -> nil
-        end
+      cond do
+        non_blank?(t["latin"]) -> t["latin"]
+        non_blank?(t["title"]) and latin_script?(t["title"]) -> t["title"]
+        true -> nil
       end
     end)
   end

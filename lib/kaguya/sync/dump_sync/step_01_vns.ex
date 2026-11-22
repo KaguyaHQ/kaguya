@@ -395,11 +395,7 @@ defmodule Kaguya.Sync.DumpSync.VNs do
         category_map,
         user_edited_vn_ids,
         now,
-        0,
-        0,
-        0,
-        0,
-        []
+        %{offset: 0, count: 0, new: 0, updated: 0, ids: []}
       )
 
     Report.record(:vns, new_total, updated_total, new_ids)
@@ -421,11 +417,7 @@ defmodule Kaguya.Sync.DumpSync.VNs do
          category_map,
          user_edited_vn_ids,
          now,
-         offset,
-         acc,
-         new_acc,
-         updated_acc,
-         ids_acc
+         %{offset: offset} = state
        ) do
     vns =
       DumpSync.query_vndb!(vndb, """
@@ -438,7 +430,7 @@ defmodule Kaguya.Sync.DumpSync.VNs do
       """)
 
     if vns == [] do
-      {acc, offset, new_acc, updated_acc, ids_acc}
+      {state.count, offset, state.new, state.updated, state.ids}
     else
       Logger.info("Processing VN batch at offset #{offset} (#{length(vns)} rows)...")
 
@@ -460,13 +452,11 @@ defmodule Kaguya.Sync.DumpSync.VNs do
         Enum.split_with(valid_vns, fn vn -> Map.has_key?(vn_mapping, vn_vndb_id(vn)) end)
 
       # Log new VNs
-      if new_vns != [] do
-        Enum.each(new_vns, fn vn ->
-          titles = Map.get(titles_map, vn.id, [])
-          title = resolve_title(titles, vn.olang) || "Unknown"
-          Logger.info("  + NEW: #{vn_vndb_id(vn)} — #{title}")
-        end)
-      end
+      Enum.each(new_vns, fn vn ->
+        titles = Map.get(titles_map, vn.id, [])
+        title = resolve_title(titles, vn.olang) || "Unknown"
+        Logger.info("  + NEW: #{vn_vndb_id(vn)} — #{title}")
+      end)
 
       # Insert new VNs with real slugs (year-based suffixes for collisions)
       new_slug_map = generate_vn_slugs(new_vns, titles_map, release_stats_map)
@@ -548,11 +538,14 @@ defmodule Kaguya.Sync.DumpSync.VNs do
         category_map,
         user_edited_vn_ids,
         now,
-        offset + @batch_size,
-        acc + count,
-        new_acc + new_count,
-        updated_acc + existing_count,
-        ids_acc ++ batch_new_ids
+        %{
+          state
+          | offset: offset + @batch_size,
+            count: state.count + count,
+            new: state.new + new_count,
+            updated: state.updated + existing_count,
+            ids: state.ids ++ batch_new_ids
+        }
       )
     end
   end
@@ -717,27 +710,21 @@ defmodule Kaguya.Sync.DumpSync.VNs do
 
   defp upsert_vn_titles(valid_vns, titles_map, vn_mapping, new_vn_uuid_map, user_edited_vn_ids) do
     title_rows =
-      Enum.flat_map(valid_vns, fn vn ->
-        vndb_id = vn_vndb_id(vn)
-        vn_uuid = Map.get(vn_mapping, vndb_id) || Map.get(new_vn_uuid_map, vndb_id)
-
-        if vn_uuid && not MapSet.member?(user_edited_vn_ids, vndb_id) do
-          titles = Map.get(titles_map, vn.id, [])
-
-          Enum.map(titles, fn t ->
-            %{
-              id: UUIDv7.generate(),
-              visual_novel_id: vn_uuid,
-              lang: t.lang,
-              official: t.official || false,
-              title: VndbFieldMapper.sanitize_utf8(t.title) || "Unknown",
-              latin: if(non_blank?(t.latin), do: VndbFieldMapper.sanitize_utf8(t.latin))
-            }
-          end)
-        else
-          []
-        end
-      end)
+      for vn <- valid_vns,
+          vndb_id <- [vn_vndb_id(vn)],
+          vn_uuid <- [Map.get(vn_mapping, vndb_id) || Map.get(new_vn_uuid_map, vndb_id)],
+          vn_uuid,
+          not MapSet.member?(user_edited_vn_ids, vndb_id),
+          t <- Map.get(titles_map, vn.id, []) do
+        %{
+          id: UUIDv7.generate(),
+          visual_novel_id: vn_uuid,
+          lang: t.lang,
+          official: t.official || false,
+          title: VndbFieldMapper.sanitize_utf8(t.title) || "Unknown",
+          latin: if(non_blank?(t.latin), do: VndbFieldMapper.sanitize_utf8(t.latin))
+        }
+      end
 
     if title_rows != [] do
       DumpSync.chunked_insert(VNTitle, title_rows,
@@ -961,26 +948,20 @@ defmodule Kaguya.Sync.DumpSync.VNs do
       acc
     else
       insert_rows =
-        Enum.flat_map(rows, fn row ->
-          case Map.get(vn_uuid_map, row.vn_id) do
-            nil ->
-              []
+        for row <- rows,
+            uuid <- [Map.get(vn_uuid_map, row.vn_id)],
+            not is_nil(uuid) do
+          # Remap deprecated "wp" → "enwiki" before wikidata enrichment.
+          site = if row.site == "wp", do: "enwiki", else: row.site
 
-            uuid ->
-              # Remap deprecated "wp" → "enwiki" so wikidata enrichment can upsert over it
-              site = if row.site == "wp", do: "enwiki", else: row.site
-
-              [
-                %{
-                  vn_id: uuid,
-                  site: site,
-                  value: String.slice(row.value || "", 0, 1000),
-                  inserted_at: now,
-                  updated_at: now
-                }
-              ]
-          end
-        end)
+          %{
+            vn_id: uuid,
+            site: site,
+            value: String.slice(row.value || "", 0, 1000),
+            inserted_at: now,
+            updated_at: now
+          }
+        end
         |> Enum.uniq_by(fn r -> {r.vn_id, r.site} end)
 
       # Preserve any locally curated extlink already occupying

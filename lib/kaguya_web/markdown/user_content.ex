@@ -93,9 +93,8 @@ defmodule KaguyaWeb.Markdown.UserContent do
              extension: [autolink: true, strikethrough: true],
              parse: [smart: false],
              render: [escape: true, hardbreaks: hardbreaks]
-           ),
-         {:ok, ast} <- Floki.parse_fragment(html) do
-      {:ok, ast}
+           ) do
+      Floki.parse_fragment(html)
     end
   end
 
@@ -165,18 +164,21 @@ defmodule KaguyaWeb.Markdown.UserContent do
         [text]
 
       parts ->
-        parts
-        |> Enum.flat_map(fn chunk ->
-          case Regex.run(~r/^\x{E000}(\d+)\x{E001}$/u, chunk) do
-            [_, idx_str] ->
-              idx = String.to_integer(idx_str)
-              inner_md = Map.get(spoilers, idx, "")
-              [spoiler_node(render_inline(inner_md, spoilers))]
+        Enum.flat_map(parts, &inflate_spoiler_chunk(&1, spoilers))
+    end
+  end
 
-            _ ->
-              if chunk == "", do: [], else: [chunk]
-          end
-        end)
+  defp inflate_spoiler_chunk("", _spoilers), do: []
+
+  defp inflate_spoiler_chunk(chunk, spoilers) do
+    case Regex.run(~r/^\x{E000}(\d+)\x{E001}$/u, chunk) do
+      [_, idx_str] ->
+        idx = String.to_integer(idx_str)
+        inner_md = Map.get(spoilers, idx, "")
+        [spoiler_node(render_inline(inner_md, spoilers))]
+
+      _ ->
+        [chunk]
     end
   end
 

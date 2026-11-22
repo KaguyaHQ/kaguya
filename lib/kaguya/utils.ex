@@ -1,4 +1,11 @@
 defmodule Kaguya.Utils do
+  @moduledoc """
+  Slug generation for individual records and changesets.
+
+  Collision checks can be scoped to a record owner and can prefer a release-year
+  suffix. Use `Kaguya.Utils.SlugUtils` when generating slugs for a batch.
+  """
+
   alias Kaguya.Repo
   import Ecto.Changeset
 
@@ -50,21 +57,21 @@ defmodule Kaguya.Utils do
     if slug_available?(base_slug, module, scope) do
       base_slug
     else
-      release_date = Keyword.get(opts, :release_date)
-
-      if release_date do
-        year = if is_struct(release_date, Date), do: release_date.year, else: release_date
-        year_slug = "#{base_slug}-#{year}"
-
-        if slug_available?(year_slug, module, scope) do
-          year_slug
-        else
-          find_numeric_slug(year_slug, module, 1, scope)
-        end
-      else
-        find_numeric_slug(base_slug, module, 1, scope)
-      end
+      unique_slug_after_collision(base_slug, module, scope, Keyword.get(opts, :release_date))
     end
+  end
+
+  defp unique_slug_after_collision(base_slug, module, scope, release_date)
+       when release_date in [nil, false],
+       do: find_numeric_slug(base_slug, module, 1, scope)
+
+  defp unique_slug_after_collision(base_slug, module, scope, release_date) do
+    year = if is_struct(release_date, Date), do: release_date.year, else: release_date
+    year_slug = "#{base_slug}-#{year}"
+
+    if slug_available?(year_slug, module, scope),
+      do: year_slug,
+      else: find_numeric_slug(year_slug, module, 1, scope)
   end
 
   defp slug_available?(slug, module, scope) do
@@ -128,6 +135,8 @@ defmodule Kaguya.Utils do
 end
 
 defmodule Kaguya.SentryFinchClient do
+  @moduledoc "Sends Sentry event requests through a dedicated Finch pool."
+
   @behaviour Sentry.HTTPClient
 
   @impl true

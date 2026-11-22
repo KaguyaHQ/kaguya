@@ -261,6 +261,47 @@ defmodule KaguyaWeb.VNLive.ReleaseCreditsTest do
     assert Repo.get_by!(VNProducer, visual_novel_id: vn.id).role == "developer"
   end
 
+  test "credits merge roles and earliest dates across visible releases without changing another VN" do
+    vn = vn!()
+    other_vn = vn!()
+
+    producer =
+      producer!("Shared credit studio")
+      |> Ecto.Changeset.change(vndb_id: "p999997")
+      |> Repo.update!()
+
+    stale_producer = producer!("Removed credit studio")
+
+    release!(vn, "Developer edition", [credit(producer, true, false)], ~D[2022-01-01])
+
+    release!(
+      vn,
+      "Publisher edition",
+      [%{"vndb_id" => producer.vndb_id, "publisher" => true}],
+      ~D[2020-01-01]
+    )
+
+    release!(vn, "Undated edition", [credit(producer, true, false)], nil)
+
+    release!(vn, "Hidden edition", [credit(producer, true, false)], ~D[1999-01-01])
+    |> Ecto.Changeset.change(hidden_at: DateTime.utc_now() |> DateTime.truncate(:second))
+    |> Repo.update!()
+
+    for {vn_id, studio_id} <- [{vn.id, stale_producer.id}, {other_vn.id, producer.id}] do
+      Repo.insert!(%VNProducer{visual_novel_id: vn_id, producer_id: studio_id, role: "publisher"})
+    end
+
+    assert :ok = Credits.recompute([vn.id, vn.id])
+
+    assert %{role: "developer_publisher", earliest_release_date: ~D[2020-01-01]} =
+             Repo.get_by!(VNProducer, visual_novel_id: vn.id, producer_id: producer.id)
+
+    refute Repo.get_by(VNProducer, visual_novel_id: vn.id, producer_id: stale_producer.id)
+
+    assert %{role: "publisher", earliest_release_date: nil} =
+             Repo.get_by!(VNProducer, visual_novel_id: other_vn.id, producer_id: producer.id)
+  end
+
   defp vn! do
     suffix = System.unique_integer([:positive])
 

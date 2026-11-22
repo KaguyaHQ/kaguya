@@ -77,6 +77,24 @@ defmodule Kaguya.Lists.TierListsTest do
            ]
   end
 
+  test "invalid later tier rolls back earlier tier writes", %{user: user, vns: [vn | _]} do
+    {:ok, list} = create_grid_list!(user, [vn])
+
+    assert {:error, %Ecto.Changeset{}} =
+             Lists.save_list_layout(list.id, user.id, %{
+               display_mode: "tier",
+               tiers: [
+                 %{label: "S", color: "#ff5555", position: 1},
+                 %{label: "Invalid", color: "invalid", position: 2}
+               ],
+               items: [%{visual_novel_id: vn.id}]
+             })
+
+    assert Repo.aggregate(from(t in ListTier, where: t.list_id == ^list.id), :count) == 0
+    assert Repo.get!(List, list.id).display_mode == "grid"
+    assert Repo.get_by!(ListItem, list_id: list.id, visual_novel_id: vn.id)
+  end
+
   test "save_list_layout accepts temporary frontend tier ids", %{
     user: user,
     vns: [vn1, vn2 | _]

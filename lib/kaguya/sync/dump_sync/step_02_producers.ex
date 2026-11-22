@@ -64,10 +64,7 @@ defmodule Kaguya.Sync.DumpSync.Producers do
           importable_producer_ids,
           protected_ids,
           0,
-          0,
-          0,
-          0,
-          []
+          {0, 0, 0, []}
         )
 
       Report.record(:producers, new_total, updated_total, new_ids)
@@ -93,10 +90,7 @@ defmodule Kaguya.Sync.DumpSync.Producers do
          importable_ids,
          protected_ids,
          offset,
-         acc,
-         new_acc,
-         updated_acc,
-         ids_acc
+         {acc, new_acc, updated_acc, ids_acc}
        ) do
     producers =
       DumpSync.query_vndb!(vndb, """
@@ -112,70 +106,63 @@ defmodule Kaguya.Sync.DumpSync.Producers do
       # Filter to producers that have at least one importable VN link
       producers = Enum.filter(producers, fn p -> MapSet.member?(importable_ids, p.id) end)
 
-      if producers == [] do
-        do_producer_batches(
-          vndb,
-          existing_ids,
-          importable_ids,
-          protected_ids,
-          offset + @batch_size,
-          acc,
-          new_acc,
-          updated_acc,
-          ids_acc
-        )
-      else
-        Logger.info(
-          "Processing producer batch at offset #{offset} (#{length(producers)} importable)..."
-        )
+      {new_count, existing_count, batch_new_ids} =
+        upsert_producer_batch(producers, existing_ids, protected_ids, offset)
 
-        now = DumpSync.now()
-
-        {existing_producers, new_producers} =
-          Enum.split_with(producers, fn p -> MapSet.member?(existing_ids, p.id) end)
-
-        # Insert new producers with real slugs
-        new_slug_map = generate_producer_slugs(new_producers)
-        new_rows = Enum.map(new_producers, &build_producer_row(&1, new_slug_map, now))
-
-        new_count =
-          DumpSync.chunked_insert(Producer, new_rows,
-            on_conflict: :nothing,
-            conflict_target: [:vndb_id]
-          )
-
-        write_create_revisions_for_new_producers(new_producers, new_rows)
-
-        # Update existing producers — protected entities only get reference fields
-        existing_rows = Enum.map(existing_producers, &build_producer_row(&1, %{}, now))
-
-        existing_count =
-          SyncProtection.protected_upsert(Producer, existing_rows, protected_ids, & &1.vndb_id,
-            full_replace_fields: @producer_replace_fields,
-            reference_replace_fields: @producer_reference_fields,
-            conflict_target: [:vndb_id]
-          )
-
-        batch_new_ids =
-          Enum.map(new_producers, fn p ->
-            name = VndbFieldMapper.sanitize_utf8(p.latin || p.name) || "Unknown"
-            slug = Map.get(new_slug_map, p.id, "—")
-            %{id: p.id, name: name, slug: slug}
-          end)
-
-        do_producer_batches(
-          vndb,
-          existing_ids,
-          importable_ids,
-          protected_ids,
-          offset + @batch_size,
-          acc + new_count + existing_count,
-          new_acc + new_count,
-          updated_acc + existing_count,
-          ids_acc ++ batch_new_ids
-        )
-      end
+      do_producer_batches(
+        vndb,
+        existing_ids,
+        importable_ids,
+        protected_ids,
+        offset + @batch_size,
+        {acc + new_count + existing_count, new_acc + new_count, updated_acc + existing_count,
+         ids_acc ++ batch_new_ids}
+      )
     end
+  end
+
+  defp upsert_producer_batch([], _existing_ids, _protected_ids, _offset), do: {0, 0, []}
+
+  defp upsert_producer_batch(producers, existing_ids, protected_ids, offset) do
+    Logger.info(
+      "Processing producer batch at offset #{offset} (#{length(producers)} importable)..."
+    )
+
+    now = DumpSync.now()
+
+    {existing_producers, new_producers} =
+      Enum.split_with(producers, fn p -> MapSet.member?(existing_ids, p.id) end)
+
+    # Insert new producers with real slugs.
+    new_slug_map = generate_producer_slugs(new_producers)
+    new_rows = Enum.map(new_producers, &build_producer_row(&1, new_slug_map, now))
+
+    new_count =
+      DumpSync.chunked_insert(Producer, new_rows,
+        on_conflict: :nothing,
+        conflict_target: [:vndb_id]
+      )
+
+    write_create_revisions_for_new_producers(new_producers, new_rows)
+
+    # Update existing producers — protected entities only get reference fields.
+    existing_rows = Enum.map(existing_producers, &build_producer_row(&1, %{}, now))
+
+    existing_count =
+      SyncProtection.protected_upsert(Producer, existing_rows, protected_ids, & &1.vndb_id,
+        full_replace_fields: @producer_replace_fields,
+        reference_replace_fields: @producer_reference_fields,
+        conflict_target: [:vndb_id]
+      )
+
+    batch_new_ids =
+      Enum.map(new_producers, fn p ->
+        name = VndbFieldMapper.sanitize_utf8(p.latin || p.name) || "Unknown"
+        slug = Map.get(new_slug_map, p.id, "—")
+        %{id: p.id, name: name, slug: slug}
+      end)
+
+    {new_count, existing_count, batch_new_ids}
   end
 
   # Writes a :create revision for each producer that was actually inserted
@@ -313,26 +300,11 @@ defmodule Kaguya.Sync.DumpSync.Producers do
       acc
     else
       insert_rows =
-        Enum.flat_map(rows, fn row ->
-          case Map.get(producer_uuid_map, row.producer_id) do
-            nil ->
-              []
-
-            uuid ->
-              # Remap deprecated "wp" → "enwiki" so wikidata enrichment can upsert over it
-              site = if row.site == "wp", do: "enwiki", else: row.site
-
-              [
-                %{
-                  producer_id: uuid,
-                  site: site,
-                  value: String.slice(row.value || "", 0, 1000),
-                  inserted_at: now,
-                  updated_at: now
-                }
-              ]
-          end
-        end)
+        for row <- rows,
+            uuid = Map.get(producer_uuid_map, row.producer_id),
+            not is_nil(uuid) do
+          producer_extlink_row(row, uuid, now)
+        end
         |> Enum.uniq_by(fn r -> {r.producer_id, r.site} end)
 
       # Preserve any locally curated extlink already occupying
@@ -346,6 +318,19 @@ defmodule Kaguya.Sync.DumpSync.Producers do
 
       do_extlink_batches(vndb, producer_uuid_map, now, offset + @batch_size, acc + count)
     end
+  end
+
+  defp producer_extlink_row(row, uuid, now) do
+    # Remap deprecated "wp" → "enwiki" so wikidata enrichment can upsert over it.
+    site = if row.site == "wp", do: "enwiki", else: row.site
+
+    %{
+      producer_id: uuid,
+      site: site,
+      value: String.slice(row.value || "", 0, 1000),
+      inserted_at: now,
+      updated_at: now
+    }
   end
 
   defp load_producer_vndb_to_uuid do
@@ -461,28 +446,23 @@ defmodule Kaguya.Sync.DumpSync.Producers do
   end
 
   defp build_wikidata_link_rows(producer_uuid, wd_row, now) do
-    Enum.reduce(@producer_wikidata_fields, {[], []}, fn {wd_col, site, fallback?},
-                                                        {always, fallback} ->
-      value = extract_wikidata_value(wd_row, wd_col)
+    for {wd_col, site, fallback?} <- @producer_wikidata_fields,
+        value = extract_wikidata_value(wd_row, wd_col),
+        not is_nil(value),
+        reduce: {[], []} do
+      {always, fallback} ->
+        link = %{
+          producer_id: producer_uuid,
+          site: site,
+          value: String.slice(to_string(value), 0, 1000),
+          inserted_at: now,
+          updated_at: now
+        }
 
-      case value do
-        nil ->
-          {always, fallback}
-
-        val ->
-          link = %{
-            producer_id: producer_uuid,
-            site: site,
-            value: String.slice(to_string(val), 0, 1000),
-            inserted_at: now,
-            updated_at: now
-          }
-
-          if fallback?,
-            do: {always, [link | fallback]},
-            else: {[link | always], fallback}
-      end
-    end)
+        if fallback?,
+          do: {always, [link | fallback]},
+          else: {[link | always], fallback}
+    end
   end
 
   # Wikidata values are either scalars (enwiki/jawiki) or arrays; take first element.

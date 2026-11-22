@@ -737,16 +737,7 @@ defmodule Kaguya.Activities do
         |> Repo.all()
         |> Map.new(&{&1.id, &1})
 
-      Map.new(items_by_target, fn {target_id, item} ->
-        ref =
-          case Map.get(entities_by_id, target_id) do
-            nil -> nil
-            entity -> builder.(entity_type, item.entity_id, entity)
-          end
-
-        {{entity_type, item.entity_id}, ref}
-      end)
-      |> Map.reject(fn {_, v} -> is_nil(v) end)
+      build_target_refs(items_by_target, entities_by_id, entity_type, builder)
     end
   end
 
@@ -775,17 +766,25 @@ defmodule Kaguya.Activities do
         |> Repo.all()
         |> Map.new(fn {r, vn} -> {r.id, {r, vn}} end)
 
-      Map.new(items_by_target, fn {target_id, item} ->
-        ref =
-          case Map.get(releases_with_vns, target_id) do
-            nil -> nil
-            {release, vn} -> build_release_ref("release", item.entity_id, release, vn)
-          end
-
-        {{"release", item.entity_id}, ref}
+      build_target_refs(items_by_target, releases_with_vns, "release", fn type,
+                                                                          id,
+                                                                          {release, vn} ->
+        build_release_ref(type, id, release, vn)
       end)
-      |> Map.reject(fn {_, v} -> is_nil(v) end)
     end
+  end
+
+  defp build_target_refs(items_by_target, entities_by_id, entity_type, builder) do
+    Map.new(items_by_target, fn {target_id, item} ->
+      ref =
+        case Map.get(entities_by_id, target_id) do
+          nil -> nil
+          entity -> builder.(entity_type, item.entity_id, entity)
+        end
+
+      {{entity_type, item.entity_id}, ref}
+    end)
+    |> Map.reject(fn {_, ref} -> is_nil(ref) end)
   end
 
   # `target_entity_id` lives in metadata for revision activities; we accept

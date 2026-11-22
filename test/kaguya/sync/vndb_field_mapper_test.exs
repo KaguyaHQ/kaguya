@@ -3,6 +3,66 @@ defmodule Kaguya.Sync.VndbFieldMapperTest do
 
   alias Kaguya.Sync.VndbFieldMapper
 
+  describe "resolve_title/2" do
+    test "each title tier takes priority over every lower tier" do
+      ranked_titles = [
+        {%{"lang" => "en", "official" => true, "title" => "English"}, "English"},
+        {%{"lang" => "ja", "official" => true, "title" => "日本語", "latin" => "Romanized"},
+         "Romanized"},
+        {%{"lang" => "ja", "official" => true, "title" => "日本語"}, "日本語"},
+        {%{"lang" => "fr", "official" => true, "title" => "French"}, "French"},
+        {%{"lang" => "zh", "official" => true, "title" => "中文", "latin" => "Chinese"}, "Chinese"},
+        {%{"lang" => "de", "title" => "German", "latin" => "Unofficial Latin"},
+         "Unofficial Latin"},
+        {%{"lang" => "de", "title" => "Unofficial native"}, "Unofficial native"}
+      ]
+
+      for {{_entry, expected}, index} <- Enum.with_index(ranked_titles) do
+        titles = ranked_titles |> Enum.drop(index) |> Enum.map(&elem(&1, 0))
+        assert VndbFieldMapper.resolve_title(titles, "ja") == expected
+        assert VndbFieldMapper.resolve_title(Enum.reverse(titles), "ja") == expected
+      end
+    end
+
+    test "ties preserve input order and only boolean true marks a title official" do
+      titles = [
+        %{"lang" => "en", "official" => "true", "title" => "Not official"},
+        %{"lang" => "en", "official" => true, "title" => "First official"},
+        %{"lang" => "en", "official" => true, "title" => "Second official"}
+      ]
+
+      assert VndbFieldMapper.resolve_title(titles, "en") == "First official"
+    end
+
+    test "blank romanization preserves the existing native-title fallback rules" do
+      title = %{"lang" => "fr", "official" => true, "title" => "Native"}
+
+      assert VndbFieldMapper.resolve_title([title], "fr") == "Native"
+      assert VndbFieldMapper.resolve_title([Map.put(title, "latin", "")], "fr") == "Native"
+      assert VndbFieldMapper.resolve_title([Map.put(title, "latin", "  ")], "fr") == nil
+      assert VndbFieldMapper.resolve_title([%{"title" => "  "}], "en") == nil
+      assert VndbFieldMapper.resolve_title([], "en") == nil
+      assert VndbFieldMapper.resolve_title(nil, "en") == nil
+    end
+  end
+
+  describe "resolve_latin_title/1" do
+    test "uses Japanese romanization or a Japanese title already in Latin script" do
+      assert VndbFieldMapper.resolve_latin_title([
+               %{"lang" => "en", "latin" => "English"},
+               %{"lang" => "ja", "title" => "日本語", "latin" => "Romanized"}
+             ]) == "Romanized"
+
+      assert VndbFieldMapper.resolve_latin_title([
+               %{"lang" => "ja", "title" => "日本語", "latin" => " "},
+               %{"lang" => "ja", "title" => "STEINS;GATE"}
+             ]) == "STEINS;GATE"
+
+      assert VndbFieldMapper.resolve_latin_title([%{"lang" => "ja", "title" => "日本語"}]) == nil
+      assert VndbFieldMapper.resolve_latin_title(nil) == nil
+    end
+  end
+
   describe "clean_description/1" do
     test "nil returns nil" do
       assert VndbFieldMapper.clean_description(nil) == nil

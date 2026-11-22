@@ -271,7 +271,7 @@ defmodule Kaguya.Sync.DumpSync do
 
   # No-votes NSFW: 0 VNDB votes + sexual/explicit covers (c_sexual_avg >= 150)
   # ID cutoff prevents misclassifying new VNs that simply haven't been voted on yet
-  @no_votes_id_cutoff 56000
+  @no_votes_id_cutoff 56_000
 
   defp classify_no_votes_nsfw(vndb) do
     rows =
@@ -463,8 +463,8 @@ defmodule Kaguya.Sync.DumpSync do
   def parse_vndb_date(val) when is_integer(val) and val >= 99_990_000, do: nil
 
   def parse_vndb_date(yyyymmdd) when is_integer(yyyymmdd) do
-    year = div(yyyymmdd, 10000)
-    month = yyyymmdd |> rem(10000) |> div(100) |> clamp(1, 12)
+    year = div(yyyymmdd, 10_000)
+    month = yyyymmdd |> rem(10_000) |> div(100) |> clamp(1, 12)
     day = rem(yyyymmdd, 100)
 
     # Try actual day first; fall back to day=1 for unknown (99) or invalid days

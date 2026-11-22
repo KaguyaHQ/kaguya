@@ -626,45 +626,47 @@ defmodule Kaguya.Shelves do
   def apply_vote_date_fallback(user_id, import_id) do
     with {:ok, import_record} <- get_import(user_id, import_id),
          {:ok, updates} <- build_vote_date_updates(import_record) do
-      if updates == [] do
-        {:ok, 0}
-      else
-        slugs = Enum.map(updates, & &1.slug)
-        slug_to_date = Map.new(updates, fn %{slug: s, vote_date: d} -> {s, d} end)
+      apply_vote_date_updates(user_id, updates)
+    end
+  end
 
-        # Resolve slugs to canonical VN ids — falls through
-        # `slug_redirects` so a user re-importing with a now-merged or
-        # renamed slug still updates the canonical's reading status.
-        slug_to_vn_id = Kaguya.VisualNovels.resolve_vn_ids_by_slugs(slugs)
+  defp apply_vote_date_updates(_user_id, []), do: {:ok, 0}
 
-        if map_size(slug_to_vn_id) == 0 do
-          {:ok, 0}
-        else
-          # Group by date to minimize queries (most will share same vote_date pattern)
-          by_date =
-            slug_to_vn_id
-            |> Enum.map(fn {slug, vn_id} -> {vn_id, Map.get(slug_to_date, slug)} end)
-            |> Enum.reject(fn {_, date} -> is_nil(date) end)
-            |> Enum.group_by(fn {_, date} -> date end, fn {vn_id, _} -> vn_id end)
+  defp apply_vote_date_updates(user_id, updates) do
+    slugs = Enum.map(updates, & &1.slug)
+    slug_to_date = Map.new(updates, fn %{slug: s, vote_date: d} -> {s, d} end)
 
-          # One query per unique date (typically much fewer than N)
-          count =
-            Enum.reduce(by_date, 0, fn {date, vn_id_list}, acc ->
-              {n, _} =
-                from(rs in ReadingStatus,
-                  where:
-                    rs.user_id == ^user_id and
-                      rs.visual_novel_id in ^vn_id_list and
-                      is_nil(rs.date_finished)
-                )
-                |> Repo.update_all(set: [date_finished: date])
+    # Resolve slugs to canonical VN ids — falls through
+    # `slug_redirects` so a user re-importing with a now-merged or
+    # renamed slug still updates the canonical's reading status.
+    slug_to_vn_id = Kaguya.VisualNovels.resolve_vn_ids_by_slugs(slugs)
 
-              acc + n
-            end)
+    if map_size(slug_to_vn_id) == 0 do
+      {:ok, 0}
+    else
+      # Group by date to minimize queries (most will share same vote_date pattern)
+      by_date =
+        slug_to_vn_id
+        |> Enum.map(fn {slug, vn_id} -> {vn_id, Map.get(slug_to_date, slug)} end)
+        |> Enum.reject(fn {_, date} -> is_nil(date) end)
+        |> Enum.group_by(fn {_, date} -> date end, fn {vn_id, _} -> vn_id end)
 
-          {:ok, count}
-        end
-      end
+      # One query per unique date (typically much fewer than N)
+      count =
+        Enum.reduce(by_date, 0, fn {date, vn_id_list}, acc ->
+          {n, _} =
+            from(rs in ReadingStatus,
+              where:
+                rs.user_id == ^user_id and
+                  rs.visual_novel_id in ^vn_id_list and
+                  is_nil(rs.date_finished)
+            )
+            |> Repo.update_all(set: [date_finished: date])
+
+          acc + n
+        end)
+
+      {:ok, count}
     end
   end
 

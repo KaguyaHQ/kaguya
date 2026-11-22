@@ -937,9 +937,10 @@ defmodule KaguyaWeb.ProfileLive.Show do
 
       Kaguya.AuditLog.log(viewer.id, "admin_delete_user", "user", profile.id, "")
 
-      with {:ok, _} <- Users.delete_user(profile.id) do
-        {:noreply, Phoenix.LiveView.redirect(socket, to: "/")}
-      else
+      case Users.delete_user(profile.id) do
+        {:ok, _} ->
+          {:noreply, Phoenix.LiveView.redirect(socket, to: "/")}
+
         _ ->
           {:noreply,
            socket

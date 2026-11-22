@@ -953,13 +953,15 @@ defmodule KaguyaWeb.DeveloperLive.Edit do
   end
 
   defp drop_index(values, index) do
-    with {position, ""} <- Integer.parse(to_string(index)) do
-      values
-      |> Enum.with_index()
-      |> Enum.reject(fn {_item, current} -> current == position end)
-      |> Enum.map(fn {item, _current} -> item end)
-    else
-      _ -> values
+    case Integer.parse(to_string(index)) do
+      {position, ""} ->
+        values
+        |> Enum.with_index()
+        |> Enum.reject(fn {_item, current} -> current == position end)
+        |> Enum.map(fn {item, _current} -> item end)
+
+      _ ->
+        values
     end
   end
 

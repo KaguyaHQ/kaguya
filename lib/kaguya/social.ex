@@ -1,4 +1,11 @@
 defmodule Kaguya.Social do
+  @moduledoc """
+  Manages user and producer follows, notifications, and follower lists.
+
+  Use this context for follow mutations so relationship rows, counters,
+  notifications, and feed activities are updated together.
+  """
+
   import Ecto.Query
 
   alias Kaguya.Repo
@@ -16,36 +23,44 @@ defmodule Kaguya.Social do
     result =
       Repo.transact(fn ->
         with {:ok, %User{} = followed} <- get_user(followed_id) do
-          cond do
-            follower_id == followed_id ->
-              {:error, "A user cannot follow themselves"}
-
-            follows?(follower_id, followed_id) ->
-              {:ok, :no_activity}
-
-            true ->
-              with {:ok, _user_follow} <- create_user_follow(follower_id, followed_id),
-                   {:ok, _notification} <-
-                     create_notification(%{
-                       user_id: followed_id,
-                       action: :follow,
-                       entity_type: :user,
-                       entity_id: followed_id,
-                       actor_id: follower_id,
-                       idempotency_key: follow_idempotency_key(follower_id, followed_id)
-                     }) do
-                {:ok, followed}
-              end
-          end
+          follow_user_in_transaction(follower_id, followed_id, followed)
         end
       end)
 
-    with {:ok, %User{} = followed} <- result do
-      record_follow_activity(follower_id, followed)
-      {:ok, true}
-    else
-      {:ok, :no_activity} -> {:ok, true}
-      other -> other
+    case result do
+      {:ok, %User{} = followed} ->
+        record_follow_activity(follower_id, followed)
+        {:ok, true}
+
+      {:ok, :no_activity} ->
+        {:ok, true}
+
+      other ->
+        other
+    end
+  end
+
+  defp follow_user_in_transaction(follower_id, followed_id, followed) do
+    cond do
+      follower_id == followed_id ->
+        {:error, "A user cannot follow themselves"}
+
+      follows?(follower_id, followed_id) ->
+        {:ok, :no_activity}
+
+      true ->
+        with {:ok, _user_follow} <- create_user_follow(follower_id, followed_id),
+             {:ok, _notification} <-
+               create_notification(%{
+                 user_id: followed_id,
+                 action: :follow,
+                 entity_type: :user,
+                 entity_id: followed_id,
+                 actor_id: follower_id,
+                 idempotency_key: follow_idempotency_key(follower_id, followed_id)
+               }) do
+          {:ok, followed}
+        end
     end
   end
 

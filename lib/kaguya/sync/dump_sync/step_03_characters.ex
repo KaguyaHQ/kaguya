@@ -102,11 +102,7 @@ defmodule Kaguya.Sync.DumpSync.Characters do
             existing_char_vndb_ids,
             importable_char_ids,
             protected_vndb_ids,
-            0,
-            0,
-            0,
-            0,
-            []
+            %{offset: 0, count: 0, new: 0, updated: 0, ids: []}
           )
 
         Report.record(:characters, new_total, updated_total, new_ids)
@@ -249,30 +245,7 @@ defmodule Kaguya.Sync.DumpSync.Characters do
         target_ids
       )
 
-    valid_rows =
-      Enum.flat_map(rows, fn r ->
-        with char_uuid when not is_nil(char_uuid) <- Map.get(char_mapping, r.id),
-             false <- MapSet.member?(protected_uuids, char_uuid),
-             vn_uuid when not is_nil(vn_uuid) <- Map.get(vn_mapping, r.vid) do
-          [%{char_uuid: char_uuid, vn_uuid: vn_uuid, role: r.role, spoil: r.spoil}]
-        else
-          _ -> []
-        end
-      end)
-      |> Enum.group_by(fn r -> {r.char_uuid, r.vn_uuid} end)
-      |> Enum.map(fn {_key, dupes} -> Enum.min_by(dupes, fn r -> role_priority(r.role) end) end)
-
-    insert_rows =
-      Enum.map(valid_rows, fn r ->
-        %{
-          visual_novel_id: r.vn_uuid,
-          character_id: r.char_uuid,
-          role: VndbFieldMapper.map_character_role(r.role),
-          spoiler_level: r.spoil || 0,
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
+    insert_rows = junction_rows(rows, char_mapping, vn_mapping, protected_uuids, now)
 
     DumpSync.chunked_insert(VNCharacter, insert_rows,
       on_conflict: {:replace, [:role, :spoiler_level, :updated_at]},
@@ -287,11 +260,7 @@ defmodule Kaguya.Sync.DumpSync.Characters do
          existing_ids,
          importable_ids,
          protected_ids,
-         offset,
-         acc,
-         new_acc,
-         updated_acc,
-         ids_acc
+         %{offset: offset} = state
        ) do
     chars =
       DumpSync.query_vndb!(vndb, """
@@ -304,7 +273,7 @@ defmodule Kaguya.Sync.DumpSync.Characters do
       """)
 
     if chars == [] do
-      {acc, new_acc, updated_acc, ids_acc}
+      {state.count, state.new, state.updated, state.ids}
     else
       # Filter to characters that have at least one importable VN link
       chars = Enum.filter(chars, fn c -> MapSet.member?(importable_ids, c.id) end)
@@ -315,11 +284,7 @@ defmodule Kaguya.Sync.DumpSync.Characters do
           existing_ids,
           importable_ids,
           protected_ids,
-          offset + @batch_size,
-          acc,
-          new_acc,
-          updated_acc,
-          ids_acc
+          %{state | offset: offset + @batch_size}
         )
       else
         Logger.info(
@@ -377,11 +342,14 @@ defmodule Kaguya.Sync.DumpSync.Characters do
           existing_ids,
           importable_ids,
           protected_ids,
-          offset + @batch_size,
-          acc + new_count + existing_count,
-          new_acc + new_count,
-          updated_acc + existing_count,
-          ids_acc ++ batch_new_ids
+          %{
+            state
+            | offset: offset + @batch_size,
+              count: state.count + new_count + existing_count,
+              new: state.new + new_count,
+              updated: state.updated + existing_count,
+              ids: state.ids ++ batch_new_ids
+          }
         )
       end
     end
@@ -523,37 +491,7 @@ defmodule Kaguya.Sync.DumpSync.Characters do
     if rows == [] do
       acc
     else
-      valid_rows =
-        Enum.flat_map(rows, fn r ->
-          with char_uuid when not is_nil(char_uuid) <- Map.get(char_mapping, r.id),
-               false <- MapSet.member?(protected_char_uuids, char_uuid),
-               vn_uuid when not is_nil(vn_uuid) <- Map.get(vn_mapping, r.vid) do
-            [%{char_uuid: char_uuid, vn_uuid: vn_uuid, role: r.role, spoil: r.spoil}]
-          else
-            _ -> []
-          end
-        end)
-
-      # Deduplicate: VNDB dump has ~2,600 duplicate (id, vid) pairs with different roles.
-      # Keep the highest-priority role per (character, VN) pair: main > primary > side > appears.
-      deduped =
-        valid_rows
-        |> Enum.group_by(fn r -> {r.char_uuid, r.vn_uuid} end)
-        |> Enum.map(fn {_key, dupes} ->
-          Enum.min_by(dupes, fn r -> role_priority(r.role) end)
-        end)
-
-      insert_rows =
-        Enum.map(deduped, fn r ->
-          %{
-            visual_novel_id: r.vn_uuid,
-            character_id: r.char_uuid,
-            role: VndbFieldMapper.map_character_role(r.role),
-            spoiler_level: r.spoil || 0,
-            inserted_at: now,
-            updated_at: now
-          }
-        end)
+      insert_rows = junction_rows(rows, char_mapping, vn_mapping, protected_char_uuids, now)
 
       count =
         DumpSync.chunked_insert(VNCharacter, insert_rows,
@@ -571,6 +509,33 @@ defmodule Kaguya.Sync.DumpSync.Characters do
         acc + count
       )
     end
+  end
+
+  # Keep the highest-priority role for each character and VN pair.
+  defp junction_rows(rows, char_mapping, vn_mapping, protected_uuids, now) do
+    valid_rows =
+      for row <- rows,
+          char_uuid <- [Map.get(char_mapping, row.id)],
+          not is_nil(char_uuid),
+          not MapSet.member?(protected_uuids, char_uuid),
+          vn_uuid <- [Map.get(vn_mapping, row.vid)],
+          not is_nil(vn_uuid) do
+        %{char_uuid: char_uuid, vn_uuid: vn_uuid, role: row.role, spoil: row.spoil}
+      end
+
+    valid_rows
+    |> Enum.group_by(fn row -> {row.char_uuid, row.vn_uuid} end)
+    |> Enum.map(fn {_key, dupes} -> Enum.min_by(dupes, &role_priority(&1.role)) end)
+    |> Enum.map(fn row ->
+      %{
+        visual_novel_id: row.vn_uuid,
+        character_id: row.char_uuid,
+        role: VndbFieldMapper.map_character_role(row.role),
+        spoiler_level: row.spoil || 0,
+        inserted_at: now,
+        updated_at: now
+      }
+    end)
   end
 
   # ── Per-Batch Data Loading ─────────────────────────────────────────────────

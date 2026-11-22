@@ -723,26 +723,30 @@ defmodule Kaguya.Lists do
         end
       end)
 
-    with {:ok, %List{} = list} <- result do
-      if list.is_public do
-        Activities.record_activity(%{
-          user_id: user_id,
-          action: :liked_list,
-          entity_type: "list",
-          entity_id: list.id,
-          metadata: %{
-            list_name: list.name,
-            list_slug: list.slug,
-            list_username: list_creator_username(list),
-            list_display_name: list_creator_display_name(list)
-          }
-        })
-      end
+    case result do
+      {:ok, %List{} = list} ->
+        if list.is_public do
+          Activities.record_activity(%{
+            user_id: user_id,
+            action: :liked_list,
+            entity_type: "list",
+            entity_id: list.id,
+            metadata: %{
+              list_name: list.name,
+              list_slug: list.slug,
+              list_username: list_creator_username(list),
+              list_display_name: list_creator_display_name(list)
+            }
+          })
+        end
 
-      {:ok, true}
-    else
-      {:ok, :already_liked} -> {:ok, true}
-      error -> error
+        {:ok, true}
+
+      {:ok, :already_liked} ->
+        {:ok, true}
+
+      error ->
+        error
     end
   end
 
@@ -1204,28 +1208,25 @@ defmodule Kaguya.Lists do
   defp normalize_moderation_attrs(_attrs), do: %{}
 
   defp maybe_create_removal_comment(list, attrs) do
-    if truthy?(Map.get(attrs, :add_comment) || Map.get(attrs, "add_comment")) do
-      case Map.get(attrs, :actor_id) || Map.get(attrs, "actor_id") do
-        nil ->
-          :ok
+    add_comment = truthy?(Map.get(attrs, :add_comment) || Map.get(attrs, "add_comment"))
+    actor_id = Map.get(attrs, :actor_id) || Map.get(attrs, "actor_id")
 
-        actor_id ->
-          content =
-            Map.get(attrs, :comment) || Map.get(attrs, "comment") || Map.get(attrs, :reason) ||
-              Map.get(attrs, "reason")
+    if add_comment and not is_nil(actor_id) do
+      content =
+        Map.get(attrs, :comment) || Map.get(attrs, "comment") || Map.get(attrs, :reason) ||
+          Map.get(attrs, "reason")
 
-          if is_binary(content) and String.trim(content) != "" do
-            case Comments.create_comment(vn_list_comment_config_for(list), %{
-                   list_id: list.id,
-                   user_id: actor_id,
-                   content: content
-                 }) do
-              {:ok, _comment} -> :ok
-              {:error, reason} -> {:error, reason}
-            end
-          else
-            :ok
-          end
+      if is_binary(content) and String.trim(content) != "" do
+        case Comments.create_comment(vn_list_comment_config_for(list), %{
+               list_id: list.id,
+               user_id: actor_id,
+               content: content
+             }) do
+          {:ok, _comment} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+      else
+        :ok
       end
     else
       :ok

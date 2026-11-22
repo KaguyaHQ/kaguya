@@ -1688,30 +1688,24 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
     |> maybe_add_range_pill(
       filters,
       params,
-      :released_after_year,
-      :released_before_year,
-      "fromYear",
-      "toYear",
+      {:released_after_year, "fromYear"},
+      {:released_before_year, "toYear"},
       "Year",
       :year
     )
     |> maybe_add_range_pill(
       filters,
       params,
-      :average_rating_gte,
-      :average_rating_lte,
-      "minRating",
-      "maxRating",
+      {:average_rating_gte, "minRating"},
+      {:average_rating_lte, "maxRating"},
       "Rating",
       :rating
     )
     |> maybe_add_range_pill(
       filters,
       params,
-      :ratings_count_gte,
-      :ratings_count_lte,
-      "minRatings",
-      "maxRatings",
+      {:ratings_count_gte, "minRatings"},
+      {:ratings_count_lte, "maxRatings"},
       "Popularity",
       :votes
     )
@@ -1764,10 +1758,8 @@ defmodule KaguyaWeb.BrowseLive.IndexComponents do
          pills,
          filters,
          params,
-         min_key,
-         max_key,
-         min_param,
-         max_param,
+         {min_key, min_param},
+         {max_key, max_param},
          label,
          variant
        ) do

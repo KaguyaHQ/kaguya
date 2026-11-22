@@ -583,31 +583,31 @@ defmodule Kaguya.Characters do
     end
   end
 
+  defp restore_appearances(_character_id, [], _now), do: :ok
+
   defp restore_appearances(character_id, appearances, now) do
-    if appearances != [] do
-      vn_ids = Enum.map(appearances, & &1.visual_novel_id) |> Enum.uniq()
+    vn_ids = Enum.map(appearances, & &1.visual_novel_id) |> Enum.uniq()
 
-      existing =
-        from(v in Kaguya.VisualNovels.VisualNovel, where: v.id in ^vn_ids, select: v.id)
-        |> Repo.all()
-        |> MapSet.new()
+    existing =
+      from(v in Kaguya.VisualNovels.VisualNovel, where: v.id in ^vn_ids, select: v.id)
+      |> Repo.all()
+      |> MapSet.new()
 
-      rows =
-        appearances
-        |> Enum.filter(&MapSet.member?(existing, &1.visual_novel_id))
-        |> Enum.map(fn a ->
-          %{
-            character_id: character_id,
-            visual_novel_id: a.visual_novel_id,
-            role: String.to_existing_atom(a.role),
-            spoiler_level: a.spoiler_level,
-            inserted_at: now,
-            updated_at: now
-          }
-        end)
+    rows =
+      appearances
+      |> Enum.filter(&MapSet.member?(existing, &1.visual_novel_id))
+      |> Enum.map(fn a ->
+        %{
+          character_id: character_id,
+          visual_novel_id: a.visual_novel_id,
+          role: String.to_existing_atom(a.role),
+          spoiler_level: a.spoiler_level,
+          inserted_at: now,
+          updated_at: now
+        }
+      end)
 
-      if rows != [], do: Repo.insert_all(VNCharacter, rows)
-    end
+    if rows != [], do: Repo.insert_all(VNCharacter, rows)
 
     :ok
   end

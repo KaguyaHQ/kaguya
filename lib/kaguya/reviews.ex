@@ -548,12 +548,16 @@ defmodule Kaguya.Reviews do
         end
       end)
 
-    with {:ok, %Review{} = review} <- result do
-      record_liked_review_activity(user_id, review)
-      {:ok, true}
-    else
-      {:ok, :already_liked} -> {:ok, true}
-      error -> error
+    case result do
+      {:ok, %Review{} = review} ->
+        record_liked_review_activity(user_id, review)
+        {:ok, true}
+
+      {:ok, :already_liked} ->
+        {:ok, true}
+
+      error ->
+        error
     end
   end
 
@@ -1037,30 +1041,27 @@ defmodule Kaguya.Reviews do
   defp normalize_moderation_attrs(_attrs), do: %{}
 
   defp maybe_create_removal_comment(review, attrs) do
-    if truthy?(Map.get(attrs, :add_comment) || Map.get(attrs, "add_comment")) do
-      case Map.get(attrs, :actor_id) || Map.get(attrs, "actor_id") do
-        nil ->
-          :ok
+    add_comment = truthy?(Map.get(attrs, :add_comment) || Map.get(attrs, "add_comment"))
+    actor_id = Map.get(attrs, :actor_id) || Map.get(attrs, "actor_id")
 
-        actor_id ->
-          review = Repo.preload(review, [:visual_novel, :user])
+    if add_comment and not is_nil(actor_id) do
+      review = Repo.preload(review, [:visual_novel, :user])
 
-          content =
-            Map.get(attrs, :comment) || Map.get(attrs, "comment") || Map.get(attrs, :reason) ||
-              Map.get(attrs, "reason")
+      content =
+        Map.get(attrs, :comment) || Map.get(attrs, "comment") || Map.get(attrs, :reason) ||
+          Map.get(attrs, "reason")
 
-          if is_binary(content) and String.trim(content) != "" do
-            case Comments.create_comment(vn_review_comment_config(review), %{
-                   vn_review_id: review.id,
-                   user_id: actor_id,
-                   content: content
-                 }) do
-              {:ok, _comment} -> :ok
-              {:error, reason} -> {:error, reason}
-            end
-          else
-            :ok
-          end
+      if is_binary(content) and String.trim(content) != "" do
+        case Comments.create_comment(vn_review_comment_config(review), %{
+               vn_review_id: review.id,
+               user_id: actor_id,
+               content: content
+             }) do
+          {:ok, _comment} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+      else
+        :ok
       end
     else
       :ok

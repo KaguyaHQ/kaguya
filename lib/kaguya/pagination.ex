@@ -1,4 +1,12 @@
 defmodule Kaguya.Pagination do
+  @moduledoc """
+  Offset pagination with bounded page sizes and optional deferred counts.
+
+  `paginate/4` returns items and pagination metadata. With no supplied count,
+  counting is deferred until `resolve_count/1` or `resolve_total_pages/1` is
+  called. Use `Kaguya.CursorPagination` for collections navigated by cursor.
+  """
+
   import Ecto.Query, only: [limit: 2, offset: 2]
   alias Kaguya.Repo
 
@@ -269,10 +277,12 @@ defmodule Kaguya.CursorPagination do
   def decode_cursor("", _), do: nil
 
   def decode_cursor(raw, [t1]) do
-    with {:ok, v1} <- from_token(raw, t1) do
-      v1
-    else
-      _ -> nil
+    case from_token(raw, t1) do
+      {:ok, v1} ->
+        v1
+
+      _ ->
+        nil
     end
   end
 

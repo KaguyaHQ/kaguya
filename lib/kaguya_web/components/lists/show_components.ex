@@ -566,13 +566,15 @@ defmodule KaguyaWeb.Lists.ShowComponents do
   end
 
   defp hex_to_rgba("#" <> hex, alpha) when byte_size(hex) == 6 do
-    with {value, ""} <- Integer.parse(hex, 16) do
-      r = Bitwise.bsr(value, 16) &&& 255
-      g = Bitwise.bsr(value, 8) &&& 255
-      b = value &&& 255
-      "rgba(#{r}, #{g}, #{b}, #{alpha})"
-    else
-      _ -> "rgba(255, 255, 255, #{alpha})"
+    case Integer.parse(hex, 16) do
+      {value, ""} ->
+        r = Bitwise.bsr(value, 16) &&& 255
+        g = Bitwise.bsr(value, 8) &&& 255
+        b = value &&& 255
+        "rgba(#{r}, #{g}, #{b}, #{alpha})"
+
+      _ ->
+        "rgba(255, 255, 255, #{alpha})"
     end
   end
 
