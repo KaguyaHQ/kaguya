@@ -5,7 +5,7 @@ defmodule Kaguya.Discussions.Posts do
 
   alias Kaguya.CursorPagination
   alias Kaguya.Repo
-  alias Kaguya.Discussions.{Comment, Pins, Policy, Post, Query, SideEffects}
+  alias Kaguya.Discussions.{Comment, Pins, Policy, Polls, Post, Query, SideEffects}
   alias Kaguya.Users.User
 
   @hour_ms :timer.hours(1)
@@ -21,15 +21,8 @@ defmodule Kaguya.Discussions.Posts do
           {:error, "Rate limit exceeded. Please try again later."}
 
         {:allow, _} ->
-          now = DateTime.utc_now() |> DateTime.truncate(:second)
-          full_attrs = Map.put(attrs, :user_id, user_id)
-
-          result =
-            Repo.transact(fn ->
-              %Post{last_comment_at: now}
-              |> Post.changeset(full_attrs)
-              |> Repo.insert()
-            end)
+          {poll_options, attrs} = Map.pop(attrs, :poll_options)
+          result = insert_post(Map.put(attrs, :user_id, user_id), poll_options)
 
           with {:ok, post} <- result do
             SideEffects.record_post_activity(user_id, post)
@@ -39,6 +32,21 @@ defmodule Kaguya.Discussions.Posts do
       end
     end
   end
+
+  # The post and its poll, if any, are created together or not at all.
+  defp insert_post(attrs, poll_options) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    Repo.transact(fn ->
+      with {:ok, post} <- %Post{last_comment_at: now} |> Post.changeset(attrs) |> Repo.insert(),
+           {:ok, _count} <- maybe_create_poll(post, poll_options) do
+        {:ok, post}
+      end
+    end)
+  end
+
+  defp maybe_create_poll(_post, nil), do: {:ok, 0}
+  defp maybe_create_poll(post, labels), do: Polls.create_poll(post, labels)
 
   def get_post(id) do
     case Repo.get(Post, id) do

@@ -1124,6 +1124,61 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
     assert has_element?(view, "#discussion-post-#{busy.id}-meta", "replied")
   end
 
+  test "the composer adds a poll and the post page takes and changes votes", %{conn: conn} do
+    author = UserFixtures.insert_user!(username: "poll_author", display_name: "Poll Author")
+    conn = Plug.Test.init_test_session(conn, %{"current_user_id" => author.id})
+
+    {:ok, view, _html} = live(conn, ~p"/discussions")
+    render_click(view, "open_new_post")
+    view |> element("#new-post-add-poll") |> render_click()
+
+    assert has_element?(view, "#new-post-poll-option-0")
+    assert has_element?(view, "#new-post-poll-option-1")
+    refute has_element?(view, "#new-post-poll-option-1-remove")
+
+    view |> element("#new-post-poll-add-option") |> render_click()
+    assert has_element?(view, "#new-post-poll-option-2-remove")
+    view |> element("#new-post-poll-option-2-remove") |> render_click()
+    refute has_element?(view, "#new-post-poll-option-2")
+
+    view
+    |> form("#new-post-form", %{
+      "title" => "Best Key VN?",
+      "content" => "",
+      "poll_options" => ["Clannad", ""]
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#new-post-poll", "at least 2 options")
+
+    {:error, {:live_redirect, %{to: post_path}}} =
+      view
+      |> form("#new-post-form", %{
+        "title" => "Best Key VN?",
+        "content" => "",
+        "poll_options" => ["Clannad", "Air"]
+      })
+      |> render_submit()
+
+    post = Repo.get_by!(Post, title: "Best Key VN?")
+    [clannad, air] = Discussions.poll_for(post.id, nil).options
+
+    {:ok, show, _html} = live(conn, post_path)
+    poll = "#post-#{post.id}-poll"
+
+    assert has_element?(show, "#{poll}-option-#{clannad.id}[aria-pressed=false]", "Clannad")
+    assert has_element?(show, poll, "0 votes")
+
+    show |> element("#{poll}-option-#{clannad.id}") |> render_click()
+    assert has_element?(show, "#{poll}-option-#{clannad.id}[aria-pressed=true]", "100%")
+    assert has_element?(show, poll, "1 vote")
+
+    show |> element("#{poll}-option-#{air.id}") |> render_click()
+    assert has_element?(show, "#{poll}-option-#{air.id}[aria-pressed=true]", "100%")
+    assert has_element?(show, "#{poll}-option-#{clannad.id}", "0%")
+    assert has_element?(show, poll, "1 vote")
+  end
+
   test "VN links on their own line render as cover cards in posts and comments", %{conn: conn} do
     author = UserFixtures.insert_user!(username: "card_author", display_name: "Card Author")
 

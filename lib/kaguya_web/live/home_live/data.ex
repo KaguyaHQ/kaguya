@@ -120,6 +120,7 @@ defmodule KaguyaWeb.HomeLive.Data do
     review_ratings = review_ratings(items)
     liked_reviews = liked_review_ids(items, viewer_id)
     liked_posts = liked_post_ids(items, viewer_id)
+    polls = post_polls(items, viewer_id)
     list_covers = list_covers(items)
 
     Enum.map(items, fn
@@ -134,7 +135,10 @@ defmodule KaguyaWeb.HomeLive.Data do
         {:list, normalize_list(list, Map.get(list_covers, list.id, []))}
 
       %Post{} = post ->
-        {:post, normalize_post(post, MapSet.member?(liked_posts, post.id))}
+        {:post,
+         post
+         |> normalize_post(MapSet.member?(liked_posts, post.id))
+         |> Map.put(:poll, Map.get(polls, post.id))}
     end)
   end
 
@@ -421,6 +425,13 @@ defmodule KaguyaWeb.HomeLive.Data do
       )
       |> MapSet.new()
     end
+  end
+
+  defp post_polls(items, viewer_id) do
+    items
+    |> Enum.filter(&match?(%Post{}, &1))
+    |> Enum.map(& &1.id)
+    |> Discussions.polls_by_post_ids(viewer_id)
   end
 
   defp liked_post_ids(_items, nil), do: MapSet.new()

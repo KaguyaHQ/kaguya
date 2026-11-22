@@ -8,6 +8,7 @@ defmodule KaguyaWeb.Home.FeedComponents do
   import KaguyaWeb.SharedComponents.LoadMore
   import KaguyaWeb.SharedComponents.SegmentedControl
 
+  alias KaguyaWeb.Components.Discussions.Poll
   alias KaguyaWeb.Components.VN.Cards, as: VNCards
   alias KaguyaWeb.Home.ActivityComponents
   alias KaguyaWeb.SharedComponents.LikeButton
@@ -227,6 +228,18 @@ defmodule KaguyaWeb.Home.FeedComponents do
           >
             {@post.content_preview}
           </p>
+
+          <%!-- The home feed only renders for signed-in viewers. --%>
+          <Poll.poll
+            :if={@post[:poll]}
+            id={"feed-post-#{@post.id}-poll"}
+            poll={@post.poll}
+            post_id={@post.id}
+            vote_event="vote_feed_poll"
+            can_vote={!@post.is_locked}
+            signed_in
+            class="mt-3 max-w-[480px]"
+          />
 
           <div class="relative z-10 mt-3 -ml-1.5 flex items-center gap-1">
             <LikeButton.like_button

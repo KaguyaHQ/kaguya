@@ -2,6 +2,7 @@ defmodule KaguyaWeb.DiscussionLive.Index do
   use KaguyaWeb, :live_view
 
   alias Kaguya.Discussions
+  alias Kaguya.Discussions.Polls
   alias KaguyaWeb.Components.Shared.NotFoundPage
   alias KaguyaWeb.DiscussionLive.Data
   alias KaguyaWeb.AuthPromptComponents
@@ -237,6 +238,33 @@ defmodule KaguyaWeb.DiscussionLive.Index do
     {:noreply, socket}
   end
 
+  def handle_event("add_new_post_poll", _params, socket) do
+    {:noreply, update_new_post_poll(socket, fn _ -> List.duplicate("", Polls.min_options()) end)}
+  end
+
+  def handle_event("remove_new_post_poll", _params, socket) do
+    {:noreply, update_new_post_poll(socket, fn _ -> nil end)}
+  end
+
+  def handle_event("add_new_post_poll_option", _params, socket) do
+    {:noreply,
+     update_new_post_poll(socket, fn options ->
+       if length(options) < Polls.max_options(), do: options ++ [""], else: options
+     end)}
+  end
+
+  def handle_event("remove_new_post_poll_option", %{"index" => index}, socket) do
+    {:noreply,
+     update_new_post_poll(socket, fn options ->
+       with {index, ""} <- Integer.parse(index),
+            true <- length(options) > Polls.min_options() do
+         List.delete_at(options, index)
+       else
+         _ -> options
+       end
+     end)}
+  end
+
   def handle_event("submit_new_post", params, %{assigns: %{current_user: nil}} = socket) do
     {:noreply, assign(socket, :new_post_form, normalize_new_post_form(params))}
   end
@@ -383,6 +411,12 @@ defmodule KaguyaWeb.DiscussionLive.Index do
         attrs
       end
 
+    attrs =
+      case form["poll_options"] do
+        options when is_list(options) -> Map.put(attrs, :poll_options, options)
+        _ -> attrs
+      end
+
     socket = assign(socket, new_post_creating: true, new_post_error_message: nil)
 
     case Discussions.create_post(current_user.id, attrs, role: current_user.role) do
@@ -397,6 +431,25 @@ defmodule KaguyaWeb.DiscussionLive.Index do
            new_post_error_message: new_post_error(reason)
          )}
     end
+  end
+
+  # `fun` gets the current options (`[]` when there's no poll) and returns
+  # the new list, or nil to remove the poll.
+  defp update_new_post_poll(socket, fun) do
+    form = socket.assigns.new_post_form
+
+    form =
+      case fun.(Map.get(form, "poll_options", [])) do
+        nil -> Map.delete(form, "poll_options")
+        options -> Map.put(form, "poll_options", options)
+      end
+
+    errors =
+      if socket.assigns.new_post_show_errors?,
+        do: validate_new_post(form, socket.assigns.new_post_selected_target),
+        else: socket.assigns.new_post_errors
+
+    assign(socket, new_post_form: form, new_post_errors: errors)
   end
 
   defp close_new_post(socket) do
@@ -481,11 +534,17 @@ defmodule KaguyaWeb.DiscussionLive.Index do
   defp allowed_target?(_target, _assigns), do: true
 
   defp normalize_new_post_form(params) do
-    %{
+    form = %{
       "title" => Map.get(params, "title", ""),
       "content" => Map.get(params, "content", ""),
       "target_query" => Map.get(params, "target_query", "")
     }
+
+    # The poll's inputs only exist while a poll is added.
+    case Map.get(params, "poll_options") do
+      options when is_list(options) -> Map.put(form, "poll_options", options)
+      _ -> form
+    end
   end
 
   defp validate_new_post(form, selected_target) do
@@ -497,6 +556,16 @@ defmodule KaguyaWeb.DiscussionLive.Index do
     |> maybe_error(:title, String.length(title) < 3, "Title must be at least 3 characters")
     |> maybe_error(:title, String.length(title) > 200, "Title is too long")
     |> maybe_error(:content, String.length(content) > 20_000, "Content is too long")
+    |> validate_poll(form["poll_options"])
+  end
+
+  defp validate_poll(errors, nil), do: errors
+
+  defp validate_poll(errors, options) do
+    case Polls.normalize_options(options) do
+      {:ok, _labels} -> errors
+      {:error, message} -> Map.put_new(errors, :poll, message)
+    end
   end
 
   defp maybe_error(errors, key, true, message), do: Map.put_new(errors, key, message)
@@ -506,6 +575,7 @@ defmodule KaguyaWeb.DiscussionLive.Index do
     form = assigns.new_post_form
 
     String.trim(form["title"] || "") != "" or String.trim(form["content"] || "") != "" or
+      Map.has_key?(form, "poll_options") or
       post_target_identity(assigns.new_post_selected_target) !=
         post_target_identity(assigns.new_post_initial_target)
   end

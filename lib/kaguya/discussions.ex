@@ -9,6 +9,9 @@ defmodule Kaguya.Discussions do
   alias Kaguya.Discussions
 
   defdelegate create_post(user_id, attrs, opts \\ []), to: Discussions.Posts
+  defdelegate vote_poll(post_id, option_id, user_id), to: Discussions.Polls, as: :vote
+  defdelegate poll_for(post_id, viewer_id), to: Discussions.Polls
+  defdelegate polls_by_post_ids(post_ids, viewer_id), to: Discussions.Polls
   defdelegate get_post(id), to: Discussions.Posts
   defdelegate get_post_for_viewer(id, viewer_id, viewer \\ %{}), to: Discussions.Posts
   defdelegate get_post_by_short_id(short_id), to: Discussions.Posts

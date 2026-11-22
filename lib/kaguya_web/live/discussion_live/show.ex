@@ -10,6 +10,7 @@ defmodule KaguyaWeb.DiscussionLive.Show do
   alias Kaguya.Reports
   alias KaguyaWeb.Comments.DiscussionAdapter
   alias KaguyaWeb.CommentsComponent
+  alias KaguyaWeb.Components.Discussions.Poll
   alias KaguyaWeb.Components.Shared.NotFoundPage
   alias KaguyaWeb.DiscussionLive.Data
   alias KaguyaWeb.Markdown.UserContent
@@ -124,6 +125,17 @@ defmodule KaguyaWeb.DiscussionLive.Show do
     else
       _ ->
         {:noreply, put_flash(socket, :error, "Sign in to like discussions.")}
+    end
+  end
+
+  def handle_event("vote_poll", %{"option-id" => option_id}, socket) do
+    with %{id: user_id} <- socket.assigns.current_user,
+         %{id: post_id} = post <- socket.assigns.post,
+         {:ok, poll} <- Discussions.vote_poll(post_id, option_id, user_id) do
+      {:noreply, assign(socket, post: Map.put(post, :poll, poll))}
+    else
+      nil -> {:noreply, put_flash(socket, :error, "Sign in to vote.")}
+      _ -> {:noreply, put_flash(socket, :error, "Could not record your vote.")}
     end
   end
 
@@ -762,6 +774,17 @@ defmodule KaguyaWeb.DiscussionLive.Show do
       <span :if={@post.is_edited} class="text-foreground-tertiary mt-1 inline-block text-xs">
         (edited)
       </span>
+
+      <Poll.poll
+        :if={@post[:poll]}
+        id={"post-#{@post.id}-poll"}
+        poll={@post.poll}
+        post_id={@post.id}
+        vote_event="vote_poll"
+        can_vote={!!@current_user && !@post.is_locked && !@post.hidden_at}
+        signed_in={!!@current_user}
+        class="mt-5 max-w-[560px]"
+      />
 
       <div class="mt-4 flex items-center gap-2">
         <button

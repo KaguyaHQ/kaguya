@@ -271,7 +271,23 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
             </div>
             <KaguyaWeb.SharedComponents.MarkdownEditor.vn_links_panel id="new-post-vn-links" />
 
-            <div class="flex justify-end gap-3 pt-4">
+            <.poll_editor
+              :if={is_list(@form["poll_options"])}
+              options={@form["poll_options"]}
+              error={@visible_errors[:poll]}
+            />
+
+            <div class="flex items-center gap-3 pt-4">
+              <button
+                :if={!is_list(@form["poll_options"])}
+                id="new-post-add-poll"
+                type="button"
+                phx-click="add_new_post_poll"
+                class="hover:text-foreground-primary text-foreground-secondary inline-flex h-9 items-center gap-1.5 rounded-[4px] px-2.5 text-sm transition-colors hover:bg-white/6"
+              >
+                <Lucide.chart_bar_big class="size-4" aria-hidden /> Add poll
+              </button>
+              <span class="flex-1"></span>
               <button
                 type="button"
                 data-dialog-close
@@ -305,6 +321,75 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
     >
       Your changes haven't been saved.
     </.confirm_dialog>
+    """
+  end
+
+  attr :options, :list, required: true
+  attr :error, :string, default: nil
+
+  defp poll_editor(assigns) do
+    assigns =
+      assign(assigns,
+        removable?: length(assigns.options) > Kaguya.Discussions.Polls.min_options(),
+        can_add?: length(assigns.options) < Kaguya.Discussions.Polls.max_options()
+      )
+
+    ~H"""
+    <div
+      id="new-post-poll"
+      role="group"
+      aria-labelledby="new-post-poll-label"
+      class="border-text-field-border mt-3 rounded-lg border p-3"
+    >
+      <div class="mb-2 flex items-center justify-between">
+        <p id="new-post-poll-label" class="text-foreground-primary text-sm font-medium">Poll</p>
+        <button
+          id="new-post-remove-poll"
+          type="button"
+          phx-click="remove_new_post_poll"
+          class="hover:text-foreground-primary text-foreground-tertiary text-xs transition-colors"
+        >
+          Remove poll
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <div :for={{label, index} <- Enum.with_index(@options)} class="flex items-center gap-2">
+          <input
+            id={"new-post-poll-option-#{index}"}
+            name="poll_options[]"
+            value={label}
+            placeholder={"Option #{index + 1}"}
+            maxlength={Kaguya.Discussions.Polls.max_label_length()}
+            autocomplete="off"
+            aria-label={"Poll option #{index + 1}"}
+            class="bg-text-field-bg border-text-field-border placeholder:text-text-field-placeholder-text text-foreground-primary h-9 min-w-0 flex-1 rounded-md border px-3 text-sm focus:border-white/30 focus:outline-hidden"
+          />
+          <button
+            :if={@removable?}
+            id={"new-post-poll-option-#{index}-remove"}
+            type="button"
+            phx-click="remove_new_post_poll_option"
+            phx-value-index={index}
+            aria-label={"Remove option #{index + 1}"}
+            class="hover:text-foreground-primary text-foreground-tertiary flex size-8 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-white/6"
+          >
+            <Lucide.x class="size-4" aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      <button
+        :if={@can_add?}
+        id="new-post-poll-add-option"
+        type="button"
+        phx-click="add_new_post_poll_option"
+        class="hover:text-foreground-primary text-foreground-secondary mt-2 inline-flex items-center gap-1 text-sm transition-colors"
+      >
+        <Lucide.plus class="size-3.5" aria-hidden /> Add option
+      </button>
+      <p :if={@error} class="text-semantic-error mt-2 text-xs">{@error}</p>
+    </div>
     """
   end
 
@@ -709,6 +794,13 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
     </article>
     """
   end
+
+  # Who replied last, once there are replies: "milk replied yesterday".
+  defp last_replier(%{comments_count: count, last_comment_user: %{username: _} = user})
+       when count > 0,
+       do: user
+
+  defp last_replier(_post), do: nil
 
   attr :user, :map, required: true
   attr :class, :any, default: nil

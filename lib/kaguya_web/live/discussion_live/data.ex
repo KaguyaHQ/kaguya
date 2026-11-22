@@ -231,6 +231,7 @@ defmodule KaguyaWeb.DiscussionLive.Data do
       slug: post.slug,
       content: post.content,
       vn_cards: VnLinks.cards_for(post.content),
+      poll: Discussions.poll_for(post.id, current_user && current_user.id),
       hidden_at: post.hidden_at,
       hidden_reason: post.hidden_reason,
       deleted_at: post.deleted_at,

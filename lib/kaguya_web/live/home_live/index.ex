@@ -198,6 +198,19 @@ defmodule KaguyaWeb.HomeLive.Index do
     end
   end
 
+  def handle_event(
+        "vote_feed_poll",
+        %{"post-id" => post_id, "option-id" => option_id},
+        socket
+      ) do
+    with %{id: user_id} <- socket.assigns.current_user,
+         {:ok, poll} <- Discussions.vote_poll(post_id, option_id, user_id) do
+      {:noreply, update(socket, :feed, &put_post_poll(&1, post_id, poll))}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not record your vote.")}
+    end
+  end
+
   defp load_home(socket) do
     case Data.load_initial_page(socket.assigns.current_user) do
       {:ok, payload} ->
@@ -257,6 +270,15 @@ defmodule KaguyaWeb.HomeLive.Index do
 
         item ->
           item
+      end)
+    end)
+  end
+
+  defp put_post_poll(feed, post_id, poll) do
+    update_in(feed.items, fn items ->
+      Enum.map(items, fn
+        {:post, %{id: ^post_id} = post} -> {:post, Map.put(post, :poll, poll)}
+        item -> item
       end)
     end)
   end
