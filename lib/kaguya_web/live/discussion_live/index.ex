@@ -34,6 +34,7 @@ defmodule KaguyaWeb.DiscussionLive.Index do
        new_post_form: @empty_new_post_form,
        new_post_errors: %{},
        new_post_selected_target: nil,
+       new_post_initial_target: nil,
        new_post_target_query: "",
        new_post_target_results: [],
        new_post_target_picker_open: false,
@@ -122,6 +123,7 @@ defmodule KaguyaWeb.DiscussionLive.Index do
        new_post_form: @empty_new_post_form,
        new_post_errors: %{},
        new_post_selected_target: selected_target,
+       new_post_initial_target: selected_target,
        new_post_target_query: "",
        new_post_target_results: target_results("", socket.assigns),
        new_post_target_picker_open: is_nil(selected_target),
@@ -144,7 +146,10 @@ defmodule KaguyaWeb.DiscussionLive.Index do
   end
 
   def handle_event("keep_editing_new_post", _params, socket) do
-    {:noreply, assign(socket, :new_post_discard_open, false)}
+    {:noreply,
+     socket
+     |> assign(:new_post_discard_open, false)
+     |> push_event("kaguya:dialog-open", %{id: "new-post-dialog"})}
   end
 
   def handle_event("open_category_target_picker", _params, socket) do
@@ -401,6 +406,7 @@ defmodule KaguyaWeb.DiscussionLive.Index do
       new_post_form: @empty_new_post_form,
       new_post_errors: %{},
       new_post_selected_target: nil,
+      new_post_initial_target: nil,
       new_post_target_query: "",
       new_post_target_results: [],
       new_post_target_picker_open: false,
@@ -500,8 +506,14 @@ defmodule KaguyaWeb.DiscussionLive.Index do
     form = assigns.new_post_form
 
     String.trim(form["title"] || "") != "" or String.trim(form["content"] || "") != "" or
-      not is_nil(assigns.new_post_selected_target)
+      post_target_identity(assigns.new_post_selected_target) !=
+        post_target_identity(assigns.new_post_initial_target)
   end
+
+  defp post_target_identity(nil), do: nil
+
+  defp post_target_identity(target),
+    do: {to_string(target.category_type), target.entity_id}
 
   defp category_type_atom(value) when is_atom(value), do: value
 

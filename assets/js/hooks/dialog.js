@@ -6,6 +6,9 @@ const Dialog = {
       const command = this.el.getAttribute('data-on-close')
       if (command) this.liveSocket.execJS(this.el, command)
     })
+    this.handleEvent('kaguya:dialog-open', ({id}) => {
+      if (id === this.el.id) this.dialog.open()
+    })
     this.onOpen = event => {
       if (event.target === this.el) this.dialog.open()
     }
