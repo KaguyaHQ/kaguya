@@ -8,6 +8,7 @@ defmodule KaguyaWeb.CharacterLive.Edit do
   alias KaguyaWeb.CharacterLive.Edit.Uploads, as: ImageUploads
   alias KaguyaWeb.Components.Shared.NotFoundPage
   alias KaguyaWeb.SharedComponents.CharacterImage
+  alias Phoenix.LiveView.JS
 
   import KaguyaWeb.UI.Button, only: [button: 1]
   import KaguyaWeb.UI.Checkbox, only: [checkbox: 1]
@@ -327,9 +328,11 @@ defmodule KaguyaWeb.CharacterLive.Edit do
         id="character-editor-help"
         href={~p"/help/characters"}
         target="_blank"
-        class="text-foreground-link text-sm underline underline-offset-2"
+        rel="noopener noreferrer"
+        aria-label="Character editing guide (opens in a new tab)"
+        class="text-foreground-link text-style-body2Regular inline-flex items-center gap-1.5 underline underline-offset-2"
       >
-        Help with characters and appearances (opens in a new tab)
+        Character editing guide <Lucide.external_link class="size-3.5" aria-hidden />
       </.link>
 
       <section
@@ -424,27 +427,27 @@ defmodule KaguyaWeb.CharacterLive.Edit do
                 </div>
               </div>
               <div class="min-w-0 flex-1 space-y-3">
-                <label
-                  for={@uploads.character_image.ref}
-                  class="text-foreground-primary text-style-body2Medium block"
+                <.button
+                  :if={@uploads.character_image.entries == []}
+                  id="character-image-choose"
+                  variant="neutral"
+                  size="small"
+                  class="gap-2"
+                  phx-click={JS.dispatch("click", to: "##{@uploads.character_image.ref}")}
+                  aria-describedby="character-image-hint"
                 >
-                  <%= cond do %>
-                    <% @uploads.character_image.entries != [] -> %>
-                      Selected image
-                    <% @character && @character.primary_image_id -> %>
-                      Replace image
-                    <% true -> %>
-                      Upload image
-                  <% end %>
-                </label>
+                  <Lucide.upload class="size-4" aria-hidden />
+                  {if @character && @character.primary_image_id,
+                    do: "Replace image",
+                    else: "Choose image"}
+                </.button>
                 <.live_file_input
                   upload={@uploads.character_image}
-                  class={[
-                    "border-text-field-border focus-visible:border-text-field-border-focus text-foreground-primary text-style-body2Regular w-full min-w-0 rounded-md border px-3 py-2 file:mr-3 file:border-0 file:bg-transparent file:text-inherit",
-                    @uploads.character_image.entries != [] && "hidden"
-                  ]}
+                  class="hidden"
+                  tabindex="-1"
+                  aria-label="Choose character image"
                 />
-                <p class="text-foreground-secondary text-style-body2Regular">
+                <p id="character-image-hint" class="text-foreground-secondary text-style-body2Regular">
                   JPG, PNG, or WebP. Up to 10 MB.
                 </p>
                 <div :for={entry <- @uploads.character_image.entries} class="space-y-2">
