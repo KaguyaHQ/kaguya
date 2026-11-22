@@ -561,7 +561,10 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
   attr :compact, :boolean, default: false
 
   defp post_list_item(assigns) do
-    assigns = assign(assigns, :live?, recently_active?(assigns.post))
+    assigns =
+      assigns
+      |> assign(:live?, recently_active?(assigns.post))
+      |> assign(:last_replier, last_replier(assigns.post))
 
     ~H"""
     <article
@@ -634,7 +637,10 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
           </p>
 
           <%!-- Object footer: the activity — who's here, how much, how recent --%>
-          <div class="text-foreground-tertiary mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] tabular-nums">
+          <div
+            id={"discussion-post-#{@post.id}-meta"}
+            class="text-foreground-tertiary mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] tabular-nums"
+          >
             <div :if={@post.recent_comment_users != []} class="relative z-10 mr-0.5 flex -space-x-1.5">
               <.link
                 :for={{user, i} <- Enum.with_index(Enum.take(@post.recent_comment_users, 3))}
@@ -653,27 +659,48 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
                 else: "replies"}
             </span>
 
-            <span :if={@post.likes_count > 0} class="text-foreground-quaternary">·</span>
+            <span
+              :if={@post.comments_count > 0 && @post.likes_count > 0}
+              class="text-foreground-quaternary"
+            >
+              ·
+            </span>
             <span :if={@post.likes_count > 0}>
               {format_short_count(@post.likes_count)} {if @post.likes_count == 1,
                 do: "like",
                 else: "likes"}
             </span>
 
-            <span class="text-foreground-quaternary">·</span>
-            <span class="inline-flex items-center gap-1.5">
+            <span
+              :if={@post.comments_count > 0 || @post.likes_count > 0}
+              class="text-foreground-quaternary"
+            >
+              ·
+            </span>
+            <span class="inline-flex min-w-0 items-center gap-1.5">
               <span
                 :if={@live?}
-                class="size-1.5 rounded-full bg-[#34D399]"
+                class="size-1.5 shrink-0 rounded-full bg-[#34D399]"
                 title="Active recently"
                 aria-hidden
               ></span>
+              <span :if={@last_replier} class="inline-flex min-w-0 items-center gap-1">
+                <.link
+                  navigate={"/@#{@last_replier.username}"}
+                  class="hover:text-foreground-primary text-foreground-secondary relative z-10 truncate font-medium transition-colors"
+                >
+                  {@last_replier.display_name}
+                </.link>
+                <span class="shrink-0">replied</span>
+              </span>
               <time
                 datetime={datetime_attr(@post.activity_at)}
                 title={datetime_title(@post.activity_at)}
-                class={["relative z-10", @live? && "text-foreground-secondary font-medium"]}
+                class={["relative z-10 shrink-0", @live? && "text-foreground-secondary font-medium"]}
               >
-                {@post.activity_from_now}
+                {if @last_replier,
+                  do: Map.get(@post, :activity_ago, @post.activity_from_now),
+                  else: @post.activity_from_now}
               </time>
             </span>
           </div>
@@ -700,6 +727,13 @@ defmodule KaguyaWeb.Discussions.IndexComponents do
     </.link>
     """
   end
+
+  # Who replied last, once there are replies: "milk replied yesterday".
+  defp last_replier(%{comments_count: count, last_comment_user: %{username: _} = user})
+       when count > 0,
+       do: user
+
+  defp last_replier(_post), do: nil
 
   attr :user, :map, required: true
   attr :class, :any, default: nil

@@ -191,6 +191,14 @@ defmodule KaguyaWeb.DiscussionLive.Data do
 
   defp entity_for_post(_post, _maps), do: nil
 
+  # Reads after a verb ("milk replied 3h ago", "replied yesterday").
+  defp activity_ago(activity_at) do
+    case SharedTime.calendar_custom(activity_at, with_ago: true) do
+      "Yesterday" -> "yesterday"
+      ago -> ago
+    end
+  end
+
   defp normalize_post(post) do
     activity_at = post.last_comment_at || post.inserted_at
 
@@ -202,6 +210,7 @@ defmodule KaguyaWeb.DiscussionLive.Data do
       likes_count: post.likes_count || 0,
       activity_at: activity_at,
       activity_from_now: SharedTime.calendar_custom(activity_at),
+      activity_ago: activity_ago(activity_at),
       inserted_at: post.inserted_at,
       is_pinned: post.is_pinned,
       is_locked: post.is_locked,

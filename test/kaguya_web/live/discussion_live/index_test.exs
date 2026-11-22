@@ -1093,6 +1093,37 @@ defmodule KaguyaWeb.DiscussionLive.IndexTest do
     refute has_element?(view, "#new-post-topic-results")
   end
 
+  test "the post list says who replied last and drops separators with nothing before them", %{
+    conn: conn
+  } do
+    author = UserFixtures.insert_user!(username: "meta_author", display_name: "Meta Author")
+    replier = UserFixtures.insert_user!(username: "meta_replier", display_name: "Meta Replier")
+
+    {:ok, quiet} =
+      Discussions.create_post(author.id, %{
+        title: "Nobody answered yet",
+        content: "Hello?",
+        category_type: :general
+      })
+
+    {:ok, busy} =
+      Discussions.create_post(author.id, %{
+        title: "Somebody answered",
+        content: "Hello?",
+        category_type: :general
+      })
+
+    {:ok, _comment} =
+      Discussions.create_comment(%{post_id: busy.id, user_id: replier.id, content: "Hi!"})
+
+    {:ok, view, _html} = live(conn, ~p"/discussions")
+
+    refute has_element?(view, "#discussion-post-#{quiet.id}-meta", ~r/^\s*·/)
+    refute has_element?(view, "#discussion-post-#{quiet.id}-meta", "replied")
+    assert has_element?(view, "#discussion-post-#{busy.id}-meta", "Meta Replier")
+    assert has_element?(view, "#discussion-post-#{busy.id}-meta", "replied")
+  end
+
   test "VN links on their own line render as cover cards in posts and comments", %{conn: conn} do
     author = UserFixtures.insert_user!(username: "card_author", display_name: "Card Author")
 
