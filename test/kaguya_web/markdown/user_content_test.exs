@@ -458,9 +458,27 @@ defmodule KaguyaWeb.Markdown.UserContentTest do
       assert html =~ ~s(<a href="/vn/saya-no-uta")
     end
 
+    test "tags inline VN links with their cover for the hover preview" do
+      html = render("I finally read [Saya no Uta](/vn/saya-no-uta) last week", vn_cards: @cards)
+
+      assert html =~
+               ~s(data-vn-preview="https://images.kaguya.io/visual_novels/saya-128w.webp" data-vn-preview-title="Saya no Uta" data-vn-preview-nsfw="1")
+    end
+
+    test "skips the hover preview for cards, covers that are missing, and other links" do
+      cards = render("[Saya no Uta](/vn/saya-no-uta)", vn_cards: @cards)
+      no_cover = render("Read [Muv-Luv](/vn/muv-luv) now", vn_cards: @cards)
+      other = render("See [VNDB](https://vndb.org/v1) too", vn_cards: @cards)
+
+      refute cards =~ "data-vn-preview"
+      refute no_cover =~ "data-vn-preview"
+      refute other =~ "data-vn-preview"
+    end
+
     test "turns VN-only lines into cards and keeps the other lines as text" do
       html =
-        render("Mine so far:\n[Saya no Uta](/vn/saya-no-uta)\n[Muv-Luv](/vn/muv-luv)\nThat is all",
+        render(
+          "Mine so far:\n[Saya no Uta](/vn/saya-no-uta)\n[Muv-Luv](/vn/muv-luv)\nThat is all",
           vn_cards: @cards
         )
 

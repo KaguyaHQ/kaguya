@@ -132,6 +132,16 @@ export function attachVnLinkAutocomplete(textarea, panel) {
     textarea.dispatchEvent(new Event("input", {bubbles: true}))
   }
 
+  // Links alone on a line render as cover cards; links inside a sentence stay
+  // inline (with a hover preview). Say so where the choice is made.
+  const cardHint = () => {
+    const hint = document.createElement("p")
+    hint.className =
+      "text-foreground-tertiary text-style-captionRegular border-border-divider mt-1 border-t px-3 pt-2 pb-1.5"
+    hint.textContent = "On its own line, it shows as a card"
+    return hint
+  }
+
   const render = () => {
     const heading = document.createElement("p")
     heading.className = "text-foreground-tertiary text-style-captionMedium px-3 pt-2.5 pb-1"
@@ -169,6 +179,7 @@ export function attachVnLinkAutocomplete(textarea, panel) {
     }
 
     panel.replaceChildren(heading, body)
+    if (items.length > 0) panel.appendChild(cardHint())
     show()
     if (items.length > 0) highlight(Math.min(active, items.length - 1))
   }

@@ -74,6 +74,7 @@ defmodule KaguyaWeb.Markdown.UserContent do
           ast
           |> walk(spoilers)
           |> render_vn_cards(vn_cards)
+          |> mark_vn_links(vn_cards)
           |> filter(allowed)
           |> Floki.raw_html()
           |> String.replace(@spoiler_escape, "||")
@@ -312,6 +313,33 @@ defmodule KaguyaWeb.Markdown.UserContent do
 
   defp vn_card_cover(_card),
     do: {"span", [{"class", "h-12 w-[34px] shrink-0 rounded bg-white/6"}], []}
+
+  # Inline VN links (those that didn't become cards) carry their cover so the
+  # client can show a hover preview (`assets/js/events/vn_link_preview.js`).
+  defp mark_vn_links(ast, vn_cards) when map_size(vn_cards) == 0, do: ast
+  defp mark_vn_links(ast, vn_cards), do: Enum.map(ast, &mark_vn_link(&1, vn_cards))
+
+  defp mark_vn_link({"div", [{"data-vn-cards", ""} | _], _children} = node, _vn_cards), do: node
+
+  defp mark_vn_link({"a", attrs, children} = node, vn_cards) do
+    {"href", href} = List.keyfind(attrs, "href", 0, {"href", nil})
+
+    case Map.get(vn_cards, VnLinks.slug_from_href(href)) do
+      %{cover_url: url} = card when is_binary(url) ->
+        nsfw = if card.cover_nsfw, do: [{"data-vn-preview-nsfw", "1"}], else: []
+
+        {"a", attrs ++ [{"data-vn-preview", url}, {"data-vn-preview-title", card.title} | nsfw],
+         children}
+
+      _ ->
+        node
+    end
+  end
+
+  defp mark_vn_link({tag, attrs, children}, vn_cards),
+    do: {tag, attrs, mark_vn_links(children, vn_cards)}
+
+  defp mark_vn_link(text, _vn_cards), do: text
 
   # ---------------------------------------------------------------------------
   # Allowlist filter — disallowed wrappers drop, children bubble up.
